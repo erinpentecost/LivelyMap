@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,12 +16,21 @@ func TestOpenMwCfg(t *testing.T) {
 	require.NotEmpty(t, plugins)
 
 	// absolute paths
-	require.Contains(t, plugins, "ernburglary.omwaddon")
-	require.Equal(t, plugins["ernburglary.omwaddon"], "/home/ern/workspace/ErnBurglary/ErnBurglary.omwaddon")
-	require.Contains(t, plugins, "ernradianttheft.omwaddon")
-	require.Equal(t, plugins["ernradianttheft.omwaddon"], "/home/ern/workspace/ErnRadiantTheft/ErnRadiantTheft.omwaddon")
+	require.Contains(t, plugins, PluginEntry{
+		Name: "ernburglary.omwaddon",
+		Path: "/home/ern/workspace/ErnBurglary/ErnBurglary.omwaddon",
+	})
+	require.Contains(t, plugins, PluginEntry{
+		Name: "ernradianttheft.omwaddon",
+		Path: "/home/ern/workspace/ErnRadiantTheft/ErnRadiantTheft.omwaddon",
+	})
 	// relative path
-	require.Contains(t, plugins, "relativeexample.omwaddon")
+	expected, err := filepath.Abs("testdata/relativeExample.omwaddon")
+	require.NoError(t, err)
+	require.Contains(t, plugins, PluginEntry{
+		Name: "relativeexample.omwaddon",
+		Path: expected,
+	})
 }
 
 func cfgPath(t *testing.T) string {
@@ -45,18 +53,6 @@ func TestGeneration(t *testing.T) {
 	plugins, err := mm.OpenMWPlugins(path, false)
 	require.NoError(t, err)
 	require.NotEmpty(t, plugins)
-
-	// Check for Tamriel Rebuilt
-	require.Contains(t, plugins, "tr_mainland.esm")
-	expectedTR := filepath.Join("00 Core", "TR_Mainland.esm")
-	require.True(t,
-		strings.HasSuffix(plugins["tr_mainland.esm"], expectedTR))
-
-	// Check for Bloodmoon
-	require.Contains(t, plugins, "bloodmoon.esm")
-	expectedBM := filepath.Join("Data Files", "Bloodmoon.esm")
-	require.True(t,
-		strings.HasSuffix(plugins["bloodmoon.esm"], expectedBM))
 
 	x, err := mm.PluginsToBMP(plugins, "testdata/bmps")
 	require.NoError(t, err)

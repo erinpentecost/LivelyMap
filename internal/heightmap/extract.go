@@ -1,41 +1,50 @@
 package heightmap
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
 
+// --- Public API types ---
+
+// PluginEntry preserves plugin order: first entry overrides earlier ones (same as openmw.cfg order).
+type PluginEntry struct {
+	Name string // lowercased basename
+	Path string // full path
+}
+
 type MapMaker interface {
-	PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error)
-	OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error)
-	MWPlugins(iniPath string, esmOnly bool) (map[string]string, error)
+	// PluginsToBMP consumes plugins in the order provided by the slice.
+	PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error)
+
+	// Helpers that read config files and return ordered plugin lists
+	OpenMWPlugins(cfgpath string, esmOnly bool) ([]PluginEntry, error)
+	MWPlugins(iniPath string, esmOnly bool) ([]PluginEntry, error)
 }
 
 type concrete struct{}
 
-func (c *concrete) PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
-	return PluginsToBMP(pluginList, bmpDir)
+func (c *concrete) PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error) {
+	return PluginsToBMP(plugins, bmpDir)
 }
 
-func (c *concrete) OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error) {
+func (c *concrete) OpenMWPlugins(cfgpath string, esmOnly bool) ([]PluginEntry, error) {
 	return OpenMWPlugins(cfgpath, esmOnly)
 }
 
-func (c *concrete) MWPlugins(iniPath string, esmOnly bool) (map[string]string, error) {
+func (c *concrete) MWPlugins(iniPath string, esmOnly bool) ([]PluginEntry, error) {
 	return MWPlugins(iniPath, esmOnly)
 }
 
-func NewMapMaker() MapMaker {
-	return &concrete{}
-}
+func NewMapMaker() MapMaker { return &concrete{} }
+
+// --- Internal types used for parsing ---
 
 type Subrecord struct {
 	Tag  string
@@ -54,6 +63,8 @@ type Record struct {
 	Id           string
 }
 
+// --- binary helpers ---
+
 func readUint32LE(b []byte) uint32 {
 	return binary.LittleEndian.Uint32(b)
 }
@@ -62,11 +73,7 @@ func readInt32LE(b []byte) int32 {
 	return int32(binary.LittleEndian.Uint32(b))
 }
 
-func readFloat32LE(b []byte) float32 {
-	var v float32
-	binary.Read(bytes.NewReader(b), binary.LittleEndian, &v)
-	return v
-}
+// --- record parsing ---
 
 func readRecord(f *os.File, tags map[string]bool) (*Record, error) {
 	start, _ := f.Seek(0, io.SeekCurrent)
@@ -167,12 +174,14 @@ func (r *Record) setIdAndName() {
 	}
 }
 
+// --- default WNAM ---
+
 var defaultWNAM []byte
 
 func init() {
 	// default WNAM bytes: 81 bytes of signed -128 -> byte 0x80
 	defaultWNAM = make([]byte, 81)
-	for i := range 81 {
+	for i := 0; i < 81; i++ {
 		defaultWNAM[i] = 0x80
 	}
 }
@@ -180,6 +189,8 @@ func init() {
 func padLength(length, pad int) int {
 	return ((length + pad - 1) / pad) * pad
 }
+
+// --- PixelArray ---
 
 type PixelArray struct {
 	Value    []byte
@@ -189,28 +200,7 @@ type PixelArray struct {
 	Size     int
 }
 
-func newPixelArrayFromRows(rows [][]byte, width, height, padWidth int) *PixelArray {
-	b := make([]byte, 0, height*padWidth)
-	for _, row := range rows {
-		// row length may be width
-		rowBytes := make([]byte, len(row))
-		copy(rowBytes, row)
-		b = append(b, rowBytes...)
-		// pad remainder
-		for i := 0; i < padWidth-width; i++ {
-			b = append(b, 0)
-		}
-	}
-	return &PixelArray{
-		Value:    b,
-		Width:    width,
-		Height:   height,
-		PadWidth: padWidth,
-		Size:     len(b),
-	}
-}
-
-func newPixelArrayFromBytes(b []byte, width, height, padWidth int) *PixelArray {
+func NewPixelArrayFromBytes(b []byte, width, height, padWidth int) *PixelArray {
 	return &PixelArray{
 		Value:    b,
 		Width:    width,
@@ -251,15 +241,18 @@ func (p *PixelArray) impose(pixelArray *PixelArray, x, y int) {
 
 func (p *PixelArray) crop(x, y, width, height int) *PixelArray {
 	cropped := make([]byte, 0, height*width)
-	for h := range height {
+	for h := 0; h < height; h++ {
 		r := p.getRow(x, y+h, width)
 		c := make([]byte, len(r))
 		copy(c, r)
 		cropped = append(cropped, c...)
 	}
-	return newPixelArrayFromBytes(cropped, width, height, width)
+	return NewPixelArrayFromBytes(cropped, width, height, width)
 }
 
+// --- plugin file parsing helpers ---
+
+// parsePluginFile: returns LAND records found in a single plugin file
 func parsePluginFile(path string, tags map[string]bool) (map[string]*Record, error) {
 	records := make(map[string]*Record)
 	f, err := os.Open(path)
@@ -291,32 +284,25 @@ func parsePluginFile(path string, tags map[string]bool) (map[string]*Record, err
 	return records, nil
 }
 
-func recordsFromPlugins(pluginDict map[string]string, recordTags map[string]bool) (map[string]map[string]*Record, error) {
+// recordsFromPlugins now accepts an ordered slice of PluginEntry and preserves that ordering
+func recordsFromPlugins(plugins []PluginEntry, recordTags map[string]bool) (map[string]map[string]*Record, error) {
 	all := make(map[string]map[string]*Record)
 	all["TES3"] = make(map[string]*Record)
-	for _, pluginPath := range pluginDict {
-		f, err := os.Open(pluginPath)
-		if err != nil {
-			return nil, err
-		}
-		f.Close()
-		// parse only requested tags
-		records := make(map[string]*Record)
-		land, err := parsePluginFile(pluginPath, recordTags)
-		if err != nil {
-			return nil, err
-		}
-		maps.Copy(records, land)
-		all["LAND"] = mergeMaps(all["LAND"], records)
-	}
-	return all, nil
-}
+	allLAND := make(map[string]*Record)
 
-func mergeMaps(a, b map[string]*Record) (out map[string]*Record) {
-	out = make(map[string]*Record)
-	maps.Copy(out, a)
-	maps.Copy(out, b)
-	return out
+	for _, p := range plugins {
+		land, err := parsePluginFile(p.Path, recordTags)
+		if err != nil {
+			return nil, err
+		}
+		// IMPORTANT: iterate in plugin order and let later plugins overwrite earlier ones
+		for name, rec := range land {
+			allLAND[name] = rec
+		}
+	}
+
+	all["LAND"] = allLAND
+	return all, nil
 }
 
 func sanitizeLand(records map[string]*Record) map[string]*Record {
@@ -344,8 +330,9 @@ func sanitizeLand(records map[string]*Record) map[string]*Record {
 	return records
 }
 
-func wnamsFromPlugins(pluginDict map[string]string) (map[string]*Subrecord, error) {
-	all, err := recordsFromPlugins(pluginDict, map[string]bool{"LAND": true})
+// WNAMsFromPlugins accepts ordered plugins and returns a map of coords -> WNAM, where later plugins override earlier ones.
+func WNAMsFromPlugins(plugins []PluginEntry) (map[string]*Subrecord, error) {
+	all, err := recordsFromPlugins(plugins, map[string]bool{"LAND": true})
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +348,9 @@ func wnamsFromPlugins(pluginDict map[string]string) (map[string]*Subrecord, erro
 	return WNAMs, nil
 }
 
-func bmpFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
+// --- BMP writer ---
+
+func BMPFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
 	// base header values similar to Python baseBMPheader
 	fileSize := uint32(0x436 + pixelArray.Height*pixelArray.PadWidth)
 	dataOffset := uint32(0x436) // 1078
@@ -387,79 +376,31 @@ func bmpFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
 	if _, err := out.Write([]byte("BM")); err != nil {
 		return err
 	}
-	err = binary.Write(out, binary.LittleEndian, fileSize)
-	if err != nil {
+	if err := binary.Write(out, binary.LittleEndian, fileSize); err != nil {
 		return err
 	}
 	// Reserved
-	err = binary.Write(out, binary.LittleEndian, uint32(0))
-	if err != nil {
+	if err := binary.Write(out, binary.LittleEndian, uint32(0)); err != nil {
 		return err
 	}
-	err = binary.Write(out, binary.LittleEndian, dataOffset)
-	if err != nil {
+	if err := binary.Write(out, binary.LittleEndian, dataOffset); err != nil {
 		return err
 	}
 
 	// BITMAPINFOHEADER (40 bytes)
-	err = binary.Write(out, binary.LittleEndian, infoSize)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, width)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, height)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, planes)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, bitsPerPixel)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, compression)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, imageSize)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, xppm)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, yppm)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, colorsUsed)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(out, binary.LittleEndian, importantColors)
-	if err != nil {
-		return err
+	for _, v := range []interface{}{infoSize, width, height, planes, bitsPerPixel, compression, imageSize, xppm, yppm, colorsUsed, importantColors} {
+		if err := binary.Write(out, binary.LittleEndian, v); err != nil {
+			return err
+		}
 	}
 
 	// Palette: heightPalette as in Python: 128..255 then 0..127 each as RGBA (A=0)
 	palette := make([]byte, 0, 256*4)
 	for i := 128; i < 256; i++ {
-		palette = append(palette, byte(i))
-		palette = append(palette, byte(i))
-		palette = append(palette, byte(i))
-		palette = append(palette, 0)
+		palette = append(palette, byte(i), byte(i), byte(i), 0)
 	}
-	for i := range 128 {
-		palette = append(palette, byte(i))
-		palette = append(palette, byte(i))
-		palette = append(palette, byte(i))
-		palette = append(palette, 0)
+	for i := 0; i < 128; i++ {
+		palette = append(palette, byte(i), byte(i), byte(i), 0)
 	}
 	if len(palette) != 1024 {
 		return fmt.Errorf("palette wrong length %d", len(palette))
@@ -475,12 +416,15 @@ func bmpFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
 	return nil
 }
 
-// PluginsToBMP builds a BMP from the provided plugins files.
-func PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
-	if len(pluginList) == 0 {
+// --- Main builder: PluginsToBMP ---
+
+// PluginsToBMP consumes an ordered slice of PluginEntry. Later entries override earlier ones.
+func PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error) {
+	if len(plugins) == 0 {
 		return 0, errors.New("no plugins provided")
 	}
-	imageWNAMs, err := wnamsFromPlugins(pluginList)
+
+	imageWNAMs, err := WNAMsFromPlugins(plugins)
 	if err != nil {
 		return 0, err
 	}
@@ -521,22 +465,22 @@ func PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
 
 	// Initialize map array to -128 (0x80 bytes)
 	row := make([]byte, padWidth)
-	for i := range width {
+	for i := 0; i < width; i++ {
 		row[i] = 0x80
 	}
 	for i := width; i < padWidth; i++ {
 		row[i] = 0 // padding zeros (as Python added pad bytes)
 	}
 	mapBytes := make([]byte, 0, padWidth*height)
-	for range height {
+	for i := 0; i < height; i++ {
 		mapBytes = append(mapBytes, row...)
 	}
-	mapArray := newPixelArrayFromBytes(mapBytes, width, height, padWidth)
+	mapArray := NewPixelArrayFromBytes(mapBytes, width, height, padWidth)
 
 	// For each cell, impose the WNAM (9x9)
-	for x := range cellWidth {
+	for x := 0; x < cellWidth; x++ {
 		worldX := x + *left
-		for y := range cellHeight {
+		for y := 0; y < cellHeight; y++ {
 			worldY := y + *bottom
 			key := fmt.Sprintf("%d,%d", worldX, worldY)
 			if sub, ok := imageWNAMs[key]; ok {
@@ -547,7 +491,7 @@ func PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
 					copy(tmp, data)
 					data = tmp
 				}
-				cellArray := newPixelArrayFromBytes(data, 9, 9, 9)
+				cellArray := NewPixelArrayFromBytes(data, 9, 9, 9)
 				mapArray.impose(cellArray, x*9, y*9)
 			}
 		}
@@ -555,39 +499,35 @@ func PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
 
 	bmpName := fmt.Sprintf("%d,%d.bmp", *left, *bottom)
 	bmpPath := filepath.Join(bmpDir, bmpName)
-	if err := bmpFromPixelArray(bmpPath, mapArray); err != nil {
+	if err := BMPFromPixelArray(bmpPath, mapArray); err != nil {
 		return 0, err
 	}
 
 	return len(imageWNAMs), nil
 }
 
-// OpenMWPlugins returns openmw plugins files from openmw.cfg.
-func OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error) {
-	contentFiles := make(map[string]string)
-	dataFolders := []string{}
+// --- Config parsing helpers that return ordered plugin slices ---
+
+// OpenMWPlugins returns openmw plugins from openmw.cfg in the order they appear.
+func OpenMWPlugins(cfgpath string, esmOnly bool) ([]PluginEntry, error) {
+	type pending struct {
+		Name string
+		Raw  string
+	}
+	var dataFolders []string
+	var pendingContents []pending
 
 	f, err := os.Open(cfgpath)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-
-	scanner := io.NewSectionReader(f, 0, 1<<63-1)
-	buf := make([]byte, 4096)
-	var fileContent bytes.Buffer
-	for {
-		n, err := scanner.Read(buf)
-		if n > 0 {
-			fileContent.Write(buf[:n])
-		}
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
 	}
-	for line := range strings.SplitSeq(fileContent.String(), "\n") {
+	lines := strings.Split(string(b), "\n")
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -599,11 +539,10 @@ func OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error) {
 		key := strings.ToLower(strings.TrimSpace(parts[0]))
 		val := strings.TrimSpace(parts[1])
 		if key == "data" {
-			path := verifyPath(cfgpath, val)
-			if path != "" {
-				// if path is a dir
-				if info, err := os.Stat(path); err == nil && info.IsDir() {
-					dataFolders = append(dataFolders, path)
+			p := verifyPath(cfgpath, val)
+			if p != "" {
+				if info, err := os.Stat(p); err == nil && info.IsDir() {
+					dataFolders = append(dataFolders, p)
 				}
 			}
 		} else if key == "content" {
@@ -614,38 +553,46 @@ func OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error) {
 				validExts[".omwaddon"] = true
 			}
 			if validExts[ext] {
-				contentFiles[strings.ToLower(val)] = ""
+				pendingContents = append(pendingContents, pending{Name: strings.ToLower(filepath.Base(val)), Raw: val})
 			}
 		}
 	}
 
-	for _, dataPath := range dataFolders {
-		items, _ := os.ReadDir(dataPath)
-		for _, item := range items {
-			lower := strings.ToLower(item.Name())
-			if _, ok := contentFiles[lower]; ok {
-				contentFiles[lower] = filepath.Join(dataPath, item.Name())
+	// resolve pendingContents against dataFolders preserving order
+	var out []PluginEntry
+	for _, pc := range pendingContents {
+		// search folders in order for first match
+		found := false
+		for _, dataPath := range dataFolders {
+			candidate := filepath.Join(dataPath, pc.Raw)
+			if _, err := os.Stat(candidate); err == nil {
+				out = append(out, PluginEntry{Name: strings.ToLower(filepath.Base(pc.Raw)), Path: candidate})
+				found = true
+				break
+			}
+			// also check lowercase matches in directory
+			items, _ := os.ReadDir(dataPath)
+			for _, item := range items {
+				if strings.ToLower(item.Name()) == strings.ToLower(pc.Raw) {
+					out = append(out, PluginEntry{Name: strings.ToLower(item.Name()), Path: filepath.Join(dataPath, item.Name())})
+					found = true
+					break
+				}
+			}
+			if found {
+				break
 			}
 		}
+		// If not found, skip it (mirrors original behavior)
 	}
 
-	for k, v := range contentFiles {
-		if v == "" {
-			delete(contentFiles, k)
-		}
-	}
-	if len(contentFiles) == 0 {
+	if len(out) == 0 {
 		return nil, nil
 	}
-	// normalize map key to plugin basename lower -> full path
-	result := make(map[string]string)
-	for k, v := range contentFiles {
-		result[strings.ToLower(filepath.Base(k))] = v
-	}
-	return result, nil
+	return out, nil
 }
 
-func verifyPath(cfgPath string, s string) string {
+func verifyPath(baseCfgPath, s string) string {
 	s = strings.Trim(s, "\" ")
 	if s == "" {
 		return ""
@@ -653,28 +600,25 @@ func verifyPath(cfgPath string, s string) string {
 	if filepath.IsAbs(s) {
 		return s
 	}
-	absPath, err := filepath.Abs(filepath.Join(filepath.Dir(cfgPath), s))
+	absPath, err := filepath.Abs(filepath.Join(filepath.Dir(baseCfgPath), s))
 	if err != nil {
 		return ""
 	}
 	return absPath
 }
 
-// MWPlugins returns mw plugins files from morrowind.ini.
-func MWPlugins(iniPath string, esmOnly bool) (map[string]string, error) {
-	masters := make(map[string]string)
-	plugins := make(map[string]string)
-	masterDates := map[string]float64{}
-	pluginDates := map[string]float64{}
+// MWPlugins returns plugins listed in morrowind.ini in the order they appear.
+func MWPlugins(iniPath string, esmOnly bool) ([]PluginEntry, error) {
+	masters := []PluginEntry{}
+	plugins := []PluginEntry{}
 
 	dataDir := filepath.Join(filepath.Dir(iniPath), "Data Files")
-	contentFiles := map[string]string{}
-
-	f, err := os.ReadFile(iniPath)
+	b, err := os.ReadFile(iniPath)
 	if err != nil {
 		return nil, err
 	}
-	for line := range strings.SplitSeq(string(f), "\n") {
+	lines := strings.Split(string(b), "\n")
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, ";") {
 			continue
@@ -690,26 +634,23 @@ func MWPlugins(iniPath string, esmOnly bool) (map[string]string, error) {
 			if _, err := os.Stat(pluginPath); err == nil {
 				ext := strings.ToLower(filepath.Ext(val))
 				name := strings.ToLower(val)
-				info, _ := os.Stat(pluginPath)
 				if ext == ".esm" {
-					masters[name] = pluginPath
-					masterDates[name] = float64(info.ModTime().Unix())
+					masters = append(masters, PluginEntry{Name: name, Path: pluginPath})
 				} else if ext == ".esp" {
-					plugins[name] = pluginPath
-					pluginDates[name] = float64(info.ModTime().Unix())
+					plugins = append(plugins, PluginEntry{Name: name, Path: pluginPath})
 				}
 			}
 		}
 	}
-	// order by timestamps: we will just combine masters then plugins
-	contentFiles = make(map[string]string)
-	maps.Copy(contentFiles, masters)
 
+	// combine masters then plugins (same semantic as original)
+	out := make([]PluginEntry, 0, len(masters)+len(plugins))
+	out = append(out, masters...)
 	if !esmOnly {
-		maps.Copy(contentFiles, plugins)
+		out = append(out, plugins...)
 	}
-	if len(contentFiles) == 0 {
+	if len(out) == 0 {
 		return nil, nil
 	}
-	return contentFiles, nil
+	return out, nil
 }
