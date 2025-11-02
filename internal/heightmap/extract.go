@@ -14,14 +14,14 @@ import (
 )
 
 type MapMaker interface {
-	PluginsToBMP(pluginList map[string]string, bmpDir string) (string, error)
+	PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error)
 	OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error)
 	MWPlugins(iniPath string, esmOnly bool) (map[string]string, error)
 }
 
 type concrete struct{}
 
-func (c *concrete) PluginsToBMP(pluginList map[string]string, bmpDir string) (string, error) {
+func (c *concrete) PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
 	return PluginsToBMP(pluginList, bmpDir)
 }
 
@@ -476,16 +476,16 @@ func bmpFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
 }
 
 // PluginsToBMP builds a BMP from the provided plugins files.
-func PluginsToBMP(pluginList map[string]string, bmpDir string) (string, error) {
+func PluginsToBMP(pluginList map[string]string, bmpDir string) (int, error) {
 	if len(pluginList) == 0 {
-		return "", errors.New("no plugins provided")
+		return 0, errors.New("no plugins provided")
 	}
 	imageWNAMs, err := wnamsFromPlugins(pluginList)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 	if len(imageWNAMs) == 0 {
-		return "", errors.New("Couldn't find any LAND records in the provided plugin(s).")
+		return 0, errors.New("Couldn't find any LAND records in the provided plugin(s).")
 	}
 
 	// Determine bounding rectangle
@@ -511,7 +511,7 @@ func PluginsToBMP(pluginList map[string]string, bmpDir string) (string, error) {
 		}
 	}
 	if left == nil || right == nil || top == nil || bottom == nil {
-		return "", errors.New("no valid LAND coordinates found")
+		return 0, errors.New("no valid LAND coordinates found")
 	}
 	cellWidth := *right - *left + 1
 	cellHeight := *top - *bottom + 1
@@ -556,9 +556,10 @@ func PluginsToBMP(pluginList map[string]string, bmpDir string) (string, error) {
 	bmpName := fmt.Sprintf("%d,%d.bmp", *left, *bottom)
 	bmpPath := filepath.Join(bmpDir, bmpName)
 	if err := bmpFromPixelArray(bmpPath, mapArray); err != nil {
-		return "", err
+		return 0, err
 	}
-	return fmt.Sprintf("Converted %d WNAMs to BMP at \"%s\"", len(imageWNAMs), bmpPath), nil
+
+	return len(imageWNAMs), nil
 }
 
 // OpenMWPlugins returns openmw plugins files from openmw.cfg.
@@ -598,7 +599,7 @@ func OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error) {
 		key := strings.ToLower(strings.TrimSpace(parts[0]))
 		val := strings.TrimSpace(parts[1])
 		if key == "data" {
-			path := verifyPath(val)
+			path := verifyPath(cfgpath, val)
 			if path != "" {
 				// if path is a dir
 				if info, err := os.Stat(path); err == nil && info.IsDir() {
@@ -644,15 +645,19 @@ func OpenMWPlugins(cfgpath string, esmOnly bool) (map[string]string, error) {
 	return result, nil
 }
 
-func verifyPath(s string) string {
+func verifyPath(cfgPath string, s string) string {
 	s = strings.Trim(s, "\" ")
 	if s == "" {
 		return ""
 	}
-	if _, err := os.Stat(s); err == nil {
+	if filepath.IsAbs(s) {
 		return s
 	}
-	return ""
+	absPath, err := filepath.Abs(filepath.Join(filepath.Dir(cfgPath), s))
+	if err != nil {
+		return ""
+	}
+	return absPath
 }
 
 // MWPlugins returns mw plugins files from morrowind.ini.
