@@ -418,6 +418,8 @@ func BMPFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
 
 // --- Main builder: PluginsToBMP ---
 
+const resolution = 9
+
 // PluginsToBMP consumes an ordered slice of PluginEntry. Later entries override earlier ones.
 func PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error) {
 	if len(plugins) == 0 {
@@ -459,8 +461,8 @@ func PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error) {
 	}
 	cellWidth := *right - *left + 1
 	cellHeight := *top - *bottom + 1
-	width := cellWidth * 9
-	height := cellHeight * 9
+	width := cellWidth * resolution
+	height := cellHeight * resolution
 	padWidth := padLength(width, 4)
 
 	// Initialize map array to -128 (0x80 bytes)
@@ -491,13 +493,13 @@ func PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error) {
 					copy(tmp, data)
 					data = tmp
 				}
-				cellArray := NewPixelArrayFromBytes(data, 9, 9, 9)
-				mapArray.impose(cellArray, x*9, y*9)
+				cellArray := NewPixelArrayFromBytes(data, resolution, resolution, resolution)
+				mapArray.impose(cellArray, x*resolution, y*resolution)
 			}
 		}
 	}
 
-	bmpName := fmt.Sprintf("%d,%d.bmp", *left, *bottom)
+	bmpName := fmt.Sprintf("%d,%d_%d,%d.bmp", *left, *bottom, *right, *top)
 	bmpPath := filepath.Join(bmpDir, bmpName)
 	if err := BMPFromPixelArray(bmpPath, mapArray); err != nil {
 		return 0, err

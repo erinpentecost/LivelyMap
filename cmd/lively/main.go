@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/erinpentecost/LivelyMap/internal/heightmap"
 )
 
 func main() {
@@ -31,14 +33,19 @@ func main() {
 	i := *inPath
 	b := *bmpDir
 
+	mm := heightmap.NewMapMaker()
+
 	// Determine content files mapping
-	contentFiles := make(map[string]string)
+	contentFiles := []heightmap.PluginEntry{}
 	ext := strings.ToLower(filepath.Ext(i))
 	if ext == ".esp" || ext == ".esm" || ext == ".omwaddon" {
 		base := strings.ToLower(filepath.Base(i))
-		contentFiles[base] = i
+		contentFiles = append(contentFiles, heightmap.PluginEntry{
+			Name: base,
+			Path: i,
+		})
 	} else if ext == ".cfg" {
-		res, err := openMWPlugins(i, *esmFlag)
+		res, err := mm.OpenMWPlugins(i, *esmFlag)
 		if err != nil {
 			fmt.Println("Error reading cfg:", err)
 			os.Exit(1)
@@ -49,7 +56,7 @@ func main() {
 		}
 		contentFiles = res
 	} else if ext == ".ini" {
-		res, err := MWPlugins(i, *esmFlag)
+		res, err := mm.MWPlugins(i, *esmFlag)
 		if err != nil {
 			fmt.Println("Error reading ini:", err)
 			os.Exit(1)
@@ -72,7 +79,7 @@ func main() {
 		}
 	}
 
-	msg, err := pluginsToBMP(contentFiles, b)
+	msg, err := mm.PluginsToBMP(contentFiles, b)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
