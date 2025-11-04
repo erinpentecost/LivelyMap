@@ -1,15 +1,25 @@
 package heightmap
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	_ "embed"
+
+	"golang.org/x/image/bmp"
 )
+
+//go:embed ramp.bmp
+var rampFile []byte
 
 // --- Public API types ---
 
@@ -348,23 +358,23 @@ func WNAMsFromPlugins(plugins []PluginEntry) (map[string]*Subrecord, error) {
 	return WNAMs, nil
 }
 
-// --- BMP writer ---
+// BMPFromPixelArray writes an 8-bit BMP preserving the original palette ordering
+// used by the previous manual-writer (128..255 then 0..127). That palette is
+// equivalent to mapping each stored byte b -> (b + 128) & 0xFF for display.
+func BMPFromPixelArrayOldest(bmpPath string, pixelArray *PixelArray) error {
+	img := image.NewGray(image.Rect(0, 0, pixelArray.Width, pixelArray.Height))
 
-func BMPFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
-	// base header values similar to Python baseBMPheader
-	fileSize := uint32(0x436 + pixelArray.Height*pixelArray.PadWidth)
-	dataOffset := uint32(0x436) // 1078
-	infoSize := uint32(0x28)
-	width := uint32(pixelArray.Width)
-	height := uint32(pixelArray.Height)
-	planes := uint16(1)
-	bitsPerPixel := uint16(8)
-	compression := uint32(0)
-	imageSize := uint32(pixelArray.Height * pixelArray.PadWidth)
-	xppm := uint32(0x0EC4)
-	yppm := uint32(0x0EC4)
-	colorsUsed := uint32(0x0100)
-	importantColors := uint32(0x0100)
+	// Copy pixels, flipping vertically so the image isn't upside-down.
+	// Also remap palette index: displayed = (stored + 128) & 0xFF
+	for y := 0; y < pixelArray.Height; y++ {
+		srcY := pixelArray.Height - 1 - y // BMPs are bottom-up in pixel arrays we wrote
+		row := pixelArray.getRow(0, srcY, 0)
+		for x := 0; x < pixelArray.Width; x++ {
+			stored := row[x]
+			display := byte((int(stored) + 128) & 0xFF)
+			img.SetGray(x, y, color.Gray{Y: display})
+		}
+	}
 
 	out, err := os.Create(bmpPath)
 	if err != nil {
@@ -372,51 +382,111 @@ func BMPFromPixelArray(bmpPath string, pixelArray *PixelArray) error {
 	}
 	defer out.Close()
 
-	// BITMAPFILEHEADER (14 bytes)
-	if _, err := out.Write([]byte("BM")); err != nil {
-		return err
-	}
-	if err := binary.Write(out, binary.LittleEndian, fileSize); err != nil {
-		return err
-	}
-	// Reserved
-	if err := binary.Write(out, binary.LittleEndian, uint32(0)); err != nil {
-		return err
-	}
-	if err := binary.Write(out, binary.LittleEndian, dataOffset); err != nil {
-		return err
-	}
+	return bmp.Encode(out, img)
+}
 
-	// BITMAPINFOHEADER (40 bytes)
-	for _, v := range []interface{}{infoSize, width, height, planes, bitsPerPixel, compression, imageSize, xppm, yppm, colorsUsed, importantColors} {
-		if err := binary.Write(out, binary.LittleEndian, v); err != nil {
-			return err
+// BMPFromPixelArray writes a BMP from a PixelArray, optionally using a color ramp BMP.
+//
+// If rampPath is empty, it uses the original grayscale mapping (b -> (b+128)&0xFF).
+// If rampPath points to a 1x256 BMP, its pixels are used as a color gradient where
+// the leftmost pixel is the lowest elevation and the rightmost is the highest.
+func BMPFromPixelArrayOld(bmpPath string, pixelArray *PixelArray, recolor bool) error {
+	var ramp [256]color.Color
+
+	if recolor {
+		rampImg, err := bmp.Decode(bytes.NewReader(rampFile))
+		if err != nil {
+			return fmt.Errorf("failed to decode color ramp BMP: %w", err)
+		}
+
+		b := rampImg.Bounds()
+		if b.Dy() != 1 || b.Dx() < 256 {
+			return fmt.Errorf("invalid color ramp dimensions (expected 1x256, got %dx%d)", b.Dx(), b.Dy())
+		}
+
+		for x := 0; x < 256; x++ {
+			ramp[x] = rampImg.At(x, 0)
+		}
+	} else {
+		// Default grayscale ramp (mirroring the old 128..255 then 0..127 palette)
+		for i := 0; i < 256; i++ {
+			v := byte((i + 128) & 0xFF)
+			ramp[i] = color.Gray{Y: v}
 		}
 	}
 
-	// Palette: heightPalette as in Python: 128..255 then 0..127 each as RGBA (A=0)
-	palette := make([]byte, 0, 256*4)
-	for i := 128; i < 256; i++ {
-		palette = append(palette, byte(i), byte(i), byte(i), 0)
-	}
-	for i := 0; i < 128; i++ {
-		palette = append(palette, byte(i), byte(i), byte(i), 0)
-	}
-	if len(palette) != 1024 {
-		return fmt.Errorf("palette wrong length %d", len(palette))
-	}
-	if _, err := out.Write(palette); err != nil {
-		return err
+	img := image.NewRGBA(image.Rect(0, 0, pixelArray.Width, pixelArray.Height))
+
+	// Copy pixels, flipping vertically
+	for y := 0; y < pixelArray.Height; y++ {
+		srcY := pixelArray.Height - 1 - y
+		row := pixelArray.getRow(0, srcY, 0)
+		for x := 0; x < pixelArray.Width; x++ {
+			stored := int(row[x])
+			displayIdx := (stored + 128) & 0xFF
+			img.Set(x, y, ramp[displayIdx])
+		}
 	}
 
-	// Pixel data (already includes padding per row)
-	if _, err := out.Write(pixelArray.Value); err != nil {
+	out, err := os.Create(bmpPath)
+	if err != nil {
 		return err
 	}
-	return nil
+	defer out.Close()
+
+	return bmp.Encode(out, img)
 }
 
-// --- Main builder: PluginsToBMP ---
+// BMPFromPixelArray writes a BMP from a PixelArray.
+// If rampPath is provided, it uses the 1×256 BMP there as a color ramp.
+// If not, it uses the original grayscale mapping (b → (b+128)&0xFF, lowest=black).
+func BMPFromPixelArray(bmpPath string, pixelArray *PixelArray, recolor bool) error {
+	var ramp [256]color.Color
+
+	// Load optional color ramp BMP
+	if recolor {
+		rampImg, err := bmp.Decode(bytes.NewReader(rampFile))
+		if err != nil {
+			return fmt.Errorf("failed to decode color ramp BMP: %w", err)
+		}
+		b := rampImg.Bounds()
+		if b.Dy() != 1 || b.Dx() < 256 {
+			return fmt.Errorf("invalid color ramp dimensions (expected 1x256, got %dx%d)", b.Dx(), b.Dy())
+		}
+		for x := 0; x < 256; x++ {
+			ramp[x] = rampImg.At(x, 0)
+		}
+	} else {
+		// Default grayscale ramp that preserves the original palette behavior:
+		// The original wrote palette entries 128..255 (bright) then 0..127 (dark),
+		// so we map stored byte b -> (b + 128) % 256 for display intensity.
+		for i := 0; i < 256; i++ {
+			//display := byte((i + 128) & 0xFF)
+			ramp[i] = color.Gray{Y: byte(i)}
+		}
+	}
+
+	img := image.NewRGBA(image.Rect(0, 0, pixelArray.Width, pixelArray.Height))
+
+	// Copy pixels, flipping vertically, and applying palette mapping
+	for y := 0; y < pixelArray.Height; y++ {
+		srcY := pixelArray.Height - 1 - y // invert vertically to match original BMPs
+		row := pixelArray.getRow(0, srcY, 0)
+		for x := 0; x < pixelArray.Width; x++ {
+			stored := int(row[x])
+			displayIdx := (stored + 128) & 0xFF
+			img.Set(x, y, ramp[displayIdx])
+		}
+	}
+
+	out, err := os.Create(bmpPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	return bmp.Encode(out, img)
+}
 
 const resolution = 9
 
@@ -499,9 +569,15 @@ func PluginsToBMP(plugins []PluginEntry, bmpDir string) (int, error) {
 		}
 	}
 
-	bmpName := fmt.Sprintf("%d,%d_%d,%d.bmp", *left, *bottom, *right, *top)
+	bmpName := fmt.Sprintf("color_%d,%d_%d,%d.bmp", *left, *bottom, *right, *top)
 	bmpPath := filepath.Join(bmpDir, bmpName)
-	if err := BMPFromPixelArray(bmpPath, mapArray); err != nil {
+	if err := BMPFromPixelArray(bmpPath, mapArray, true); err != nil {
+		return 0, err
+	}
+
+	hbmpName := fmt.Sprintf("height_%d,%d_%d,%d.bmp", *left, *bottom, *right, *top)
+	hbmpPath := filepath.Join(bmpDir, hbmpName)
+	if err := BMPFromPixelArray(hbmpPath, mapArray, false); err != nil {
 		return 0, err
 	}
 

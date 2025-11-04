@@ -21,11 +21,19 @@ local util = require('openmw.util')
 local core = require('openmw.core')
 local interfaces = require("openmw.interfaces")
 local pself = require("openmw.self")
+local aux_util = require('openmw_aux.util')
 
-local lastCellid
-local cellX
-local cellY
-local enterTime
+local storage = require('openmw.storage')
+local stored = storage.playerSection('MOD_NAME')
+stored:setLifeTime(storage.LIFE_TIME.Persistent)
+local diskLog = {}
+
+local persist = {
+    lastCellid = nil,
+    cellX = nil,
+    cellY = nil,
+    enterTime = nil
+}
 
 local function escape(str)
     return string.gsub(str, "([,%^%%%|'\"]+)", "_")
@@ -34,58 +42,63 @@ end
 local playerName = escape(pself.type.records[pself.recordId].name)
 
 local function log(tokenType, data)
-    print(MOD_NAME ..
-        ":" .. math.ceil(core.getGameTime()) .. "," .. tokenType .. "," .. playerName .. "," .. tostring(data))
+    local line = MOD_NAME ..
+        ":" .. math.ceil(core.getGameTime()) .. "," .. tokenType .. "," .. playerName .. "," .. tostring(data)
+    print(line)
+    table.insert(diskLog, math.ceil(core.getGameTime()) .. "," .. tokenType .. "," .. tostring(data))
 end
 
 local function onSave()
-    return {
-        lastCellid = lastCellid,
-        enterTime = enterTime,
-        cellX = cellX,
-        cellY = cellY,
-    }
+    print(aux_util.deepToString(diskLog))
+    stored:reset("LOG", diskLog)
+    return persist
 end
 
 local function onLoad(data)
-    log("START_SESSION")
+    -- load working data
     if data ~= nil then
-        lastCellid = data.lastCellid
-        enterTime = data.enterTime
-        cellX = data.cellX
-        cellY = data.cellY
+        persist = data
+    end
+    -- load long-term data
+    diskLog = stored:asTable()
+    if diskLog == nil then
+        diskLog = {}
+    end
+    print(aux_util.deepToString(diskLog))
+end
+
+local function initPersist(now)
+    persist.enterTime = now
+    persist.lastCellid = pself.cell.id
+    if pself.cell.isExterior then
+        persist.cellX = pself.cell.gridX
+        persist.cellY = pself.cell.gridY
+    else
+        persist.cellX = nil
+        persist.cellY = nil
     end
 end
 
 local function onUpdate(dt)
     local now = core.getGameTime()
 
-    if lastCellid == nil then
-        lastCellid = pself.cell.id
-        enterTime = now
+    if persist.lastCellid == nil then
+        initPersist(now)
     end
-    if lastCellid ~= pself.cell.id then
-        local timeSpent = math.ceil(now - enterTime)
-        if cellX ~= nil then
+    if persist.lastCellid ~= pself.cell.id then
+        local timeSpent = math.ceil(now - persist.enterTime)
+        if persist.cellX ~= nil then
             -- this is an exterior
-            log("TRACK_EXTERIOR",
-                tostring(timeSpent) .. "," .. tostring(cellX) .. "," .. tostring(cellY) .. ",\"" ..
-                lastCellid .. "\"")
+            log("EXTERIOR",
+                tostring(timeSpent) .. "," .. tostring(persist.cellX) .. "," .. tostring(persist.cellY) .. ",\"" ..
+                persist.lastCellid .. "\"")
         else
-            log("TRACK_INTERIOR", tostring(timeSpent) .. ",\"" ..
-                lastCellid .. "\"")
+            log("INTERIOR", tostring(timeSpent) .. ",\"" ..
+                persist.lastCellid .. "\"")
         end
 
         -- set up for next move
-        enterTime = now
-        lastCellid = pself.cell.id
-        if pself.cell.isExterior then
-            cellX = pself.cell.gridX
-            cellY = pself.cell.gridY
-        else
-            cellX = nil
-            cellY = nil
-        end
+        initPersist(now)
     end
 end
 
