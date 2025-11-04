@@ -86,7 +86,6 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 		// https://github.com/OpenMW/openmw/blob/master/components/esm/fourcc.hpp#L6
 		const REC_PlayerStorage = 0x4D41554C
 		if binary.LittleEndian.Uint32(recType[:]) == REC_PlayerStorage {
-			fmt.Printf("LUAM raw: %v\n", data)
 			// Found the playerStorage block
 			// The data is not compressed, so we can just use it as is.
 			raw := data
@@ -105,8 +104,8 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 				return nil, fmt.Errorf("reading numSections: %w", err)
 			}
 			for i := uint32(0); i < numSections; i++ {
-				// Read section name length (uint32)
-				var nameLen uint32
+				// Read section name (uint16 length-prefixed string)
+				var nameLen uint16
 				if err := binary.Read(br, binary.LittleEndian, &nameLen); err != nil {
 					return nil, fmt.Errorf("reading nameLen section #%d: %w", i, err)
 				}
