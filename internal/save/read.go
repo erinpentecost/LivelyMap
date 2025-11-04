@@ -2,7 +2,6 @@ package save
 
 import (
 	"bytes"
-	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -32,21 +31,37 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 	if string(magic[:]) != "TES3" {
 		return nil, fmt.Errorf("unexpected magic: %q", magic)
 	}
-	// Read version (major/minor) from header
+
+	// TES3 is a record too, we need to read its header.
+	var recSize uint32
+	if err := binary.Read(f, binary.LittleEndian, &recSize); err != nil {
+		return nil, fmt.Errorf("reading recSize: %w", err)
+	}
+	if _, err := f.Seek(8, io.SeekCurrent); err != nil {
+		return nil, fmt.Errorf("seeking past junk and flags: %w", err)
+	}
+
+	// Read the TES3 record data.
+	data := make([]byte, recSize)
+	if _, err := io.ReadFull(f, data); err != nil {
+		return nil, fmt.Errorf("reading TES3 record data: %w", err)
+	}
+
+	// Now we can parse the version from the data.
+	reader := bytes.NewReader(data)
 	var versionMajor, versionMinor uint16
-	if err := binary.Read(f, binary.LittleEndian, &versionMajor); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &versionMajor); err != nil {
 		return nil, fmt.Errorf("read versionMajor: %w", err)
 	}
-	if err := binary.Read(f, binary.LittleEndian, &versionMinor); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &versionMinor); err != nil {
 		return nil, fmt.Errorf("read versionMinor: %w", err)
 	}
 	// Optionally verify versionMajor/minor match 0.49
 
 	// 2. Loop through records until we find the “playerStorage” record
 	for {
-		// Each record: uint32 type, uint32 size, then data (size bytes).
-		var recType uint32
-		if err := binary.Read(f, binary.LittleEndian, &recType); err != nil {
+		var recType [4]byte
+		if _, err := io.ReadFull(f, recType[:]); err != nil {
 			if err == io.EOF {
 				break
 			}
@@ -56,53 +71,42 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 		if err := binary.Read(f, binary.LittleEndian, &recSize); err != nil {
 			return nil, fmt.Errorf("reading recSize: %w", err)
 		}
-
+		if _, err := f.Seek(8, io.SeekCurrent); err != nil {
+			return nil, fmt.Errorf("seeking past junk and flags: %w", err)
+		}
 		data := make([]byte, recSize)
 		if _, err := io.ReadFull(f, data); err != nil {
 			return nil, fmt.Errorf("reading record data for type %d: %w", recType, err)
 		}
 
+		fmt.Printf("recType: %s\n", string(recType[:]))
+
 		// Compare recType against the constant for playerStorage
 		// this is calculated from running the fourcc macro on "LUAM":
 		// https://github.com/OpenMW/openmw/blob/master/components/esm/fourcc.hpp#L6
 		const REC_PlayerStorage = 0x4D41554C
-		if recType == REC_PlayerStorage {
+		if binary.LittleEndian.Uint32(recType[:]) == REC_PlayerStorage {
+			fmt.Printf("LUAM raw: %v\n", data)
 			// Found the playerStorage block
-			// Possibly compressed — check header inside data
-			reader := bytes.NewReader(data)
-			// Example: read a bool or uint8 indicating compression
-			var compressedFlag uint8
-			if err := binary.Read(reader, binary.LittleEndian, &compressedFlag); err != nil {
-				return nil, fmt.Errorf("reading compressedFlag: %w", err)
-			}
-			var raw []byte
-			if compressedFlag != 0 {
-				// decompress using zlib
-				zr, err := zlib.NewReader(reader)
-				if err != nil {
-					return nil, fmt.Errorf("zlib.NewReader: %w", err)
-				}
-				defer zr.Close()
-				raw, err = io.ReadAll(zr)
-				if err != nil {
-					return nil, fmt.Errorf("reading decompressed data: %w", err)
-				}
-			} else {
-				raw, err = io.ReadAll(reader)
-				if err != nil {
-					return nil, fmt.Errorf("reading uncompressed data: %w", err)
-				}
-			}
+			// The data is not compressed, so we can just use it as is.
+			raw := data
 
 			// Now raw contains the storage sections. Parse them:
 			br := bytes.NewReader(raw)
+			var magic [4]byte
+			if _, err := io.ReadFull(br, magic[:]); err != nil {
+				return nil, fmt.Errorf("reading LUAW magic: %w", err)
+			}
+			if string(magic[:]) != "LUAW" {
+				return nil, fmt.Errorf("unexpected LUAW magic: %q", magic)
+			}
 			var numSections uint32
 			if err := binary.Read(br, binary.LittleEndian, &numSections); err != nil {
 				return nil, fmt.Errorf("reading numSections: %w", err)
 			}
 			for i := uint32(0); i < numSections; i++ {
-				// Read section name length (uint16)
-				var nameLen uint16
+				// Read section name length (uint32)
+				var nameLen uint32
 				if err := binary.Read(br, binary.LittleEndian, &nameLen); err != nil {
 					return nil, fmt.Errorf("reading nameLen section #%d: %w", i, err)
 				}
@@ -129,7 +133,6 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 					}, nil
 				}
 			}
-
 			// If we reach here, sectionName not found in this block
 			return nil, fmt.Errorf("section %q not found inside playerStorage block", sectionName)
 		}
