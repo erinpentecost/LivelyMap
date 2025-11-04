@@ -3,10 +3,13 @@ package save
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 )
+
+const NS = "LivelyMap"
 
 // StorageSectionData holds the extracted section.
 type StorageSectionData struct {
@@ -79,7 +82,30 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 			return nil, fmt.Errorf("reading record data for type %d: %w", recType, err)
 		}
 
-		fmt.Printf("recType: %s\n", string(recType[:]))
+		//fmt.Printf("recType: %s, size: %d\n", string(recType[:]), recSize)
+
+		// the LUAM table contains global script data.
+		// It has LUAS fields, which contain the path to the lua script.
+		// Sometimes these LUAS fields are followed by LUAD fields,
+		// which contain data that has been persisted to storage for that script
+		// through the use of the OnSave() engine handler.
+		//
+		// I'm guessing there are LUAS or LUAD records that exist as subsets of the player character record.
+		//
+		//
+		// "GLOB" sections are for global variables.
+		//if string(recType[:]) == "LUAM" { //bytes.Contains(data, []byte("140726,EXTERIOR")) {
+		fmt.Printf("recType: %s, size: %d\n", string(recType[:]), recSize)
+		if bytes.Contains(data, []byte("logList")) {
+
+			encodedStr := hex.EncodeToString(data)
+			fmt.Printf("%s\n", encodedStr)
+			fmt.Print(string(data))
+			break
+		} else {
+			continue
+		}
+		// LUAP�̽Q�@FRMb����LUASscripts/omw/settings/global.luaLUADE?SettingsGameplayErnRadiantTheft)
 
 		// Compare recType against the constant for playerStorage
 		// this is calculated from running the fourcc macro on "LUAM":
@@ -104,8 +130,8 @@ func ExtractPlayerStorageSection(savePath string, sectionName string) (*StorageS
 				return nil, fmt.Errorf("reading numSections: %w", err)
 			}
 			for i := uint32(0); i < numSections; i++ {
-				// Read section name (uint16 length-prefixed string)
-				var nameLen uint16
+				// Read section name length (uint32)
+				var nameLen uint32
 				if err := binary.Read(br, binary.LittleEndian, &nameLen); err != nil {
 					return nil, fmt.Errorf("reading nameLen section #%d: %w", i, err)
 				}

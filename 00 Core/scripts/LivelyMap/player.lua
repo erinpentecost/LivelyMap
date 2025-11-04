@@ -26,7 +26,7 @@ local aux_util = require('openmw_aux.util')
 local storage = require('openmw.storage')
 local stored = storage.playerSection('MOD_NAME')
 stored:setLifeTime(storage.LIFE_TIME.Persistent)
-local diskLog = {}
+local logList = {}
 
 local persist = {
     lastCellid = nil,
@@ -45,12 +45,13 @@ local function log(tokenType, data)
     local line = MOD_NAME ..
         ":" .. math.ceil(core.getGameTime()) .. "," .. tokenType .. "," .. playerName .. "," .. tostring(data)
     print(line)
-    table.insert(diskLog, math.ceil(core.getGameTime()) .. "," .. tokenType .. "," .. tostring(data))
+    table.insert(logList, math.ceil(core.getGameTime()) .. "," .. tokenType .. "," .. tostring(data))
 end
 
 local function onSave()
-    print(aux_util.deepToString(diskLog))
-    stored:reset("LOG", diskLog)
+    print(aux_util.deepToString(logList))
+    stored:set("logList", logList)
+    print(aux_util.deepToString(stored:asTable()))
     return persist
 end
 
@@ -60,11 +61,11 @@ local function onLoad(data)
         persist = data
     end
     -- load long-term data
-    diskLog = stored:asTable()
-    if diskLog == nil then
-        diskLog = {}
+    logList = stored:get("logList")
+    if logList == nil then
+        logList = {}
     end
-    print(aux_util.deepToString(diskLog))
+    print(aux_util.deepToString(logList))
 end
 
 local function initPersist(now)
@@ -80,6 +81,9 @@ local function initPersist(now)
 end
 
 local function onUpdate(dt)
+    if dt == 0 then
+        return
+    end
     local now = core.getGameTime()
 
     if persist.lastCellid == nil then
@@ -89,11 +93,10 @@ local function onUpdate(dt)
         local timeSpent = math.ceil(now - persist.enterTime)
         if persist.cellX ~= nil then
             -- this is an exterior
-            log("EXTERIOR",
-                tostring(timeSpent) .. "," .. tostring(persist.cellX) .. "," .. tostring(persist.cellY) .. ",\"" ..
-                persist.lastCellid .. "\"")
+            log("EXT",
+                tostring(timeSpent) .. "," .. tostring(persist.cellX) .. "," .. tostring(persist.cellY))
         else
-            log("INTERIOR", tostring(timeSpent) .. ",\"" ..
+            log("INT", tostring(timeSpent) .. ",\"" ..
                 persist.lastCellid .. "\"")
         end
 
