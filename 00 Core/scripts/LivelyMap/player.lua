@@ -24,7 +24,7 @@ local pself = require("openmw.self")
 local aux_util = require('openmw_aux.util')
 
 local storage = require('openmw.storage')
-local stored = storage.playerSection('MOD_NAME')
+local stored = storage.playerSection(MOD_NAME)
 stored:setLifeTime(storage.LIFE_TIME.Persistent)
 local logList = {}
 

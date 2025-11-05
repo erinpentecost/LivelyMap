@@ -1,0 +1,28 @@
+lua storage sections are not in player save files.
+they are in player_storage.bin.
+
+
+GitHub Copilot Chat Assistant
+
+player_storage.bin is OpenMW’s internal binary storage created by LuaStorage::save. It’s not a plain-text format (not JSON/INI/XML) — it stores Lua sections/keys and each value as a serialized binary string (Value::mSerializedValue), produced by the engine’s Lua serialization code (LuaUtil::serialize). That means it’s a custom OpenMW binary serialization of Lua objects and should be read/modified via OpenMW’s LuaStorage load/save or the LuaUtil serialization code, not by hand.
+
+See the code that writes/reads it:
+- apps/openmw/mwlua/luamanagerimp.cpp (where save/load are called): https://github.com/OpenMW/openmw/blob/7c0702a71cca79f71bf87de0ec1761ec7864d67f/apps/openmw/mwlua/luamanagerimp.cpp#L120-L199
+- components/lua/storage.hpp (shows Value stores a serialized string): https://github.com/OpenMW/openmw/blob/7c0702a71cca79f71bf87de0ec1761ec7864d67f/components/lua/storage.hpp
+
+If you need the exact byte-level format, inspect the LuaUtil::serialize/deserialize implementation in the repository (the serialization routines determine the on-disk encoding). Note: search results used to answer may be incomplete.
+
+
+serialize is the LuaUtil serialization function declared and implemented in the Lua component:
+
+- Declaration: components/lua/serialization.hpp
+  - Signature: LuaUtil::BinaryData serialize(const sol::object& /*data*/, const LuaUtil::UserdataSerializer* customSerializer = nullptr);
+  - Note: BinaryData is an alias for std::string (it may contain '\0').
+
+- Implementation: components/lua/serialization.cpp (the serialize implementation and the helper functions that serialize userdata live here).
+
+So the call std::string serializedData = serialize(data); in components/lua/storage.cpp invokes LuaUtil::serialize (returns BinaryData / std::string) and is defined in the files above.
+
+Results may be incomplete; view the files on GitHub:
+- declaration: https://github.com/OpenMW/openmw/blob/7c0702a71cca79f71bf87de0ec1761ec7864d67f/components/lua/serialization.hpp
+- implementation: https://github.com/OpenMW/openmw/blob/7c0702a71cca79f71bf87de0ec1761ec7864d67f/components/lua/serialization.cpp
