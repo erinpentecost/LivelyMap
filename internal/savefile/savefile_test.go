@@ -1,4 +1,4 @@
-package save
+package savefile
 
 import (
 	_ "embed"
@@ -8,8 +8,7 @@ import (
 )
 
 func TestOpenMwCfg(t *testing.T) {
-
-	section, err := ExtractPlayerStorageSection("testdata/livelymap.omwsave", "EXTERIOR")
+	paths, err := ExtractSaveData("testdata/livelymap.omwsave")
 	require.NoError(t, err)
-	require.NotNil(t, section)
+	require.NotEmpty(t, paths)
 }
