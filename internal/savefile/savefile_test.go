@@ -8,7 +8,10 @@ import (
 )
 
 func TestOpenMwCfg(t *testing.T) {
-	paths, err := ExtractSaveData("testdata/livelymap.omwsave")
+	raw, err := ExtractSaveData("testdata/livelymap.omwsave")
+	require.NoError(t, err)
+	require.NotEmpty(t, raw)
+	paths, err := Unmarshal(raw)
 	require.NoError(t, err)
 	require.NotEmpty(t, paths)
 }

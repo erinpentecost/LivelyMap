@@ -20,7 +20,7 @@ type PathEntry struct {
 	CellID    string `json:"id"`
 }
 
-func ExtractSaveData(savePath string) ([]PathEntry, error) {
+func ExtractSaveData(savePath string) ([]byte, error) {
 	f, err := os.Open(savePath)
 	if err != nil {
 		return nil, fmt.Errorf("open save file: %w", err)
@@ -31,7 +31,10 @@ func ExtractSaveData(savePath string) ([]PathEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("extract subslice: %w", err)
 	}
+	return raw, nil
+}
 
+func Unmarshal(raw []byte) ([]PathEntry, error) {
 	var paths []PathEntry
 	if err := json.Unmarshal(raw, &paths); err != nil {
 		return nil, fmt.Errorf("unmarshal subslice: %w", err)
