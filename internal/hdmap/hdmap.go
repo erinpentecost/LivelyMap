@@ -25,6 +25,7 @@ func LoadLANDs(plugins []string) iter.Seq2[*esm.Record, error] {
 	return func(yield func(*esm.Record, error) bool) {
 
 		for _, p := range slices.Backward(plugins) {
+			fmt.Printf("Parsing %q\n", p)
 			records, err := esm.ParsePluginFile(p)
 			if err != nil {
 				if !yield(nil, fmt.Errorf("parse plugin %q: %w", p, err)) {
@@ -37,14 +38,16 @@ func LoadLANDs(plugins []string) iter.Seq2[*esm.Record, error] {
 				if rec.Tag != land.LAND {
 					continue
 				}
+				fmt.Printf("\n")
 				var intv *esm.Subrecord
 				var vhgt *esm.Subrecord
 				for _, s := range rec.Subrecords {
+					fmt.Printf("%s: len=%d bytes\n", s.Tag, len(s.Data))
 					if s.Tag == land.INTV {
 						intv = s
 					} else if s.Tag == land.VHGT && s != nil {
 						vhgt = s
-						// fmt.Printf("found vhgt:\n\t%s\n", hex.EncodeToString(vhgt.Data))
+						fmt.Printf("found vhgt: first 32 bytes:\n\t%s\n", hex.EncodeToString(vhgt.Data[:min(32, len(vhgt.Data))]))
 					}
 				}
 				if intv == nil || len(intv.Data) < 8 {
@@ -58,7 +61,7 @@ func LoadLANDs(plugins []string) iter.Seq2[*esm.Record, error] {
 					// no texture height data, skip.
 					fmt.Printf("skipping LAND %q because VHGT is empty\n", key)
 					continue
-				} else if len(vhgt.Data) < 100 {
+				} else if len(vhgt.Data) == 0 {
 					// bad height data, skip.
 					fmt.Printf("skipping LAND %q because VHGT is bad:\n\t%s\n", key, hex.EncodeToString(vhgt.Data))
 					continue
@@ -81,11 +84,11 @@ func LoadLANDs(plugins []string) iter.Seq2[*esm.Record, error] {
 var fallbackHeights [][]float32
 
 func init() {
-	heights := make([][]float32, 65)
-	for i := range heights {
-		heights[i] = make([]float32, 65)
+	fallbackHeights = make([][]float32, 65)
+	for i := range fallbackHeights {
+		fallbackHeights[i] = make([]float32, 65)
 		for b := range 65 {
-			heights[i][b] = -128 * 10
+			fallbackHeights[i][b] = -128 * 10
 		}
 	}
 }
@@ -129,15 +132,12 @@ const gridSize = 65
 func (p *parsedLand) normalHeightMap(heightTransform func(float32) byte) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
-	for x := range gridSize {
-		for y := range gridSize {
-			img.SetRGBA(
-				x,
-				y,
-				color.RGBA{
-					// TODO: finish normals
-					R: heightTransform(p.heights[x][y]),
-				})
+	for y := range p.heights { // rows (y)
+		for x := range p.heights[y] { // columns (x)
+			img.SetRGBA(x, y, color.RGBA{
+				R: heightTransform(p.heights[y][x]),
+				G: 0, A: 255, B: 0, // set the other components as needed
+			})
 		}
 	}
 	return img
@@ -150,8 +150,12 @@ func transformHeight(v float32, min float32, max float32) byte {
 	if v > max {
 		return math.MaxUint8
 	}
-
-	return byte(((v - min) / max) * math.MaxUint8)
+	denom := max - min
+	if denom == 0 {
+		return 0
+	}
+	normalized := (v - min) / denom
+	return byte(normalized * math.MaxUint8)
 }
 
 type CellInfo struct {
@@ -166,7 +170,8 @@ func RecordsToCellInfo(recs iter.Seq2[*esm.Record, error]) (iter.Seq[*CellInfo],
 	// Do first pass on records to find extents.
 
 	var left, right, top, bottom int32
-	var minHeight, maxHeight float32
+	minHeight := float32(math.Inf(1))
+	maxHeight := float32(math.Inf(-1))
 
 	parsedLANDs := []*parsedLand{}
 	for lnd, err := range recs {

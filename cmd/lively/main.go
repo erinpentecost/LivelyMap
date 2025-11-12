@@ -45,19 +45,24 @@ func sync(path string) error {
 	}
 
 	for cell := range cellinfo {
-		targetName := fmt.Sprintf("%d_%d_nh.bmp", cell.X, cell.Y)
-		fmt.Printf("Processing %q\n", targetName)
-		if cell.NormalHeightMap == nil {
-			fmt.Printf("%q has no normal height map\n", targetName)
-			continue
-		}
-		out, err := os.Create(filepath.Join(targetDir, targetName))
-		if err != nil {
-			return fmt.Errorf("create file %q: %w", targetName, err)
-		}
-		defer out.Close()
+		err := func(cell *hdmap.CellInfo) error {
+			targetName := fmt.Sprintf("%d_%d_nh.bmp", cell.X, cell.Y)
+			fmt.Printf("Processing %q\n", targetName)
+			if cell.NormalHeightMap == nil {
+				fmt.Printf("%q has no normal height map\n", targetName)
+			}
+			out, err := os.Create(filepath.Join(targetDir, targetName))
+			if err != nil {
+				return fmt.Errorf("create file %q: %w", targetName, err)
+			}
+			defer out.Close()
 
-		return bmp.Encode(out, cell.NormalHeightMap)
+			if err := bmp.Encode(out, cell.NormalHeightMap); err != nil {
+				return err
+			}
+			return nil
+		}(cell)
+		fmt.Printf("write error: %v\n", err)
 	}
 
 	return nil
