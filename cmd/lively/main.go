@@ -53,7 +53,7 @@ func sync(path string) error {
 		}
 
 		normalWorldMapper := hdmap.NewWorldMapper()
-		err = normalWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.bmp"))
+		err = normalWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.png"))
 		if err != nil {
 			return fmt.Errorf("write world map: %w", err)
 		}
@@ -71,7 +71,7 @@ func sync(path string) error {
 		}
 
 		classicWorldMapper := hdmap.NewWorldMapper()
-		err = classicWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "classic.bmp"))
+		err = classicWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "classic.png"))
 		if err != nil {
 			return fmt.Errorf("write world map: %w", err)
 		}

@@ -37,12 +37,12 @@ func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight f
 	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
 
-	// Throw away extreme low values that are underwater.
-	// We are raising the "floor" here.
-	potentialMin := float32(heightStats.Min())
+	// Throw away all values that are underwater.
+	d.minHeight = d.waterHeight
+	/*potentialMin := float32(heightStats.Min())
 	if potentialMin < d.waterHeight {
 		d.minHeight = min(float32(heightStats.Quantile(0.1)), d.waterHeight)
-	}
+	}*/
 }
 
 // normalHeightMap generates a *_nh (normal height map) texture for openmw.

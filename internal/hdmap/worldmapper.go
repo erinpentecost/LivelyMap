@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	"image/png"
 	"iter"
 	"os"
-
-	"golang.org/x/image/bmp"
 )
 
 type ImageSelector interface {
@@ -57,7 +56,7 @@ func (w *WorldMapper) Write(ctx context.Context, mapExtents MapCoords, cells ite
 		return err
 	}
 	defer out.Close()
-	return bmp.Encode(out, w.outImage)
+	return png.Encode(out, w.outImage)
 }
 
 func (w *WorldMapper) handleCell(cell *CellInfo) error {
