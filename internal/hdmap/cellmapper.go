@@ -13,39 +13,34 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type NormalHeightRenderer interface {
-	RenderNormalHeightMap(p *ParsedLandRecord) *image.RGBA
+type CellRenderer interface {
+	Render(p *ParsedLandRecord) *image.RGBA
 	SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32)
-	GetCellResolution() (x uint32, y uint32)
-}
-type ColorRenderer interface {
-	RenderColorMap(p *ParsedLandRecord) *image.RGBA
 	GetCellResolution() (x uint32, y uint32)
 }
 
 type CellMapper struct {
 	LP *LandParser
 
-	NormalHeightHandler NormalHeightRenderer
-	ColorHandler        ColorRenderer
+	Renderer CellRenderer
 
 	mux   sync.Mutex
 	Cells []*CellInfo
 }
 
-func NewCellMapper(lp *LandParser, nhr NormalHeightRenderer, ch ColorRenderer) *CellMapper {
-	if nhr == nil {
-		nhr = &defaultNormalHeightRenderer{}
+func NewCellMapper(lp *LandParser, renderer CellRenderer) *CellMapper {
+	if renderer == nil {
+		renderer = &NormalHeightRenderer{}
 	}
 	return &CellMapper{
-		LP:                  lp,
-		NormalHeightHandler: nhr,
-		Cells:               []*CellInfo{},
+		LP:       lp,
+		Renderer: renderer,
+		Cells:    []*CellInfo{},
 	}
 }
 
 func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
-	h.NormalHeightHandler.SetHeightExtents(h.LP.MinHeight, h.LP.MaxHeight, 0)
+	h.Renderer.SetHeightExtents(h.LP.MinHeight, h.LP.MaxHeight, 0)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(4)
@@ -56,7 +51,7 @@ func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
 			outCell := &CellInfo{
 				X:               parsed.x,
 				Y:               parsed.y,
-				NormalHeightMap: h.NormalHeightHandler.RenderNormalHeightMap(parsed),
+				NormalHeightMap: h.Renderer.Render(parsed),
 			}
 			h.mux.Lock()
 			defer h.mux.Unlock()

@@ -45,16 +45,32 @@ func sync(path string) error {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
 
-	hdm := hdmap.NewCellMapper(parsedLands, nil, nil)
-	cellinfo, err := hdm.Generate(ctx)
-	if err != nil {
-		return fmt.Errorf("generate cell maps: %w", err)
+	{
+		hdm := hdmap.NewCellMapper(parsedLands, &hdmap.NormalHeightRenderer{})
+		cellinfo, err := hdm.Generate(ctx)
+		if err != nil {
+			return fmt.Errorf("generate cell maps: %w", err)
+		}
+
+		normalWorldMapper := hdmap.NewWorldMapper()
+		err = normalWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.bmp"))
+		if err != nil {
+			return fmt.Errorf("write world map: %w", err)
+		}
 	}
 
-	normalWorldMapper := hdmap.NewWorldMapper()
-	err = normalWorldMapper.Write(ctx, hdm.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.bmp"))
-	if err != nil {
-		return fmt.Errorf("write world map: %w", err)
+	{
+		hdm := hdmap.NewCellMapper(parsedLands, &hdmap.ClassicRenderer{})
+		cellinfo, err := hdm.Generate(ctx)
+		if err != nil {
+			return fmt.Errorf("generate cell maps: %w", err)
+		}
+
+		classicWorldMapper := hdmap.NewWorldMapper()
+		err = classicWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "classic.bmp"))
+		if err != nil {
+			return fmt.Errorf("write world map: %w", err)
+		}
 	}
 
 	return nil

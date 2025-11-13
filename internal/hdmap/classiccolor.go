@@ -38,17 +38,17 @@ func init() {
 	}
 }
 
-type classicColorRenderer struct {
+type ClassicRenderer struct {
 	minHeight   float32
 	maxHeight   float32
 	waterHeight float32
 }
 
-func (d *classicColorRenderer) GetCellResolution() (x uint32, y uint32) {
+func (d *ClassicRenderer) GetCellResolution() (x uint32, y uint32) {
 	return gridSize, gridSize
 }
 
-func (d *classicColorRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
+func (d *ClassicRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
 	d.minHeight = minHeight
 	d.maxHeight = maxHeight
 	d.waterHeight = waterHeight
@@ -58,7 +58,7 @@ func (d *classicColorRenderer) SetHeightExtents(minHeight float32, maxHeight flo
 // The RGB channels of the normal map are used to store XYZ components of
 // tangent space normals and the alpha channel of the normal map may be used
 // to store a height map used for parallax.
-func (d *classicColorRenderer) RenderNormalHeightMap(p *ParsedLandRecord) *image.RGBA {
+func (d *ClassicRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
@@ -80,7 +80,7 @@ func (d *classicColorRenderer) RenderNormalHeightMap(p *ParsedLandRecord) *image
 	return img
 }
 
-func (d *classicColorRenderer) transformHeight(v float32) int {
+func (d *ClassicRenderer) transformHeight(v float32) int {
 	if v < d.minHeight {
 		return 0
 	}

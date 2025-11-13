@@ -23,17 +23,17 @@ var waterNormalHeight = color.RGBA{R: math.MaxUint8 / 2, G: math.MaxUint8 / 2, B
 // This results in a 64x64 pixel grid.
 //
 // Also note that the "image" package treats 0,0 as the top-left, so we need to invert Y.
-type defaultNormalHeightRenderer struct {
+type NormalHeightRenderer struct {
 	minHeight   float32
 	maxHeight   float32
 	waterHeight float32
 }
 
-func (d *defaultNormalHeightRenderer) GetCellResolution() (x uint32, y uint32) {
+func (d *NormalHeightRenderer) GetCellResolution() (x uint32, y uint32) {
 	return gridSize, gridSize
 }
 
-func (d *defaultNormalHeightRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
+func (d *NormalHeightRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
 	d.minHeight = minHeight
 	d.maxHeight = maxHeight
 	d.waterHeight = waterHeight
@@ -43,7 +43,7 @@ func (d *defaultNormalHeightRenderer) SetHeightExtents(minHeight float32, maxHei
 // The RGB channels of the normal map are used to store XYZ components of
 // tangent space normals and the alpha channel of the normal map may be used
 // to store a height map used for parallax.
-func (d *defaultNormalHeightRenderer) RenderNormalHeightMap(p *ParsedLandRecord) *image.RGBA {
+func (d *NormalHeightRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
@@ -78,7 +78,7 @@ func normalTransform(v int8) uint8 {
 	return uint8(v) ^ 0x80
 }
 
-func (d *defaultNormalHeightRenderer) transformHeight(v float32) byte {
+func (d *NormalHeightRenderer) transformHeight(v float32) byte {
 	if v < d.minHeight {
 		return 0
 	}
