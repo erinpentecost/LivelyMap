@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/erinpentecost/LivelyMap/internal/hdmap"
@@ -39,13 +40,19 @@ func sync(path string) error {
 	// temporary for debuggin
 	plugins = plugins[:2]
 
-	hdm := hdmap.NewCellMapper(plugins, nil, nil)
+	parsedLands := hdmap.NewLandParser(plugins)
+	if err := parsedLands.ParsePlugins(); err != nil {
+		return fmt.Errorf("parse plugins: %w", err)
+	}
+
+	hdm := hdmap.NewCellMapper(parsedLands, nil, nil)
 	cellinfo, err := hdm.Generate(ctx)
 	if err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
-	wdm := hdmap.NewWorldMapper()
-	err = wdm.Write(ctx, hdm.MapExtents, cellinfo, &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.bmp"))
+
+	normalWorldMapper := hdmap.NewWorldMapper()
+	err = normalWorldMapper.Write(ctx, hdm.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.bmp"))
 	if err != nil {
 		return fmt.Errorf("write world map: %w", err)
 	}
