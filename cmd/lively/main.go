@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,18 +9,17 @@ import (
 
 	"github.com/erinpentecost/LivelyMap/internal/hdmap"
 	"github.com/ernmw/omwpacker/cfg"
-	"golang.org/x/image/bmp"
 )
 
 const plugin_name = "livelymap.omwaddon"
 
 func sync(path string) error {
+	ctx := context.Background()
 
 	plugins, _, err := cfg.OpenMWPlugins(path)
 	if err != nil {
 		return fmt.Errorf("open %q: %w", path, err)
 	}
-	plugins = plugins
 
 	// find path to dump map to
 	var targetDir string
@@ -36,33 +36,15 @@ func sync(path string) error {
 		return fmt.Errorf("%q is not a directory", targetDir)
 	}
 
-	// TODO remove, this is to speed up testing
-	//plugins = plugins[:2]
-
-	cellinfo, err := hdmap.RecordsToCellInfo(hdmap.LoadLANDs(plugins))
+	hdm := hdmap.NewCellMapper(plugins, nil, nil)
+	cellinfo, err := hdm.Generate(ctx)
 	if err != nil {
-		return fmt.Errorf("parse land records: %w", err)
+		return fmt.Errorf("generate cell maps: %w", err)
 	}
-
-	for cell := range cellinfo {
-		err := func(cell *hdmap.CellInfo) error {
-			targetName := fmt.Sprintf("%d_%d_nh.bmp", cell.X, cell.Y)
-			fmt.Printf("Processing %q\n", targetName)
-			if cell.NormalHeightMap == nil {
-				fmt.Printf("%q has no normal height map\n", targetName)
-			}
-			out, err := os.Create(filepath.Join(targetDir, targetName))
-			if err != nil {
-				return fmt.Errorf("create file %q: %w", targetName, err)
-			}
-			defer out.Close()
-
-			if err := bmp.Encode(out, cell.NormalHeightMap); err != nil {
-				return err
-			}
-			return nil
-		}(cell)
-		fmt.Printf("write error: %v\n", err)
+	wdm := hdmap.NewWorldMapper()
+	err = wdm.Write(ctx, hdm.MapExtents, cellinfo, &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.bmp"))
+	if err != nil {
+		return fmt.Errorf("write world map: %w", err)
 	}
 
 	return nil
