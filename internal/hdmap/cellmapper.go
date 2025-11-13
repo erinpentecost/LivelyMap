@@ -14,6 +14,7 @@ import (
 )
 
 type CellRenderer interface {
+	// Render turns a ParsedLandRecord into an image.
 	Render(p *ParsedLandRecord) *image.RGBA
 	SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32)
 	GetCellResolution() (x uint32, y uint32)

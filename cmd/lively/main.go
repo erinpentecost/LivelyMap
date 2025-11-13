@@ -60,7 +60,11 @@ func sync(path string) error {
 	}
 
 	{
-		hdm := hdmap.NewCellMapper(parsedLands, &hdmap.ClassicRenderer{})
+		renderer, err := hdmap.NewClassicRenderer("")
+		if err != nil {
+			return fmt.Errorf("new classic renderer")
+		}
+		hdm := hdmap.NewCellMapper(parsedLands, renderer)
 		cellinfo, err := hdm.Generate(ctx)
 		if err != nil {
 			return fmt.Errorf("generate cell maps: %w", err)

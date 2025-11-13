@@ -11,18 +11,9 @@ import (
 	"github.com/ernmw/omwpacker/esm/record/land"
 )
 
-var fallbackHeights [][]float32
 var fallbackNormals [][]land.VertexField
 
 func init() {
-	fallbackHeights = make([][]float32, 65)
-	for i := range fallbackHeights {
-		fallbackHeights[i] = make([]float32, 65)
-		for b := range 65 {
-			fallbackHeights[i][b] = -128 * 10
-		}
-	}
-
 	fallbackNormals = make([][]land.VertexField, 65)
 	for i := range fallbackNormals {
 		fallbackNormals[i] = make([]land.VertexField, 65)
@@ -127,6 +118,8 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 	l.MinHeight = float32(math.Inf(1))
 	l.MaxHeight = float32(math.Inf(-1))
 
+	present := map[int64]bool{}
+
 	for lnd, err := range recs {
 		if err != nil {
 			return fmt.Errorf("range over records iter: %w", err)
@@ -140,6 +133,7 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 			return fmt.Errorf("parse land record: %w", err)
 		}
 		l.Lands = append(l.Lands, parsed)
+		present[int64(parsed.x)|int64(parsed.y)<<32] = true
 		// calc XY extents
 		l.MapExtents.Left = min(l.MapExtents.Left, parsed.x)
 		l.MapExtents.Right = max(l.MapExtents.Right, parsed.x)
@@ -153,6 +147,28 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 			}
 		}
 	}
+
+	// fill in empties
+	fallbackHeights := make([][]float32, 65)
+	for i := range fallbackHeights {
+		fallbackHeights[i] = make([]float32, 65)
+		for b := range 65 {
+			fallbackHeights[i][b] = l.MinHeight
+		}
+	}
+	for x := l.MapExtents.Left; x <= l.MapExtents.Right; x++ {
+		for y := l.MapExtents.Bottom; y <= l.MapExtents.Top; y++ {
+			if !present[int64(x)|int64(y)<<32] {
+				l.Lands = append(l.Lands, &ParsedLandRecord{
+					x:       x,
+					y:       y,
+					heights: fallbackHeights,
+					normals: fallbackNormals,
+				})
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -170,7 +186,7 @@ func (l *LandParser) parseLandRecord(rec *esm.Record) (*ParsedLandRecord, error)
 		case land.VHGT:
 			parsed := land.VHGTField{}
 			if err := parsed.Unmarshal(subrec); err != nil {
-				out.heights = fallbackHeights
+				return nil, fmt.Errorf("bad VHGT entry for %d,%d", out.x, out.y)
 			} else {
 				out.heights = parsed.ComputeAbsoluteHeights()
 			}
