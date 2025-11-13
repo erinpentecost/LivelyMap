@@ -8,6 +8,8 @@ import (
 
 const gridSize = 64
 
+var waterNormalHeight = color.RGBA{R: math.MaxUint8 / 2, G: math.MaxUint8 / 2, B: math.MaxUint8, A: 0}
+
 // The vertex grid is 65x65 because it uses one vertex per point on a quad.
 // A cell is 8192 units along one dimension, which is 128 game units per quad.
 //
@@ -19,6 +21,8 @@ const gridSize = 64
 // Considering the size of Project Tamriel, I think this is the way to go.
 // But how do smash down a quad into just one pixel? Just pick one of them.
 // This results in a 64x64 pixel grid.
+//
+// Also note that the "image" package treats 0,0 as the top-left, so we need to invert Y.
 type defaultNormalHeightRenderer struct {
 	minHeight   float32
 	maxHeight   float32
@@ -53,12 +57,18 @@ func (d *defaultNormalHeightRenderer) RenderNormalHeightMap(p *ParsedLandRecord)
 
 	for y := range gridSize {
 		for x := range gridSize {
-			img.SetRGBA(x, y, color.RGBA{
-				R: normalTransform(p.normals[y][x].X),
-				G: normalTransform(p.normals[y][x].Y),
-				B: normalTransform(p.normals[y][x].Z),
-				A: d.transformHeight(p.heights[y][x]),
-			})
+			// Need to invert y
+			iy := gridSize - y - 1
+			if p.heights[y][x] >= d.waterHeight {
+				img.SetRGBA(x, iy, color.RGBA{
+					R: normalTransform(p.normals[y][x].X),
+					G: normalTransform(p.normals[y][x].Y),
+					B: normalTransform(p.normals[y][x].Z),
+					A: d.transformHeight(p.heights[y][x]),
+				})
+			} else {
+				img.SetRGBA(x, iy, waterNormalHeight)
+			}
 		}
 	}
 	return img

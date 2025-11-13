@@ -93,16 +93,13 @@ func (h *CellMapper) loadLANDs(plugins []string) iter.Seq2[*esm.Record, error] {
 				if rec.Tag != land.LAND {
 					continue
 				}
-				fmt.Printf("\n")
 				var intv *esm.Subrecord
 				var vhgt *esm.Subrecord
 				for _, s := range rec.Subrecords {
-					fmt.Printf("%s: len=%d bytes\n", s.Tag, len(s.Data))
 					if s.Tag == land.INTV {
 						intv = s
 					} else if s.Tag == land.VHGT && s != nil {
 						vhgt = s
-						fmt.Printf("found vhgt: first 32 bytes:\n\t%s\n", hex.EncodeToString(vhgt.Data[:min(32, len(vhgt.Data))]))
 					}
 				}
 				if intv == nil || len(intv.Data) < 8 {
@@ -203,8 +200,8 @@ func (h *CellMapper) recordsToCellInfo(ctx context.Context, recs iter.Seq2[*esm.
 		// calc XY extents
 		h.MapExtents.Left = min(h.MapExtents.Left, parsed.x)
 		h.MapExtents.Right = max(h.MapExtents.Right, parsed.x)
-		h.MapExtents.Top = min(h.MapExtents.Top, parsed.y)
-		h.MapExtents.Bottom = max(h.MapExtents.Bottom, parsed.y)
+		h.MapExtents.Top = max(h.MapExtents.Top, parsed.y)
+		h.MapExtents.Bottom = min(h.MapExtents.Bottom, parsed.y)
 		// calc Z extents
 		for x := range parsed.heights {
 			for y := range parsed.heights[x] {
@@ -214,34 +211,36 @@ func (h *CellMapper) recordsToCellInfo(ctx context.Context, recs iter.Seq2[*esm.
 		}
 	}
 
-	// todo: use real value for water height
-	h.NormalHeightHandler.SetHeightExtents(minHeight, maxHeight, minHeight/2)
+	h.NormalHeightHandler.SetHeightExtents(minHeight, maxHeight, 0)
 
 	// Fork out image rendering
 	out := make(chan *CellInfo)
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(4)
 
-	for _, parsed := range parsedLANDs {
-		g.Go(func() error {
-			outCell := &CellInfo{
-				X:               parsed.x,
-				Y:               parsed.y,
-				NormalHeightMap: h.NormalHeightHandler.RenderNormalHeightMap(parsed),
-			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case out <- outCell:
-				return nil
-			}
-		})
-	}
-
-	// make sure we close the channel once errgroup resolves.
 	go func() {
-		g.Wait()
-		close(out)
+		defer close(out)
+		g, ctx := errgroup.WithContext(ctx)
+		g.SetLimit(4)
+
+		for _, parsed := range parsedLANDs {
+			g.Go(func() error {
+				//fmt.Printf("Rendering cell %d,%d\n", parsed.x, parsed.y)
+				outCell := &CellInfo{
+					X:               parsed.x,
+					Y:               parsed.y,
+					NormalHeightMap: h.NormalHeightHandler.RenderNormalHeightMap(parsed),
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case out <- outCell:
+					return nil
+				}
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			fmt.Printf("Error while rendering cells: %v\n", err)
+		}
 	}()
 
 	return out, nil

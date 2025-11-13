@@ -36,6 +36,9 @@ func sync(path string) error {
 		return fmt.Errorf("%q is not a directory", targetDir)
 	}
 
+	// temporary for debuggin
+	plugins = plugins[:2]
+
 	hdm := hdmap.NewCellMapper(plugins, nil, nil)
 	cellinfo, err := hdm.Generate(ctx)
 	if err != nil {
