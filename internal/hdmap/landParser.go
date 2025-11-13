@@ -8,6 +8,8 @@ import (
 	"slices"
 
 	"github.com/ernmw/omwpacker/esm"
+
+	"github.com/erinpentecost/LivelyMap/internal/tdigest"
 	"github.com/ernmw/omwpacker/esm/record/land"
 )
 
@@ -27,10 +29,15 @@ func init() {
 	}
 }
 
+type Stats interface {
+	Min() float64
+	Max() float64
+	Quantile(q float64) float64
+}
+
 type LandParser struct {
+	Heights    *tdigest.TDigest
 	MapExtents MapCoords
-	MinHeight  float32
-	MaxHeight  float32
 	Plugins    []string
 	Lands      []*ParsedLandRecord
 }
@@ -43,7 +50,7 @@ type ParsedLandRecord struct {
 }
 
 func NewLandParser(plugins []string) *LandParser {
-	return &LandParser{Plugins: plugins}
+	return &LandParser{Plugins: plugins, Heights: tdigest.New()}
 }
 
 func (l *LandParser) ParsePlugins() error {
@@ -57,18 +64,35 @@ func (l *LandParser) ParsePlugins() error {
 func (l *LandParser) loadPlugins() iter.Seq2[*esm.Record, error] {
 	LANDs := make(map[string]*esm.Record)
 
-	return func(yield func(*esm.Record, error) bool) {
+	type pluginsResp struct {
+		recs []*esm.Record
+		err  error
+	}
 
+	pluginsChan := make(chan *pluginsResp, 2)
+	go func() {
+		defer close(pluginsChan)
 		for _, p := range slices.Backward(l.Plugins) {
 			fmt.Printf("Parsing %q\n", p)
 			records, err := esm.ParsePluginFile(p)
 			if err != nil {
-				if !yield(nil, fmt.Errorf("parse plugin %q: %w", p, err)) {
-					return
-				}
+				err = fmt.Errorf("parse plugin %q: %w", p, err)
 			}
-			// iterate through records; later plugins override earlier ones
-			for _, rec := range records {
+			pluginsChan <- &pluginsResp{
+				recs: records,
+				err:  err,
+			}
+		}
+	}()
+
+	return func(yield func(*esm.Record, error) bool) {
+		// iterate through records; later plugins override earlier ones
+		for resp := range pluginsChan {
+			if resp.err != nil {
+				fmt.Printf("error parsing plugin: %v", resp.err)
+				continue
+			}
+			for _, rec := range resp.recs {
 				// Only interested in LAND records
 				if rec.Tag != land.LAND {
 					continue
@@ -115,10 +139,8 @@ func (l *LandParser) loadPlugins() iter.Seq2[*esm.Record, error] {
 
 func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error {
 	// Do first pass on records to find extents.
-	l.MinHeight = float32(math.Inf(1))
-	l.MaxHeight = float32(math.Inf(-1))
 
-	present := map[int64]bool{}
+	present := map[uint64]bool{}
 
 	for lnd, err := range recs {
 		if err != nil {
@@ -133,7 +155,7 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 			return fmt.Errorf("parse land record: %w", err)
 		}
 		l.Lands = append(l.Lands, parsed)
-		present[int64(parsed.x)|int64(parsed.y)<<32] = true
+		present[coordKey(parsed.x, parsed.y)] = true
 		// calc XY extents
 		l.MapExtents.Left = min(l.MapExtents.Left, parsed.x)
 		l.MapExtents.Right = max(l.MapExtents.Right, parsed.x)
@@ -142,23 +164,24 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 		// calc Z extents
 		for x := range parsed.heights {
 			for y := range parsed.heights[x] {
-				l.MinHeight = min(l.MinHeight, parsed.heights[x][y])
-				l.MaxHeight = max(l.MaxHeight, parsed.heights[x][y])
+				l.Heights.Add(float64(parsed.heights[x][y]), 1)
 			}
 		}
 	}
 
 	// fill in empties
+	nearBottom := float32(l.Heights.Quantile(0.1))
 	fallbackHeights := make([][]float32, 65)
 	for i := range fallbackHeights {
 		fallbackHeights[i] = make([]float32, 65)
 		for b := range 65 {
-			fallbackHeights[i][b] = l.MinHeight
+			fallbackHeights[i][b] = nearBottom
 		}
 	}
+	fmt.Println("Faking records...")
 	for x := l.MapExtents.Left; x <= l.MapExtents.Right; x++ {
 		for y := l.MapExtents.Bottom; y <= l.MapExtents.Top; y++ {
-			if !present[int64(x)|int64(y)<<32] {
+			if !present[coordKey(x, y)] {
 				l.Lands = append(l.Lands, &ParsedLandRecord{
 					x:       x,
 					y:       y,
@@ -170,6 +193,10 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 	}
 
 	return nil
+}
+
+func coordKey(x int32, y int32) uint64 {
+	return (uint64(y) << 32) ^ uint64(x)
 }
 
 func (l *LandParser) parseLandRecord(rec *esm.Record) (*ParsedLandRecord, error) {

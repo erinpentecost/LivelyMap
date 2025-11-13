@@ -33,10 +33,16 @@ func (d *NormalHeightRenderer) GetCellResolution() (x uint32, y uint32) {
 	return gridSize, gridSize
 }
 
-func (d *NormalHeightRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
-	d.minHeight = minHeight
-	d.maxHeight = maxHeight
+func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
+	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
+
+	// Throw away extreme low values that are underwater.
+	// We are raising the "floor" here.
+	potentialMin := float32(heightStats.Min())
+	if potentialMin < d.waterHeight {
+		d.minHeight = min(float32(heightStats.Quantile(0.1)), d.waterHeight)
+	}
 }
 
 // normalHeightMap generates a *_nh (normal height map) texture for openmw.

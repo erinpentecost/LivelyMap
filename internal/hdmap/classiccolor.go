@@ -51,7 +51,7 @@ func NewClassicRenderer(rampFilePath string) (*ClassicRenderer, error) {
 	if len(rampFilePath) == 0 {
 		rmp, err := LoadRamp(bytes.NewReader(classicRampFile))
 		if err != nil {
-			return nil, fmt.Errorf("loading default ramp: %w")
+			return nil, fmt.Errorf("loading default ramp: %w", err)
 		}
 		return &ClassicRenderer{ramp: rmp}, nil
 	}
@@ -61,7 +61,7 @@ func NewClassicRenderer(rampFilePath string) (*ClassicRenderer, error) {
 	}
 	rmp, err := LoadRamp(file)
 	if err != nil {
-		return nil, fmt.Errorf("loading default ramp: %w")
+		return nil, fmt.Errorf("loading default ramp: %w", err)
 	}
 	return &ClassicRenderer{ramp: rmp}, nil
 }
@@ -70,10 +70,16 @@ func (d *ClassicRenderer) GetCellResolution() (x uint32, y uint32) {
 	return gridSize, gridSize
 }
 
-func (d *ClassicRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
-	d.minHeight = minHeight
-	d.maxHeight = maxHeight
+func (d *ClassicRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
+	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
+
+	// Throw away extreme low values that are underwater.
+	// We are raising the "floor" here.
+	potentialMin := float32(heightStats.Min())
+	if potentialMin < d.waterHeight {
+		d.minHeight = min(float32(heightStats.Quantile(0.1)), d.waterHeight)
+	}
 }
 
 // normalHeightMap generates a *_nh (normal height map) texture for openmw.
@@ -81,7 +87,6 @@ func (d *ClassicRenderer) SetHeightExtents(minHeight float32, maxHeight float32,
 // tangent space normals and the alpha channel of the normal map may be used
 // to store a height map used for parallax.
 func (d *ClassicRenderer) Render(p *ParsedLandRecord) *image.RGBA {
-
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
 	// Throw away the last column and row.

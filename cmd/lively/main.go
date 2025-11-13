@@ -38,13 +38,13 @@ func sync(path string) error {
 	}
 
 	// temporary for debuggin
-	plugins = plugins[:2]
+	//plugins = plugins[:2]
 
 	parsedLands := hdmap.NewLandParser(plugins)
 	if err := parsedLands.ParsePlugins(); err != nil {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
-
+	fmt.Printf("Done parsing %d cells.\n", len(parsedLands.Lands))
 	{
 		hdm := hdmap.NewCellMapper(parsedLands, &hdmap.NormalHeightRenderer{})
 		cellinfo, err := hdm.Generate(ctx)
