@@ -50,9 +50,9 @@ func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
 		g.Go(func() error {
 			//fmt.Printf("Rendering cell %d,%d\n", parsed.x, parsed.y)
 			outCell := &CellInfo{
-				X:               parsed.x,
-				Y:               parsed.y,
-				NormalHeightMap: h.Renderer.Render(parsed),
+				X:     parsed.x,
+				Y:     parsed.y,
+				Image: h.Renderer.Render(parsed),
 			}
 			h.mux.Lock()
 			defer h.mux.Unlock()
@@ -68,8 +68,7 @@ func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
 }
 
 type CellInfo struct {
-	X               int32
-	Y               int32
-	NormalHeightMap image.Image
-	Color           image.Image
+	X     int32
+	Y     int32
+	Image *image.RGBA
 }

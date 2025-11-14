@@ -40,7 +40,7 @@ func sync(path string) error {
 	// temporary for debuggin
 	//plugins = plugins[:2]
 
-	parsedLands := hdmap.NewLandParser(plugins)
+	parsedLands := hdmap.NewLandParser(plugins[:2])
 	if err := parsedLands.ParsePlugins(); err != nil {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
@@ -53,7 +53,11 @@ func sync(path string) error {
 		}
 
 		normalWorldMapper := hdmap.NewWorldMapper()
-		err = normalWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "normalheightmap.png"))
+		err = normalWorldMapper.Write(
+			ctx,
+			parsedLands.MapExtents,
+			slices.Values(cellinfo),
+			filepath.Join(targetDir, "normalheightmap.dds"))
 		if err != nil {
 			return fmt.Errorf("write world map: %w", err)
 		}
@@ -71,7 +75,10 @@ func sync(path string) error {
 		}
 
 		classicWorldMapper := hdmap.NewWorldMapper()
-		err = classicWorldMapper.Write(ctx, parsedLands.MapExtents, slices.Values(cellinfo), &hdmap.NormalHeightImageSelector{}, filepath.Join(targetDir, "classic.png"))
+		err = classicWorldMapper.Write(ctx,
+			parsedLands.MapExtents,
+			slices.Values(cellinfo),
+			filepath.Join(targetDir, "classic.dds"))
 		if err != nil {
 			return fmt.Errorf("write world map: %w", err)
 		}

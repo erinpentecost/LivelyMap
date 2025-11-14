@@ -51,6 +51,16 @@ func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight f
 // to store a height map used for parallax.
 func (d *NormalHeightRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 
+	// This output looks wrong in most image viewers because the alpha
+	// channel is multiplied with the color channel.
+	// Split them like this:
+	/*
+		magick input.png -alpha set -channel R -separate r.png
+		magick input.png -alpha set -channel G -separate g.png
+		magick input.png -alpha set -channel B -separate b.png
+		magick r.png g.png b.png -combine -depth 8 PNG24:output_rgb24.png
+	*/
+
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
 	// Throw away the last column and row.
@@ -68,8 +78,13 @@ func (d *NormalHeightRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 			if p.heights[y][x] >= d.waterHeight {
 				img.SetRGBA(x, iy, color.RGBA{
 					R: normalTransform(p.normals[y][x].X),
-					G: normalTransform(p.normals[y][x].Y),
+					// Positive Y in the VNML file is toward the north.
+					// This gets flipped when ultimately writing to the png
+					// so, flip it here.
+					// G: normalTransform(p.normals[y][x].Y), // original
+					G: normalTransform(-1 * p.normals[y][x].Y),
 					B: normalTransform(p.normals[y][x].Z),
+					// setting A to 255 results in a correct normal map
 					A: d.transformHeight(p.heights[y][x]),
 				})
 			} else {
