@@ -38,11 +38,7 @@ func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight f
 	d.waterHeight = waterHeight
 
 	// Throw away all values that are underwater.
-	d.minHeight = d.waterHeight
-	/*potentialMin := float32(heightStats.Min())
-	if potentialMin < d.waterHeight {
-		d.minHeight = min(float32(heightStats.Quantile(0.1)), d.waterHeight)
-	}*/
+	d.minHeight = max(d.waterHeight, float32(heightStats.Min()))
 }
 
 // normalHeightMap generates a *_nh (normal height map) texture for openmw.
@@ -50,16 +46,6 @@ func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight f
 // tangent space normals and the alpha channel of the normal map may be used
 // to store a height map used for parallax.
 func (d *NormalHeightRenderer) Render(p *ParsedLandRecord) *image.RGBA {
-
-	// This output looks wrong in most image viewers because the alpha
-	// channel is multiplied with the color channel.
-	// Split them like this:
-	/*
-		magick input.png -alpha set -channel R -separate r.png
-		magick input.png -alpha set -channel G -separate g.png
-		magick input.png -alpha set -channel B -separate b.png
-		magick r.png g.png b.png -combine -depth 8 PNG24:output_rgb24.png
-	*/
 
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 

@@ -10,13 +10,13 @@ import (
 
 	"github.com/erinpentecost/LivelyMap/internal/hdmap"
 	"github.com/ernmw/omwpacker/cfg"
+	"golang.org/x/sync/errgroup"
 )
 
 const plugin_name = "livelymap.omwaddon"
 
 func sync(path string) error {
 	ctx := context.Background()
-
 	plugins, _, err := cfg.OpenMWPlugins(path)
 	if err != nil {
 		return fmt.Errorf("open %q: %w", path, err)
@@ -37,54 +37,67 @@ func sync(path string) error {
 		return fmt.Errorf("%q is not a directory", targetDir)
 	}
 
-	// temporary for debuggin
-	//plugins = plugins[:2]
+	return drawMaps(ctx, targetDir, plugins)
+}
 
-	parsedLands := hdmap.NewLandParser(plugins[:2])
+func drawMaps(ctx context.Context, targetDir string, plugins []string) error {
+	fmt.Printf("Parsing %d plugins...\n", len(plugins))
+	parsedLands := hdmap.NewLandParser(plugins)
 	if err := parsedLands.ParsePlugins(); err != nil {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
 	fmt.Printf("Done parsing %d cells.\n", len(parsedLands.Lands))
-	{
-		hdm := hdmap.NewCellMapper(parsedLands, &hdmap.NormalHeightRenderer{})
-		cellinfo, err := hdm.Generate(ctx)
-		if err != nil {
-			return fmt.Errorf("generate cell maps: %w", err)
-		}
 
-		normalWorldMapper := hdmap.NewWorldMapper()
-		err = normalWorldMapper.Write(
-			ctx,
-			parsedLands.MapExtents,
-			slices.Values(cellinfo),
-			filepath.Join(targetDir, "normalheightmap.dds"))
-		if err != nil {
-			return fmt.Errorf("write world map: %w", err)
-		}
+	// Render individual cells
+	fmt.Printf("Rendering %d normalheightmap cells...\n", len(parsedLands.Lands))
+	normalCells := hdmap.NewCellMapper(parsedLands, &hdmap.NormalHeightRenderer{})
+	if err := normalCells.Generate(ctx); err != nil {
+		return fmt.Errorf("generate cell maps: %w", err)
+	}
+	// Render individual cells
+	fmt.Printf("Rendering %d classic color cells...\n", len(parsedLands.Lands))
+	renderer, err := hdmap.NewClassicRenderer("")
+	if err != nil {
+		return fmt.Errorf("new classic renderer")
+	}
+	classicColorCells := hdmap.NewCellMapper(parsedLands, renderer)
+	if err := classicColorCells.Generate(ctx); err != nil {
+		return fmt.Errorf("generate cell maps: %w", err)
 	}
 
-	{
-		renderer, err := hdmap.NewClassicRenderer("")
-		if err != nil {
-			return fmt.Errorf("new classic renderer")
-		}
-		hdm := hdmap.NewCellMapper(parsedLands, renderer)
-		cellinfo, err := hdm.Generate(ctx)
-		if err != nil {
-			return fmt.Errorf("generate cell maps: %w", err)
-		}
+	g, _ := errgroup.WithContext(ctx)
+	g.SetLimit(4)
 
-		classicWorldMapper := hdmap.NewWorldMapper()
-		err = classicWorldMapper.Write(ctx,
-			parsedLands.MapExtents,
-			slices.Values(cellinfo),
-			filepath.Join(targetDir, "classic.dds"))
-		if err != nil {
-			return fmt.Errorf("write world map: %w", err)
-		}
+	for _, extents := range hdmap.FindSquares(parsedLands.MapExtents) {
+		g.Go(func() error {
+			fmt.Printf("Combining cells for extent %s...\n", extents)
+			normalWorldMapper := hdmap.NewWorldMapper()
+			err := normalWorldMapper.Write(
+				ctx,
+				extents,
+				slices.Values(normalCells.Cells),
+				filepath.Join(targetDir, fmt.Sprintf("world_%s_nh.dds", extents)))
+			if err != nil {
+				return fmt.Errorf("write world map: %w", err)
+			}
+			return nil
+		})
+
+		g.Go(func() error {
+			fmt.Printf("Combining cells for extent %s...\n", extents)
+			classicWorldMapper := hdmap.NewWorldMapper()
+			err = classicWorldMapper.Write(ctx,
+				extents,
+				slices.Values(classicColorCells.Cells),
+				filepath.Join(targetDir, fmt.Sprintf("world_%s.dds", extents)))
+			if err != nil {
+				return fmt.Errorf("write world map: %w", err)
+			}
+			return nil
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 func main() {

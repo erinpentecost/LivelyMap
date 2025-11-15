@@ -28,6 +28,7 @@ func NewWorldMapper() *WorldMapper {
 
 func (w *WorldMapper) Write(ctx context.Context, mapExtents MapCoords, cells iter.Seq[*CellInfo], path string) error {
 	w.mapExtents = mapExtents
+	fmt.Printf("Map extents: %s\n", mapExtents)
 
 	for cell := range cells {
 		if err := w.handleCell(cell); err != nil {
@@ -75,6 +76,10 @@ func (w *WorldMapper) handleCell(cell *CellInfo) error {
 		)
 	}
 
+	if w.mapExtents.NotContains(cell.X, cell.Y) {
+		return nil
+	}
+
 	// Compute tile destination pixel coordinates (in pixel units)
 	px := int(cell.X - w.mapExtents.Left)
 	py := int(w.mapExtents.Top - cell.Y) // flip world Y -> image Y (top-left image origin)
@@ -96,7 +101,7 @@ func (w *WorldMapper) handleCell(cell *CellInfo) error {
 
 	// For each row of the source, copy the row bytes into the destination.
 	// Each pixel is 4 bytes (RGBA).
-	for row := 0; row < th; row++ {
+	for row := range th {
 		// source index for the beginning of this row
 		si := (row+srcMin.Y-srcMin.Y)*srcStride + (0+srcMin.X-srcMin.X)*4
 		// destination index: (dstY0 + row) * dstStride + dstX0*4
@@ -104,7 +109,8 @@ func (w *WorldMapper) handleCell(cell *CellInfo) error {
 
 		// boundaries safety (shouldn't be needed if inputs correct)
 		if di < 0 || di+tw*4 > len(dstPix) || si < 0 || si+tw*4 > len(srcPix) {
-			return fmt.Errorf("blit out of bounds (di=%d si=%d tw=%d th=%d dstLen=%d srcLen=%d)",
+			return fmt.Errorf("cell (%d,%d) blit out of bounds (di=%d si=%d tw=%d th=%d dstLen=%d srcLen=%d)",
+				cell.X, cell.Y,
 				di, si, tw, th, len(dstPix), len(srcPix))
 		}
 		copy(dstPix[di:di+tw*4], srcPix[si:si+tw*4])

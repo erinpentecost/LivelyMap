@@ -78,6 +78,7 @@ func (l *LandParser) loadPlugins() iter.Seq2[*esm.Record, error] {
 			if err != nil {
 				err = fmt.Errorf("parse plugin %q: %w", p, err)
 			}
+			fmt.Printf("Done parsing %q\n", p)
 			pluginsChan <- &pluginsResp{
 				recs: records,
 				err:  err,

@@ -25,8 +25,9 @@ type CellMapper struct {
 
 	Renderer CellRenderer
 
-	mux   sync.Mutex
-	Cells []*CellInfo
+	cacheMux sync.Mutex
+	mux      sync.Mutex
+	Cells    []*CellInfo
 }
 
 func NewCellMapper(lp *LandParser, renderer CellRenderer) *CellMapper {
@@ -36,11 +37,13 @@ func NewCellMapper(lp *LandParser, renderer CellRenderer) *CellMapper {
 	return &CellMapper{
 		LP:       lp,
 		Renderer: renderer,
-		Cells:    []*CellInfo{},
+		Cells:    nil,
 	}
 }
 
-func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
+// Generate rendered cells. This is stored in h.Cells
+func (h *CellMapper) Generate(ctx context.Context) error {
+	h.Cells = []*CellInfo{}
 	h.Renderer.SetHeightExtents(h.LP.Heights, 0)
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -62,9 +65,9 @@ func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("render cell: %w", err)
+		return fmt.Errorf("render cell: %w", err)
 	}
-	return h.Cells, nil
+	return nil
 }
 
 type CellInfo struct {
