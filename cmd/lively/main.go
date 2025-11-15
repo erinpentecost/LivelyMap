@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -22,25 +24,30 @@ func sync(path string) error {
 		return fmt.Errorf("open %q: %w", path, err)
 	}
 
-	// find path to dump map to
-	var targetDir string
+	var rootPath string
 	for _, plugin := range plugins {
-		print(plugin + "\n")
-
 		if strings.EqualFold(filepath.Base(plugin), plugin_name) {
-			targetDir = filepath.Join(filepath.Dir(plugin), "scripts", "LivelyMap", "dump")
+			rootPath = filepath.Dir(filepath.Dir(plugin))
 		}
 	}
-	if tdir_, err := os.Stat(targetDir); err != nil {
-		return fmt.Errorf("open directory %q: %w", targetDir, err)
-	} else if !tdir_.IsDir() {
-		return fmt.Errorf("%q is not a directory", targetDir)
-	}
 
-	return drawMaps(ctx, targetDir, plugins)
+	return drawMaps(ctx, rootPath, plugins)
 }
 
-func drawMaps(ctx context.Context, targetDir string, plugins []string) error {
+func drawMaps(ctx context.Context, rootPath string, plugins []string) error {
+
+	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
+	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures")
+	core01TexturePath := filepath.Join(rootPath, "01 Color Map", "textures")
+
+	for _, texturePath := range []string{core00TexturePath, core01TexturePath, core00DataPath} {
+		if tdir_, err := os.Stat(texturePath); err != nil {
+			return fmt.Errorf("open directory %q: %w", texturePath, err)
+		} else if !tdir_.IsDir() {
+			return fmt.Errorf("%q is not a directory", texturePath)
+		}
+	}
+
 	fmt.Printf("Parsing %d plugins...\n", len(plugins))
 	parsedLands := hdmap.NewLandParser(plugins)
 	if err := parsedLands.ParsePlugins(); err != nil {
@@ -48,13 +55,13 @@ func drawMaps(ctx context.Context, targetDir string, plugins []string) error {
 	}
 	fmt.Printf("Done parsing %d cells.\n", len(parsedLands.Lands))
 
-	// Render individual cells
+	// Render individual normal cells
 	fmt.Printf("Rendering %d normalheightmap cells...\n", len(parsedLands.Lands))
 	normalCells := hdmap.NewCellMapper(parsedLands, &hdmap.NormalHeightRenderer{})
 	if err := normalCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
-	// Render individual cells
+	// Render individual classic color cells
 	fmt.Printf("Rendering %d classic color cells...\n", len(parsedLands.Lands))
 	renderer, err := hdmap.NewClassicRenderer("")
 	if err != nil {
@@ -64,40 +71,82 @@ func drawMaps(ctx context.Context, targetDir string, plugins []string) error {
 	if err := classicColorCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
-
-	g, _ := errgroup.WithContext(ctx)
-	g.SetLimit(4)
-
-	for _, extents := range hdmap.FindSquares(parsedLands.MapExtents) {
-		g.Go(func() error {
-			fmt.Printf("Combining cells for extent %s...\n", extents)
-			normalWorldMapper := hdmap.NewWorldMapper()
-			err := normalWorldMapper.Write(
-				ctx,
-				extents,
-				slices.Values(normalCells.Cells),
-				filepath.Join(targetDir, fmt.Sprintf("world_%s_nh.dds", extents)))
-			if err != nil {
-				return fmt.Errorf("write world map: %w", err)
-			}
-			return nil
+	// Set up jobs to join the sub-images together.
+	mapInfos := []MapInfo{}
+	maps := []*MapRenderJob{}
+	for i, extents := range hdmap.FindSquares(parsedLands.MapExtents) {
+		mapInfos = append(mapInfos, MapInfo{
+			Name:    fmt.Sprintf("world_%d", i),
+			Extents: extents,
 		})
-
-		g.Go(func() error {
-			fmt.Printf("Combining cells for extent %s...\n", extents)
-			classicWorldMapper := hdmap.NewWorldMapper()
-			err = classicWorldMapper.Write(ctx,
-				extents,
-				slices.Values(classicColorCells.Cells),
-				filepath.Join(targetDir, fmt.Sprintf("world_%s.dds", extents)))
-			if err != nil {
-				return fmt.Errorf("write world map: %w", err)
-			}
-			return nil
+		maps = append(maps, &MapRenderJob{
+			Directory: filepath.Join(core00TexturePath),
+			Name:      fmt.Sprintf("world_%d.dds", i),
+			Extents:   extents,
+			Cells:     classicColorCells,
+		})
+		maps = append(maps, &MapRenderJob{
+			Directory: filepath.Join(core00TexturePath),
+			Name:      fmt.Sprintf("world_%d_nh.dds", i),
+			Extents:   extents,
+			Cells:     normalCells,
 		})
 	}
 
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(4)
+	for _, m := range maps {
+		g.Go(func() error { return m.Draw(gctx) })
+	}
+
+	// Save map image info so the Lua mod knows what to do with them:
+	g.Go(func() error {
+		return printMapInfo(
+			filepath.Join(core00DataPath, "maps.json"),
+			mapInfos,
+		)
+	})
+
 	return g.Wait()
+}
+
+type MapInfo struct {
+	Name    string
+	Extents hdmap.MapCoords
+}
+
+func printMapInfo(path string, maps []MapInfo) error {
+	container := struct {
+		Maps []MapInfo
+	}{
+		Maps: maps,
+	}
+	raw, err := json.Marshal(container)
+	if err != nil {
+		return fmt.Errorf("marshal map info json: %w", err)
+	}
+	return os.WriteFile(path, raw, 0666)
+}
+
+type MapRenderJob struct {
+	Directory string `json:"-"`
+	Name      string
+	Extents   hdmap.MapCoords
+	Cells     *hdmap.CellMapper `json:"-"`
+}
+
+func (m *MapRenderJob) Draw(ctx context.Context) error {
+	fullPath := path.Join(m.Directory, m.Name)
+	fmt.Printf("Combining cells for %q...\n", fullPath)
+	classicWorldMapper := hdmap.NewWorldMapper()
+	err := classicWorldMapper.Write(ctx,
+		m.Extents,
+		slices.Values(m.Cells.Cells),
+		path.Join(m.Directory, m.Name))
+	if err != nil {
+		return fmt.Errorf("write world map %q: %w", m.Name, err)
+	}
+	return nil
 }
 
 func main() {
