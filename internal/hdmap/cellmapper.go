@@ -14,8 +14,9 @@ import (
 )
 
 type CellRenderer interface {
+	// Render turns a ParsedLandRecord into an image.
 	Render(p *ParsedLandRecord) *image.RGBA
-	SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32)
+	SetHeightExtents(heightStats Stats, waterHeight float32)
 	GetCellResolution() (x uint32, y uint32)
 }
 
@@ -24,8 +25,9 @@ type CellMapper struct {
 
 	Renderer CellRenderer
 
-	mux   sync.Mutex
-	Cells []*CellInfo
+	cacheMux sync.Mutex
+	mux      sync.Mutex
+	Cells    []*CellInfo
 }
 
 func NewCellMapper(lp *LandParser, renderer CellRenderer) *CellMapper {
@@ -35,12 +37,14 @@ func NewCellMapper(lp *LandParser, renderer CellRenderer) *CellMapper {
 	return &CellMapper{
 		LP:       lp,
 		Renderer: renderer,
-		Cells:    []*CellInfo{},
+		Cells:    nil,
 	}
 }
 
-func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
-	h.Renderer.SetHeightExtents(h.LP.MinHeight, h.LP.MaxHeight, 0)
+// Generate rendered cells. This is stored in h.Cells
+func (h *CellMapper) Generate(ctx context.Context) error {
+	h.Cells = []*CellInfo{}
+	h.Renderer.SetHeightExtents(h.LP.Heights, 0)
 
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(4)
@@ -49,9 +53,9 @@ func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
 		g.Go(func() error {
 			//fmt.Printf("Rendering cell %d,%d\n", parsed.x, parsed.y)
 			outCell := &CellInfo{
-				X:               parsed.x,
-				Y:               parsed.y,
-				NormalHeightMap: h.Renderer.Render(parsed),
+				X:     parsed.x,
+				Y:     parsed.y,
+				Image: h.Renderer.Render(parsed),
 			}
 			h.mux.Lock()
 			defer h.mux.Unlock()
@@ -61,14 +65,13 @@ func (h *CellMapper) Generate(ctx context.Context) ([]*CellInfo, error) {
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, fmt.Errorf("render cell: %w", err)
+		return fmt.Errorf("render cell: %w", err)
 	}
-	return h.Cells, nil
+	return nil
 }
 
 type CellInfo struct {
-	X               int32
-	Y               int32
-	NormalHeightMap image.Image
-	Color           image.Image
+	X     int32
+	Y     int32
+	Image *image.RGBA
 }

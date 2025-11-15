@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"math"
+	"os"
 
 	_ "embed"
 
@@ -13,19 +15,18 @@ import (
 )
 
 //go:embed ramp.bmp
-var rampFile []byte
+var classicRampFile []byte
 
-// height of 0.000 should be x=128
-var ramp [256]color.RGBA
-
-func init() {
-	rampImg, err := bmp.Decode(bytes.NewReader(rampFile))
+func LoadRamp(rawBmp io.Reader) ([256]color.RGBA, error) {
+	// height of 0.000 should be x=128
+	var ramp [256]color.RGBA
+	rampImg, err := bmp.Decode(rawBmp)
 	if err != nil {
-		panic(fmt.Errorf("failed to decode color ramp BMP: %w", err))
+		return ramp, fmt.Errorf("failed to decode color ramp BMP: %w", err)
 	}
 	b := rampImg.Bounds()
 	if b.Dy() != 1 || b.Dx() < 256 {
-		panic(fmt.Errorf("invalid color ramp dimensions (expected 1x256, got %dx%d)", b.Dx(), b.Dy()))
+		return ramp, fmt.Errorf("invalid color ramp dimensions (expected 1x256, got %dx%d)", b.Dx(), b.Dy())
 	}
 	for x := range 256 {
 		r, g, b, a := rampImg.At(x, 0).RGBA()
@@ -36,22 +37,49 @@ func init() {
 			A: uint8(a >> 8),
 		}
 	}
+	return ramp, nil
 }
 
 type ClassicRenderer struct {
 	minHeight   float32
 	maxHeight   float32
 	waterHeight float32
+	ramp        [256]color.RGBA
+}
+
+func NewClassicRenderer(rampFilePath string) (*ClassicRenderer, error) {
+	if len(rampFilePath) == 0 {
+		rmp, err := LoadRamp(bytes.NewReader(classicRampFile))
+		if err != nil {
+			return nil, fmt.Errorf("loading default ramp: %w", err)
+		}
+		return &ClassicRenderer{ramp: rmp}, nil
+	}
+	file, err := os.Open(rampFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
+	}
+	rmp, err := LoadRamp(file)
+	if err != nil {
+		return nil, fmt.Errorf("loading default ramp: %w", err)
+	}
+	return &ClassicRenderer{ramp: rmp}, nil
 }
 
 func (d *ClassicRenderer) GetCellResolution() (x uint32, y uint32) {
 	return gridSize, gridSize
 }
 
-func (d *ClassicRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
-	d.minHeight = minHeight
-	d.maxHeight = maxHeight
+func (d *ClassicRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
+	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
+
+	// Throw away extreme low values that are underwater.
+	// We are raising the "floor" here.
+	potentialMin := float32(heightStats.Min())
+	if potentialMin < d.waterHeight {
+		d.minHeight = min(float32(heightStats.Quantile(0.1)), d.waterHeight)
+	}
 }
 
 // normalHeightMap generates a *_nh (normal height map) texture for openmw.
@@ -59,39 +87,63 @@ func (d *ClassicRenderer) SetHeightExtents(minHeight float32, maxHeight float32,
 // tangent space normals and the alpha channel of the normal map may be used
 // to store a height map used for parallax.
 func (d *ClassicRenderer) Render(p *ParsedLandRecord) *image.RGBA {
-
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
 	// Throw away the last column and row.
 	// This is how I'm sampling a quad into a single pixel.
-
-	// Normal mapping in wikipedia has this spec:
-	// X: -1 to +1 :  Red:     0 to 255
-	// Y: -1 to +1 :  Green:   0 to 255
-	// Z:  0 to -1 :  Blue:  128 to 255
-
 	for y := range gridSize {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-			img.SetRGBA(x, iy, ramp[d.transformHeight(p.heights[y][x])])
+			img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
 		}
 	}
 	return img
 }
 
-func (d *ClassicRenderer) transformHeight(v float32) int {
-	if v < d.minHeight {
+func (d *ClassicRenderer) transformHeight(v float32) byte {
+	// clamp extremes
+	if v <= d.minHeight {
 		return 0
 	}
-	if v > d.maxHeight {
-		return math.MaxUint8
+	if v >= d.maxHeight {
+		return 0xFF // 255
 	}
-	if v < 0 {
-		normalized := (v - d.minHeight) / (-1 * d.minHeight)
-		return int(normalized * math.MaxUint8)
-	} else {
-		normalized := v / d.maxHeight
-		return int(normalized * math.MaxUint8)
+
+	// exact water line -> the first value of the upper half
+	if v == d.waterHeight {
+		return 128
 	}
+
+	if v < d.waterHeight {
+		denom := d.waterHeight - d.minHeight
+		if denom == 0 {
+			return 0
+		}
+		normalized := float64((v - d.minHeight) / denom) // 0..1
+		// map to 0..127 (128 values)
+		val := math.Round(normalized * 127.0)
+		if val < 0 {
+			val = 0
+		}
+		if val > 127 {
+			val = 127
+		}
+		return byte(uint8(val))
+	}
+
+	// v > waterHeight -> map to 128..255 (128 values)
+	denom := d.maxHeight - d.waterHeight
+	if denom == 0 {
+		return 0xFF
+	}
+	normalized := float64((v - d.waterHeight) / denom) // 0..1
+	val := math.Round(normalized * 127.0)              // 0..127
+	if val < 0 {
+		val = 0
+	}
+	if val > 127 {
+		val = 127
+	}
+	return byte(uint8(128 + int(val)))
 }

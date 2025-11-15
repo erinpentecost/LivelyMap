@@ -33,10 +33,12 @@ func (d *NormalHeightRenderer) GetCellResolution() (x uint32, y uint32) {
 	return gridSize, gridSize
 }
 
-func (d *NormalHeightRenderer) SetHeightExtents(minHeight float32, maxHeight float32, waterHeight float32) {
-	d.minHeight = minHeight
-	d.maxHeight = maxHeight
+func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
+	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
+
+	// Throw away all values that are underwater.
+	d.minHeight = max(d.waterHeight, float32(heightStats.Min()))
 }
 
 // normalHeightMap generates a *_nh (normal height map) texture for openmw.
@@ -62,8 +64,13 @@ func (d *NormalHeightRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 			if p.heights[y][x] >= d.waterHeight {
 				img.SetRGBA(x, iy, color.RGBA{
 					R: normalTransform(p.normals[y][x].X),
-					G: normalTransform(p.normals[y][x].Y),
+					// Positive Y in the VNML file is toward the north.
+					// This gets flipped when ultimately writing to the png
+					// so, flip it here.
+					// G: normalTransform(p.normals[y][x].Y), // original
+					G: normalTransform(-1 * p.normals[y][x].Y),
 					B: normalTransform(p.normals[y][x].Z),
+					// setting A to 255 results in a correct normal map
 					A: d.transformHeight(p.heights[y][x]),
 				})
 			} else {
