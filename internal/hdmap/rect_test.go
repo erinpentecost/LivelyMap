@@ -49,7 +49,7 @@ func TestFindSquares_ChoppingCase(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FindSquares(tt.input)
+			result := findSquares(tt.input)
 			if len(result) != 2 {
 				t.Fatalf("Expected 2 results for large map, got %d", len(result))
 			}
@@ -71,7 +71,7 @@ func TestFindSquares_PerfectSquare(t *testing.T) {
 	perfectSquareMap := MapCoords{Top: 50, Bottom: -49, Left: -50, Right: 49}
 
 	t.Run("Perfect Square Map (100x100)", func(t *testing.T) {
-		result := FindSquares(perfectSquareMap)
+		result := findSquares(perfectSquareMap)
 		if len(result) != 1 {
 			t.Fatalf("Expected 1 result for perfect square map, got %d", len(result))
 		}

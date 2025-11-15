@@ -74,7 +74,7 @@ func drawMaps(ctx context.Context, rootPath string, plugins []string) error {
 	// Set up jobs to join the sub-images together.
 	mapInfos := []MapInfo{}
 	maps := []*MapRenderJob{}
-	for i, extents := range hdmap.FindSquares(parsedLands.MapExtents) {
+	for i, extents := range hdmap.Partition(parsedLands.MapExtents) {
 		mapInfos = append(mapInfos, MapInfo{
 			Name:    fmt.Sprintf("world_%d", i),
 			Extents: extents,
@@ -144,7 +144,7 @@ func (m *MapRenderJob) Draw(ctx context.Context) error {
 		slices.Values(m.Cells.Cells),
 		path.Join(m.Directory, m.Name))
 	if err != nil {
-		return fmt.Errorf("write world map %q: %w", m.Name, err)
+		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)
 	}
 	return nil
 }
