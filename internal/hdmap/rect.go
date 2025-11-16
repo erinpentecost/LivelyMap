@@ -211,8 +211,8 @@ func Partition(m MapCoords) []SubmapNode {
 		// If the square is small enough, don't subdivide it.
 		width := 1 + square.Right - square.Left
 		height := 1 + square.Top - square.Bottom
-		// Vvardenfell is 43x41.
-		if width*height <= 43*41 {
+		// Vvardenfell is 43x42.
+		if width*height <= 43*42 {
 			partitions = append(partitions, square)
 			continue
 		}

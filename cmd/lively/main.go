@@ -31,7 +31,7 @@ func sync(path string) error {
 		}
 	}
 
-	return drawMaps(ctx, rootPath, plugins)
+	return drawMaps(ctx, rootPath, plugins[:2])
 }
 
 func drawMaps(ctx context.Context, rootPath string, plugins []string) error {
