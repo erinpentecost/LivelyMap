@@ -11,6 +11,10 @@ import (
 	_ "embed"
 )
 
+type TextureColorCache struct {
+	dataPaths []string
+}
+
 type TexRenderer struct {
 	minHeight   float32
 	maxHeight   float32

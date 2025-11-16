@@ -1,9 +1,9 @@
 package hdmap
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
-	"iter"
 	"math"
 	"slices"
 
@@ -19,8 +19,10 @@ var fallbackVtex [][]uint16
 
 func init() {
 	fallbackNormals = make([][]land.VertexField, 65)
+	fallbackVtex = make([][]uint16, 65)
 	for i := range fallbackNormals {
 		fallbackNormals[i] = make([]land.VertexField, 65)
+		fallbackVtex[i] = make([]uint16, 65)
 		for b := range 65 {
 			fallbackNormals[i][b] = land.VertexField{
 				X: 0,
@@ -63,154 +65,36 @@ func NewLandParser(plugins []string) *LandParser {
 }
 
 func (l *LandParser) ParsePlugins() error {
-	records := l.loadPlugins()
-	if err := l.recordsToCellInfo(records); err != nil {
-		return fmt.Errorf("records to cell info: %w", err)
-	}
-	return nil
-}
-
-const LTEX esm.RecordTag = "LTEX"
-
-func parseLtex(s *esm.Record) (index uint16, path string, err error) {
-	for _, s := range s.Subrecords {
-		switch s.Tag {
-		case ltex.INTV:
-			parsed := ltex.INTVField{}
-			err = parsed.Unmarshal(s)
-			if err != nil {
-				return
-			}
-			index = uint16(parsed.Value)
-		case ltex.DATA:
-			parsed := ltex.DATAField{}
-			err = parsed.Unmarshal(s)
-			if err != nil {
-				return
-			}
-			path = parsed.Value
-		}
-	}
-	return
-}
-
-func (l *LandParser) loadPlugins() iter.Seq2[*esm.Record, error] {
-	LANDs := make(map[string]*esm.Record)
-	type pluginsResp struct {
-		recs []*esm.Record
-		err  error
-	}
-
-	pluginsChan := make(chan *pluginsResp, 2)
-	go func() {
-		defer close(pluginsChan)
-		for _, p := range slices.Backward(l.Plugins) {
-			fmt.Printf("Parsing %q\n", p)
-			records, err := esm.ParsePluginFile(p)
-			if err != nil {
-				err = fmt.Errorf("parse plugin %q: %w", p, err)
-			}
-			fmt.Printf("Done parsing %q\n", p)
-			pluginsChan <- &pluginsResp{
-				recs: records,
-				err:  err,
-			}
-		}
-	}()
-
-	return func(yield func(*esm.Record, error) bool) {
-		// iterate through records; later plugins override earlier ones
-		for resp := range pluginsChan {
-			if resp.err != nil {
-				fmt.Printf("error parsing plugin: %v", resp.err)
-				continue
-			}
-			for _, rec := range resp.recs {
-				// extract ltex info since we're here
-				// already. this is super gross and I should
-				// clean it up later.
-				if rec.Tag == LTEX {
-					idx, path, err := parseLtex(rec)
-					if err != nil {
-						fmt.Printf("failed to parse LTEX record")
-					} else {
-						if _, present := l.LandTextures[idx]; !present {
-							l.LandTextures[idx] = path
-						}
-					}
-				}
-				// Only interested in LAND records
-				if rec.Tag != land.LAND {
-					continue
-				}
-				var intv *esm.Subrecord
-				var vhgt *esm.Subrecord
-				for _, s := range rec.Subrecords {
-					if s.Tag == land.INTV {
-						intv = s
-					} else if s.Tag == land.VHGT && s != nil {
-						vhgt = s
-					}
-				}
-				if intv == nil || len(intv.Data) < 8 {
-					// no coordinates — skip this LAND record
-					fmt.Printf("skipping LAND because INTV is bad\n")
-					continue
-				}
-				key := string(intv.Data)
-
-				if vhgt == nil {
-					// no texture height data, skip.
-					fmt.Printf("skipping LAND %q because VHGT is empty\n", key)
-					continue
-				} else if len(vhgt.Data) == 0 {
-					// bad height data, skip.
-					fmt.Printf("skipping LAND %q because VHGT is bad:\n\t%s\n", key, hex.EncodeToString(vhgt.Data))
-					continue
-				}
-
-				if _, filled := LANDs[key]; filled {
-					// alread filled out. skip.
-					fmt.Printf("skipping LAND %q because it was already seen\n", key)
-					continue
-				}
-				LANDs[key] = rec
-				if !yield(rec, nil) {
-					return
-				}
-			}
-		}
-	}
-}
-
-func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error {
-	// Do first pass on records to find extents.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	present := map[uint64]bool{}
 
-	for lnd, err := range recs {
-		if err != nil {
-			return fmt.Errorf("range over records iter: %w", err)
-		}
-		if lnd.Tag != land.LAND {
-			continue
-		}
-
-		parsed, err := l.parseLandRecord(lnd)
-		if err != nil {
-			return fmt.Errorf("parse land record: %w", err)
-		}
-		l.Lands = append(l.Lands, parsed)
-		present[coordKey(parsed.x, parsed.y)] = true
-		// calc XY extents
-		l.MapExtents.Left = min(l.MapExtents.Left, parsed.x)
-		l.MapExtents.Right = max(l.MapExtents.Right, parsed.x)
-		l.MapExtents.Top = max(l.MapExtents.Top, parsed.y)
-		l.MapExtents.Bottom = min(l.MapExtents.Bottom, parsed.y)
-		// calc Z extents
-		for x := range parsed.heights {
-			for y := range parsed.heights[x] {
-				l.Heights.Add(float64(parsed.heights[x][y]), 1)
+	for rec := range l.loadPlugins(ctx) {
+		switch rec.Tag {
+		case LTEX:
+			idx, path, err := parseLtex(rec)
+			if err != nil {
+				return fmt.Errorf("failed to parse LTEX record")
+			}
+			l.LandTextures[idx] = path
+		case land.LAND:
+			parsed, err := l.parseLandRecord(rec)
+			if err != nil {
+				return fmt.Errorf("parse land record: %w", err)
+			}
+			l.Lands = append(l.Lands, parsed)
+			present[coordKey(parsed.x, parsed.y)] = true
+			// calc XY extents
+			l.MapExtents.Left = min(l.MapExtents.Left, parsed.x)
+			l.MapExtents.Right = max(l.MapExtents.Right, parsed.x)
+			l.MapExtents.Top = max(l.MapExtents.Top, parsed.y)
+			l.MapExtents.Bottom = min(l.MapExtents.Bottom, parsed.y)
+			// calc Z extents
+			for x := range parsed.heights {
+				for y := range parsed.heights[x] {
+					l.Heights.Add(float64(parsed.heights[x][y]), 1)
+				}
 			}
 		}
 	}
@@ -240,6 +124,130 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 	}
 
 	return nil
+}
+
+const LTEX esm.RecordTag = "LTEX"
+
+func parseLtex(s *esm.Record) (index uint16, path string, err error) {
+	for _, s := range s.Subrecords {
+		switch s.Tag {
+		case ltex.INTV:
+			parsed := ltex.INTVField{}
+			err = parsed.Unmarshal(s)
+			if err != nil {
+				return
+			}
+			index = uint16(parsed.Value)
+		case ltex.DATA:
+			parsed := ltex.DATAField{}
+			err = parsed.Unmarshal(s)
+			if err != nil {
+				return
+			}
+			path = parsed.Value
+		}
+	}
+	return
+}
+
+// loadPlugins reads in plugins and returns a filtered set of active records.
+// These have been deduped, with overridden records dropped.
+func (l *LandParser) loadPlugins(ctx context.Context) <-chan *esm.Record {
+	LTEXs := make(map[uint16]*esm.Record)
+	LANDs := make(map[string]*esm.Record)
+	type pluginsResp struct {
+		recs []*esm.Record
+		err  error
+	}
+
+	pluginsChan := make(chan *pluginsResp, 2)
+	go func() {
+		defer close(pluginsChan)
+		for _, p := range slices.Backward(l.Plugins) {
+			fmt.Printf("Parsing %q\n", p)
+			records, err := esm.ParsePluginFile(p)
+			if err != nil {
+				err = fmt.Errorf("parse plugin %q: %w", p, err)
+			}
+			fmt.Printf("Done parsing %q\n", p)
+			pluginsChan <- &pluginsResp{
+				recs: records,
+				err:  err,
+			}
+		}
+	}()
+
+	out := make(chan *esm.Record, 10)
+
+	go func() {
+		defer close(out)
+		// iterate through records; later plugins override earlier ones
+		for resp := range pluginsChan {
+			if resp.err != nil {
+				fmt.Printf("error parsing plugin: %v", resp.err)
+				continue
+			}
+			for _, rec := range resp.recs {
+				switch rec.Tag {
+				case LTEX:
+					idx, _, err := parseLtex(rec)
+					if err != nil {
+						fmt.Printf("failed to parse LTEX record")
+					} else {
+						if _, present := LTEXs[idx]; !present {
+							LTEXs[idx] = rec
+							select {
+							case out <- rec:
+							case <-ctx.Done():
+								return
+							}
+						}
+					}
+				case land.LAND:
+					var intv *esm.Subrecord
+					var vhgt *esm.Subrecord
+					for _, s := range rec.Subrecords {
+						if s.Tag == land.INTV {
+							intv = s
+						} else if s.Tag == land.VHGT && s != nil {
+							vhgt = s
+						}
+					}
+					if intv == nil || len(intv.Data) < 8 {
+						// no coordinates — skip this LAND record
+						fmt.Printf("skipping LAND because INTV is bad\n")
+						continue
+					}
+					key := string(intv.Data)
+
+					if vhgt == nil {
+						// no texture height data, skip.
+						fmt.Printf("skipping LAND %q because VHGT is empty\n", key)
+						continue
+					} else if len(vhgt.Data) == 0 {
+						// bad height data, skip.
+						fmt.Printf("skipping LAND %q because VHGT is bad:\n\t%s\n", key, hex.EncodeToString(vhgt.Data))
+						continue
+					}
+
+					if _, filled := LANDs[key]; filled {
+						// alread filled out. skip.
+						fmt.Printf("skipping LAND %q because it was already seen\n", key)
+						continue
+					}
+					LANDs[key] = rec
+					select {
+					case out <- rec:
+					case <-ctx.Done():
+						return
+					}
+				default:
+					continue
+				}
+			}
+		}
+	}()
+	return out
 }
 
 func coordKey(x int32, y int32) uint64 {
