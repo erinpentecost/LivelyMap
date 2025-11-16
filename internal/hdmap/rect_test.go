@@ -49,7 +49,7 @@ func TestFindSquares_ChoppingCase(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FindSquares(tt.input)
+			result := findSquares(tt.input)
 			if len(result) != 2 {
 				t.Fatalf("Expected 2 results for large map, got %d", len(result))
 			}
@@ -71,7 +71,7 @@ func TestFindSquares_PerfectSquare(t *testing.T) {
 	perfectSquareMap := MapCoords{Top: 50, Bottom: -49, Left: -50, Right: 49}
 
 	t.Run("Perfect Square Map (100x100)", func(t *testing.T) {
-		result := FindSquares(perfectSquareMap)
+		result := findSquares(perfectSquareMap)
 		if len(result) != 1 {
 			t.Fatalf("Expected 1 result for perfect square map, got %d", len(result))
 		}
@@ -79,4 +79,130 @@ func TestFindSquares_PerfectSquare(t *testing.T) {
 			t.Errorf("Expected %v, got %v", perfectSquareMap, result[0])
 		}
 	})
+}
+
+func TestConnectMapCoords(t *testing.T) {
+	// Index layout (Top increases upward):
+	//
+	//       [0] North
+	// [2] Left   [4] Right
+	//       [3] South
+	//
+	coords := []MapCoords{
+		{Top: 20, Bottom: 10, Left: -5, Right: 5},  // 0 = North
+		{Top: 10, Bottom: 0, Left: -5, Right: 5},   // 1 = Center
+		{Top: 10, Bottom: 0, Left: -15, Right: -5}, // 2 = Left
+		{Top: 0, Bottom: -10, Left: -5, Right: 5},  // 3 = South
+		{Top: 10, Bottom: 0, Left: 5, Right: 15},   // 4 = Right
+	}
+
+	nodes := connectMapCoords(coords)
+
+	// Check center connections
+	center := nodes[1]
+
+	check := func(dir Direction, want SubmapID) {
+		n, ok := center.ConnectedTo[dir]
+		if !ok {
+			t.Fatalf("missing %v connection", dir)
+		}
+		if n != want {
+			t.Fatalf("wrong %v connection: got %d want %d", dir, n, want)
+		}
+	}
+
+	check(North, 0)
+	check(South, 3)
+	check(West, 2)
+	check(East, 4)
+}
+
+func TestMapCoordsUtilities(t *testing.T) {
+	m := MapCoords{
+		Top:    10,
+		Bottom: 0,
+		Left:   -5,
+		Right:  5,
+	}
+
+	// String formatting
+	if got := m.String(); got != "0_-5_10_5" {
+		t.Fatalf("String() wrong: got %q want %q", got, "0_-5_10_5")
+	}
+
+	// Center
+	x, y := m.Center()
+	if x != 0 || y != 5 {
+		t.Fatalf("Center() wrong: got (%d,%d), want (0,5)", x, y)
+	}
+
+	// Containment
+	if m.NotContainsPoint(0, 5) {
+		t.Fatalf("NotContainsPoint incorrectly returned true for interior point")
+	}
+	if !m.NotContainsPoint(100, 5) {
+		t.Fatalf("NotContainsPoint incorrectly returned false for exterior point")
+	}
+
+	// Superset
+	small := MapCoords{
+		Top:    8,
+		Bottom: 2,
+		Left:   -3,
+		Right:  3,
+	}
+	if !m.SupersetOf(small) {
+		t.Fatalf("SupersetOf: expected large to contain small")
+	}
+
+	// Negative case
+	overhang := MapCoords{
+		Top:    12, // sticks out above
+		Bottom: 2,
+		Left:   -3,
+		Right:  3,
+	}
+	if m.SupersetOf(overhang) {
+		t.Fatalf("SupersetOf: incorrectly returned true for non-contained region")
+	}
+}
+
+func TestPartitionAndConnectivity(t *testing.T) {
+	// A deliberately uneven rectangle forcing findSquares() to split it.
+	// Width = 20, height = 10 → two vertical squares each size 10.
+	m := MapCoords{
+		Top:    10,
+		Bottom: 0,
+		Left:   0,
+		Right:  19,
+	}
+
+	parts := Partition(m)
+
+	if len(parts) == 0 {
+		t.Fatalf("Partition returned zero parts")
+	}
+
+	// Every returned node should:
+	// 1. Be a square
+	// 2. Have correct 1:1 IDs
+	for _, node := range parts {
+		w := 1 + node.Extents.Right - node.Extents.Left
+		h := 1 + node.Extents.Top - node.Extents.Bottom
+		if w != h {
+			t.Fatalf("Partition returned non-square region: %v (w=%d h=%d)", node.Extents, w, h)
+		}
+	}
+
+	// Connectivity sanity: each node should have at least one connection
+	// unless it's an isolated single-node partition (not possible here).
+	missing := 0
+	for _, node := range parts {
+		if len(node.ConnectedTo) == 0 {
+			missing++
+		}
+	}
+	if missing > 0 {
+		t.Fatalf("Expected all partition nodes to have at least one connection, missing=%d", missing)
+	}
 }

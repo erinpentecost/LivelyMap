@@ -1,1 +1,1 @@
-{"Maps":[{"Name":"world_0","Extents":{"Top":33,"Bottom":-59,"Left":-139,"Right":-47}},{"Name":"world_1","Extents":{"Top":33,"Bottom":-59,"Left":-43,"Right":49}}]}
+{"Maps":[{"Extents":{"Top":27,"Bottom":-14,"Left":-18,"Right":23},"ID":0,"ConnectedTo":{"south":1},"CenterX":2,"CenterY":6},{"Extents":{"Top":25,"Bottom":-16,"Left":-18,"Right":23},"ID":1,"ConnectedTo":{"north":0},"CenterX":2,"CenterY":4}]}

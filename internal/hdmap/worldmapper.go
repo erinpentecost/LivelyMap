@@ -30,6 +30,10 @@ func (w *WorldMapper) Write(ctx context.Context, mapExtents MapCoords, cells ite
 	w.mapExtents = mapExtents
 	fmt.Printf("Map extents: %s\n", mapExtents)
 
+	if w.mapExtents.Bottom > w.mapExtents.Top || w.mapExtents.Left > w.mapExtents.Right {
+		return fmt.Errorf("invalid extents: %s", w.mapExtents)
+	}
+
 	for cell := range cells {
 		if err := w.handleCell(cell); err != nil {
 			return fmt.Errorf("handleCell: %w", err)
@@ -76,7 +80,7 @@ func (w *WorldMapper) handleCell(cell *CellInfo) error {
 		)
 	}
 
-	if w.mapExtents.NotContains(cell.X, cell.Y) {
+	if w.mapExtents.NotContainsPoint(cell.X, cell.Y) {
 		return nil
 	}
 

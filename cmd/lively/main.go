@@ -31,7 +31,7 @@ func sync(path string) error {
 		}
 	}
 
-	return drawMaps(ctx, rootPath, plugins)
+	return drawMaps(ctx, rootPath, plugins[:2])
 }
 
 func drawMaps(ctx context.Context, rootPath string, plugins []string) error {
@@ -72,23 +72,21 @@ func drawMaps(ctx context.Context, rootPath string, plugins []string) error {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
 	// Set up jobs to join the sub-images together.
-	mapInfos := []MapInfo{}
-	maps := []*MapRenderJob{}
-	for i, extents := range hdmap.FindSquares(parsedLands.MapExtents) {
-		mapInfos = append(mapInfos, MapInfo{
-			Name:    fmt.Sprintf("world_%d", i),
-			Extents: extents,
-		})
-		maps = append(maps, &MapRenderJob{
+	mapInfos := []hdmap.SubmapNode{}
+	maps := []*mapRenderJob{}
+	for _, extents := range hdmap.Partition(parsedLands.MapExtents) {
+		mapInfos = append(mapInfos, extents)
+
+		maps = append(maps, &mapRenderJob{
 			Directory: filepath.Join(core00TexturePath),
-			Name:      fmt.Sprintf("world_%d.dds", i),
-			Extents:   extents,
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
 			Cells:     classicColorCells,
 		})
-		maps = append(maps, &MapRenderJob{
+		maps = append(maps, &mapRenderJob{
 			Directory: filepath.Join(core00TexturePath),
-			Name:      fmt.Sprintf("world_%d_nh.dds", i),
-			Extents:   extents,
+			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+			Extents:   extents.Extents,
 			Cells:     normalCells,
 		})
 	}
@@ -110,14 +108,9 @@ func drawMaps(ctx context.Context, rootPath string, plugins []string) error {
 	return g.Wait()
 }
 
-type MapInfo struct {
-	Name    string
-	Extents hdmap.MapCoords
-}
-
-func printMapInfo(path string, maps []MapInfo) error {
+func printMapInfo(path string, maps []hdmap.SubmapNode) error {
 	container := struct {
-		Maps []MapInfo
+		Maps []hdmap.SubmapNode
 	}{
 		Maps: maps,
 	}
@@ -128,14 +121,14 @@ func printMapInfo(path string, maps []MapInfo) error {
 	return os.WriteFile(path, raw, 0666)
 }
 
-type MapRenderJob struct {
-	Directory string `json:"-"`
+type mapRenderJob struct {
+	Directory string
 	Name      string
 	Extents   hdmap.MapCoords
-	Cells     *hdmap.CellMapper `json:"-"`
+	Cells     *hdmap.CellMapper
 }
 
-func (m *MapRenderJob) Draw(ctx context.Context) error {
+func (m *mapRenderJob) Draw(ctx context.Context) error {
 	fullPath := path.Join(m.Directory, m.Name)
 	fmt.Printf("Combining cells for %q...\n", fullPath)
 	classicWorldMapper := hdmap.NewWorldMapper()
@@ -144,7 +137,7 @@ func (m *MapRenderJob) Draw(ctx context.Context) error {
 		slices.Values(m.Cells.Cells),
 		path.Join(m.Directory, m.Name))
 	if err != nil {
-		return fmt.Errorf("write world map %q: %w", m.Name, err)
+		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)
 	}
 	return nil
 }
