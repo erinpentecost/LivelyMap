@@ -11,36 +11,75 @@ import (
 	_ "embed"
 )
 
-type TextureColorCache struct {
-	dataPaths []string
+type colorSampler struct {
+	source image.Image
+	dx     int
+	dy     int
+}
+
+func newColorSampler(source image.Image) *colorSampler {
+	x := source.Bounds().Dx()
+	y := source.Bounds().Dy()
+	if x == 0 || y == 0 {
+		return nil
+	}
+	return &colorSampler{
+		source: source,
+		dx:     x,
+		dy:     y,
+	}
+}
+
+func (c *colorSampler) Sample(x, y int) color.Color {
+	return c.source.At(
+		x%c.dx,
+		y%c.dy,
+	)
 }
 
 type TexRenderer struct {
 	minHeight   float32
 	maxHeight   float32
 	waterHeight float32
-	// ramp is still used for water
-	ramp            [256]color.RGBA
-	texIndexToColor map[uint16]color.RGBA
+	// ramp is still used for water and as a fallback
+	ramp     [256]color.RGBA
+	textures map[uint16]*colorSampler
 }
 
-func NewTexRenderer(rampFilePath string, texIndexToColor map[uint16]color.RGBA) (*TexRenderer, error) {
+func NewTexRenderer(rampFilePath string, textures map[uint16]image.Image) (*TexRenderer, error) {
+	out := &TexRenderer{}
+
+	// load rampfile
 	if len(rampFilePath) == 0 {
 		rmp, err := LoadRamp(bytes.NewReader(classicRampFile))
 		if err != nil {
 			return nil, fmt.Errorf("loading default ramp: %w", err)
 		}
-		return &TexRenderer{ramp: rmp}, nil
+		out.ramp = rmp
+	} else {
+		file, err := os.Open(rampFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
+		}
+		rmp, err := LoadRamp(file)
+		if err != nil {
+			return nil, fmt.Errorf("loading default ramp: %w", err)
+		}
+		out.ramp = rmp
 	}
-	file, err := os.Open(rampFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
+
+	// textures
+	out.textures = map[uint16]*colorSampler{}
+	for idx, img := range textures {
+		if idx != math.MaxUint16 {
+			sampler := newColorSampler(img)
+			if sampler != nil {
+				out.textures[idx] = sampler
+			}
+		}
 	}
-	rmp, err := LoadRamp(file)
-	if err != nil {
-		return nil, fmt.Errorf("loading default ramp: %w", err)
-	}
-	return &TexRenderer{ramp: rmp, texIndexToColor: map[uint16]color.RGBA{}}, nil
+
+	return out, nil
 }
 
 func (d *TexRenderer) GetCellResolution() (x uint32, y uint32) {
@@ -68,8 +107,27 @@ func (d *TexRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
+
 			if p.heights[y][x] >= d.waterHeight {
-				// get color from texture map
+				ty := iy / 4
+				tx := x / 4
+				// get color from texture map if available
+				if len(p.vtex) < 16 || len(p.vtex[ty]) < 16 {
+					//fmt.Printf("Mangled VTEX record for cell %d,%d\n", p.x, p.y)
+					img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
+					continue
+				}
+				texIndex := p.vtex[ty][tx]
+				tex, ok := d.textures[texIndex]
+				if !ok {
+					//fmt.Printf("Unknown texture %d in VTEX record for cell %d,%d\n", texIndex, p.x, p.y)
+					continue
+					//img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
+				} else {
+					// sample color from tex
+					// todo: pick a random color instead
+					img.Set(x, iy, tex.Sample(x, iy))
+				}
 			} else {
 				// use water ramp color
 				img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])

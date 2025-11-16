@@ -31,6 +31,8 @@ github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964/go.mod h1:Xd9
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/dblezek/tga v0.0.0-20150626111426-80720cbc1017 h1:awJfkE1xXsPK+yOi1JfFBYCrSBkZXWbOgEFL6dmYeUA=
+github.com/dblezek/tga v0.0.0-20150626111426-80720cbc1017/go.mod h1:47yJHzYP/+2SCHY45B0eyR1QaecoOhkTTpS7UasE0DY=
 github.com/dlclark/regexp2 v1.1.6/go.mod h1:2pZnwuY/m+8K6iRw6wQdMtk+rH5tNGR1i55kozfMjCc=
 github.com/dlclark/regexp2 v1.2.0/go.mod h1:2pZnwuY/m+8K6iRw6wQdMtk+rH5tNGR1i55kozfMjCc=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
@@ -49,7 +51,11 @@ github.com/ernmw/omwpacker v0.0.0-20251112005715-f36d6b3d4f5a h1:kDWYimBJKrRNVxx
 github.com/ernmw/omwpacker v0.0.0-20251112005715-f36d6b3d4f5a/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
 github.com/ernmw/omwpacker v0.0.0-20251116045327-10400d08e97d h1:APymB8bTFXn7HioWj4Rtyp/8yaPqv0pPG5WCVdtEJeI=
 github.com/ernmw/omwpacker v0.0.0-20251116045327-10400d08e97d/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
+github.com/ernmw/omwpacker v0.3.0 h1:jVTAshjNoqAYVNWeGhJXD2mBILTdywJQ7+vKGm+IKxQ=
+github.com/ernmw/omwpacker v0.3.0/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
+github.com/galaco/dxt v0.0.0-20190227194637-c61fd9851f0b h1:9bq7/AiG+NnLDLo8bIZFXDIGuxTMM973mgNzEJ5tbBI=
+github.com/galaco/dxt v0.0.0-20190227194637-c61fd9851f0b/go.mod h1:X/6UtAHv99sFgg/2as6275XXCm3AXrG3O5vkBzxTwe4=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
@@ -89,6 +95,8 @@ github.com/mattn/go-colorable v0.1.4/go.mod h1:U0ppj6V5qS13XJ6of8GYAs25YV2eR4EVc
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/mattn/go-isatty v0.0.8/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hdxcsrc5s=
 github.com/mattn/go-isatty v0.0.11/go.mod h1:PhnuNfih5lzO57/f3n+odYbM4JtupLOxQOAqxQCu2WE=
+github.com/mauserzjeh/dxt v1.0.0 h1:5Qb1aqvdYGAKzQuZQ3lJGKzUje2WswXNvaZkWd0NqG0=
+github.com/mauserzjeh/dxt v1.0.0/go.mod h1:Ulty8+/KXIxoS/sOspJ2z/aPdsXnDH+sCWdZHQSD51k=
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/nkovacs/streamquote v0.0.0-20170412213628-49af9bddb229/go.mod h1:0aYXnNPJ8l7uZxf45rWW1a/uME32OF0rhiYGNQ2oF2E=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
