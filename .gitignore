@@ -1,2 +1,2 @@
 *.prof
-*.dds
+**/textures/*.dds

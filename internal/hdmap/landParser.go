@@ -84,9 +84,17 @@ func (l *LandParser) readTexture(path string) (image.Image, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".tga":
-		return tga.Decode(bytes.NewReader(raw))
+		img, err := tga.Decode(bytes.NewReader(raw))
+		if err != nil {
+			return nil, fmt.Errorf("decode TGA %q: %w", path, err)
+		}
+		return img, nil
 	case ".dds":
-		return dds.Decode(raw)
+		img, err := dds.Decode(raw)
+		if err != nil {
+			return nil, fmt.Errorf("decode DDS %q: %w", path, err)
+		}
+		return img, nil
 	default:
 		return nil, fmt.Errorf("don't know how to read %q", path)
 	}

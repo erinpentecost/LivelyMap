@@ -9,8 +9,8 @@ import (
 	"github.com/mauserzjeh/dxt"
 )
 
-// DecodeDDS parses a DDS file from the provided bytes and returns an image.Image.
-// Supports DXT1, DXT3, DXT5.
+// Decode parses a DDS file from the provided bytes and returns an image.Image.
+// Supports DXT1, DXT3, DXT5 and simple uncompressed 24/32-bit RGB(A).
 func Decode(dds []byte) (image.Image, error) {
 	const (
 		ddsMagicLen   = 4
@@ -27,33 +27,55 @@ func Decode(dds []byte) (image.Image, error) {
 		return nil, fmt.Errorf("dds: missing magic 'DDS '")
 	}
 
+	// hdr is the 124-byte DDS header (immediately after the 4-byte magic)
 	hdr := dds[4 : 4+ddsHeaderLen] // 124 bytes
-	// within hdr:
-	// [0:4]  dwSize
-	// [4:8]  dwFlags
-	// [8:12] dwHeight
-	// [12:16] dwWidth
-	//
-	// PixelFormat structure at offset 76 of the header (32 bytes)
+
+	// Read header fields by exact byte offsets (do NOT rely on binary.Read into a Go struct)
+	if len(hdr) < ddsHeaderLen {
+		return nil, fmt.Errorf("dds: header too short")
+	}
+
+	// core header fields (offsets are relative to hdr)
+	// dwSize       = hdr[0:4]
+	// dwFlags      = hdr[4:8]
+	// dwHeight     = hdr[8:12]
+	// dwWidth      = hdr[12:16]
+	// dwPitchOrLinearSize = hdr[16:20]
+	height := binary.LittleEndian.Uint32(hdr[8:12])
+	width := binary.LittleEndian.Uint32(hdr[12:16])
+	// pitchOrLinear := binary.LittleEndian.Uint32(hdr[16:20]) // unused for now
+
+	// PixelFormat (32 bytes) starts at hdr offset 76
 	if len(hdr) < pfOffsetInHdr+32 {
 		return nil, fmt.Errorf("dds: header missing pixel format")
 	}
 	pf := hdr[pfOffsetInHdr : pfOffsetInHdr+32]
-	// pf layout usually: [0:4] dwSize, [4:8] dwFlags, [8:12] dwFourCC, [12:16] dwRGBBitCount, ...
-	// But some exporters put the FourCC in a nonstandard slot (e.g. GIMP puts "DXT1" at pf[4:8]),
-	// and some headers have dwSize==4. Be defensive: check canonical slot, then pf[4:8], then scan header.
+
+	// Read the exact pixel format fields by offset
+	pfSize := binary.LittleEndian.Uint32(pf[0:4])
+	_ = pfSize // currently unused, but good to read/validate if needed
+	// pfFlags := binary.LittleEndian.Uint32(pf[4:8])
+	// canonical FourCC is pf[8:12]
 	fourCC := string(pf[8:12])
+	// canonical rgb bit count is pf[12:16]
+	rgbBitCount := binary.LittleEndian.Uint32(pf[12:16])
+	// masks (pf[16:20], pf[20:24], pf[24:28], pf[28:32])
+	// rMask := binary.LittleEndian.Uint32(pf[16:20])
+	// gMask := binary.LittleEndian.Uint32(pf[20:24])
+	// bMask := binary.LittleEndian.Uint32(pf[24:28])
+	// aMask := binary.LittleEndian.Uint32(pf[28:32])
+
+	// Defensive FourCC detection:
+	// Some exporters (e.g. some versions of GIMP) write FourCC at pf[4:8] or otherwise nonstandard fields.
 	if fourCC == "\x00\x00\x00\x00" {
-		// try the adjacent slot (some exporters set dwFlags/fourcc oddly)
+		// try pf[4:8]
 		candidate := string(pf[4:8])
 		if candidate != "\x00\x00\x00\x00" {
 			fourCC = candidate
 		} else {
-			// final fallback: search the 124-byte header for known FourCC strings
-			// (DXT1/DXT3/DXT5 are the ones we support).
-			for _, s := range []string{"DXT1", "DXT3", "DXT5"} {
+			// final fallback: search the header for known FourCCs
+			for _, s := range []string{"DXT1", "DXT3", "DXT5", "DX10"} {
 				if idx := bytes.Index(hdr, []byte(s)); idx >= 0 {
-					// found it somewhere in the header — use that
 					fourCC = s
 					break
 				}
@@ -61,22 +83,16 @@ func Decode(dds []byte) (image.Image, error) {
 		}
 	}
 
-	// rgbBitCount typically lives at pf[12:16]. If it's zero, try to recover:
-	rgbBitCount := binary.LittleEndian.Uint32(pf[12:16])
+	// Defensive rgbBitCount recovery: if it's zero, try pf[16:20] (some broken exporters reorder),
+	// otherwise fall back to the header's pitch/linear-size as last resort.
 	if rgbBitCount == 0 {
-		// Try a nearby location (sometimes the exporter wrote fields in a different order)
-		// check pf[16:20] as a fallback; otherwise read hdr's pitch/linear field too.
 		alt := binary.LittleEndian.Uint32(pf[16:20])
 		if alt != 0 {
 			rgbBitCount = alt
-		} else if len(hdr) >= 20 {
-			// fallback: use dwPitchOrLinearSize from header (bytes 16..20 of hdr)
+		} else {
 			rgbBitCount = binary.LittleEndian.Uint32(hdr[16:20])
 		}
 	}
-
-	height := binary.LittleEndian.Uint32(hdr[8:12])
-	width := binary.LittleEndian.Uint32(hdr[12:16])
 
 	// Data starts after the 128-byte header
 	data := dds[totalHeader:]
@@ -95,6 +111,9 @@ func Decode(dds []byte) (image.Image, error) {
 		rgbaBytes, err = dxt.DecodeDXT3(data, uint(width), uint(height))
 	case "DXT5":
 		rgbaBytes, err = dxt.DecodeDXT5(data, uint(width), uint(height))
+	case "DX10":
+		// DX10 requires parsing a DDS_HEADER_DX10 extension; not implemented here.
+		return nil, fmt.Errorf("dds: DX10 header not supported")
 	default:
 		// support simple uncompressed RGB(A) (common masks) as fallback
 		if fourCC == "\x00\x00\x00\x00" && (rgbBitCount == 24 || rgbBitCount == 32) {
@@ -110,19 +129,11 @@ func Decode(dds []byte) (image.Image, error) {
 	// Create image.RGBA and copy pixels
 	img := image.NewRGBA(image.Rect(0, 0, int(width), int(height)))
 	// our decoders produce RGBA byte slices in R,G,B,A per pixel order
-	if len(rgbaBytes) != int(width*height*4) {
-		// defensive: if strides differ, try to copy as much as possible
-		return nil, fmt.Errorf("dds: unexpected decoded byte length %d, want %d", len(rgbaBytes), int(width*height*4))
+	expectedLen := int(width * height * 4)
+	if len(rgbaBytes) != expectedLen {
+		return nil, fmt.Errorf("dds: unexpected decoded byte length %d, want %d", len(rgbaBytes), expectedLen)
 	}
 	copy(img.Pix, rgbaBytes)
-
-	// optional: ensure opaque pixels have alpha==255 (depending on decoder)
-	// not required, but safe: iterate and clamp
-	for i := 0; i < len(img.Pix); i += 4 {
-		if img.Pix[i+3] == 0 {
-			// leave as-is; some formats legitimately have zero alpha
-		}
-	}
 
 	return img, nil
 }
