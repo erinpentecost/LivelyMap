@@ -19,7 +19,7 @@ const plugin_name = "livelymap.omwaddon"
 
 func sync(path string) error {
 	ctx := context.Background()
-	plugins, _, err := cfg.OpenMWPlugins(path)
+	plugins, dataPaths, err := cfg.OpenMWPlugins(path)
 	if err != nil {
 		return fmt.Errorf("open %q: %w", path, err)
 	}

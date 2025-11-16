@@ -11,9 +11,11 @@ import (
 
 	"github.com/erinpentecost/LivelyMap/internal/tdigest"
 	"github.com/ernmw/omwpacker/esm/record/land"
+	"github.com/ernmw/omwpacker/esm/record/ltex"
 )
 
 var fallbackNormals [][]land.VertexField
+var fallbackVtex [][]uint16
 
 func init() {
 	fallbackNormals = make([][]land.VertexField, 65)
@@ -25,6 +27,7 @@ func init() {
 				Y: math.MaxInt8,
 				Z: 0,
 			}
+			fallbackVtex[i][b] = math.MaxUint16
 		}
 	}
 }
@@ -36,10 +39,11 @@ type Stats interface {
 }
 
 type LandParser struct {
-	Heights    *tdigest.TDigest
-	MapExtents MapCoords
-	Plugins    []string
-	Lands      []*ParsedLandRecord
+	Heights      *tdigest.TDigest
+	MapExtents   MapCoords
+	Plugins      []string
+	Lands        []*ParsedLandRecord
+	LandTextures map[uint16]string
 }
 
 type ParsedLandRecord struct {
@@ -47,10 +51,15 @@ type ParsedLandRecord struct {
 	y       int32
 	heights [][]float32
 	normals [][]land.VertexField
+	vtex    [][]uint16
 }
 
 func NewLandParser(plugins []string) *LandParser {
-	return &LandParser{Plugins: plugins, Heights: tdigest.New()}
+	return &LandParser{
+		Plugins:      plugins,
+		Heights:      tdigest.New(),
+		LandTextures: map[uint16]string{},
+	}
 }
 
 func (l *LandParser) ParsePlugins() error {
@@ -61,9 +70,32 @@ func (l *LandParser) ParsePlugins() error {
 	return nil
 }
 
+const LTEX esm.RecordTag = "LTEX"
+
+func parseLtex(s *esm.Record) (index uint16, path string, err error) {
+	for _, s := range s.Subrecords {
+		switch s.Tag {
+		case ltex.INTV:
+			parsed := ltex.INTVField{}
+			err = parsed.Unmarshal(s)
+			if err != nil {
+				return
+			}
+			index = uint16(parsed.Value)
+		case ltex.DATA:
+			parsed := ltex.DATAField{}
+			err = parsed.Unmarshal(s)
+			if err != nil {
+				return
+			}
+			path = parsed.Value
+		}
+	}
+	return
+}
+
 func (l *LandParser) loadPlugins() iter.Seq2[*esm.Record, error] {
 	LANDs := make(map[string]*esm.Record)
-
 	type pluginsResp struct {
 		recs []*esm.Record
 		err  error
@@ -94,6 +126,19 @@ func (l *LandParser) loadPlugins() iter.Seq2[*esm.Record, error] {
 				continue
 			}
 			for _, rec := range resp.recs {
+				// extract ltex info since we're here
+				// already. this is super gross and I should
+				// clean it up later.
+				if rec.Tag == LTEX {
+					idx, path, err := parseLtex(rec)
+					if err != nil {
+						fmt.Printf("failed to parse LTEX record")
+					} else {
+						if _, present := l.LandTextures[idx]; !present {
+							l.LandTextures[idx] = path
+						}
+					}
+				}
 				// Only interested in LAND records
 				if rec.Tag != land.LAND {
 					continue
@@ -188,6 +233,7 @@ func (l *LandParser) recordsToCellInfo(recs iter.Seq2[*esm.Record, error]) error
 					y:       y,
 					heights: fallbackHeights,
 					normals: fallbackNormals,
+					vtex:    fallbackVtex,
 				})
 			}
 		}
@@ -224,6 +270,13 @@ func (l *LandParser) parseLandRecord(rec *esm.Record) (*ParsedLandRecord, error)
 				out.normals = fallbackNormals
 			} else {
 				out.normals = normals.Vertices
+			}
+		case land.VTEX:
+			texes := land.VTEXField{}
+			if err := texes.Unmarshal(subrec); err != nil {
+				out.vtex = fallbackVtex
+			} else {
+				out.vtex = texes.Vertices
 			}
 		}
 	}

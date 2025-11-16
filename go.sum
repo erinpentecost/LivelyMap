@@ -47,6 +47,8 @@ github.com/ernmw/omwpacker v0.0.0-20251111180308-ff448cbf651d h1:97RP/EggjargS5R
 github.com/ernmw/omwpacker v0.0.0-20251111180308-ff448cbf651d/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
 github.com/ernmw/omwpacker v0.0.0-20251112005715-f36d6b3d4f5a h1:kDWYimBJKrRNVxxLknDRRVvcsfYNRMa9UZxhK5CnRj0=
 github.com/ernmw/omwpacker v0.0.0-20251112005715-f36d6b3d4f5a/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
+github.com/ernmw/omwpacker v0.0.0-20251116045327-10400d08e97d h1:APymB8bTFXn7HioWj4Rtyp/8yaPqv0pPG5WCVdtEJeI=
+github.com/ernmw/omwpacker v0.0.0-20251116045327-10400d08e97d/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/go-gl/glfw v0.0.0-20190409004039-e6da0acd62b1/go.mod h1:vR7hzQXu2zJy9AVAgeJqvqgH9Q5CA+iKCZ2gyEVpxRU=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
