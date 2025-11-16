@@ -1,7 +1,6 @@
 package hdmap
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dblezek/tga"
 	"github.com/ernmw/omwpacker/cfg"
 	"github.com/ernmw/omwpacker/esm"
 
@@ -77,18 +75,20 @@ func NewLandParser(env *cfg.Environment) *LandParser {
 }
 
 func (l *LandParser) readTexture(path string) (image.Image, error) {
+
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".tga" {
+		// don't ask
+		path = strings.TrimSuffix(path, ext) + ".dds"
+		ext = ".dds"
+	}
+
 	raw, err := l.Env.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read texture: %w", err)
 	}
-	ext := strings.ToLower(filepath.Ext(path))
+
 	switch ext {
-	case ".tga":
-		img, err := tga.Decode(bytes.NewReader(raw))
-		if err != nil {
-			return nil, fmt.Errorf("decode TGA %q: %w", path, err)
-		}
-		return img, nil
 	case ".dds":
 		img, err := dds.Decode(raw)
 		if err != nil {
@@ -109,6 +109,7 @@ func (l *LandParser) ParsePlugins() error {
 	for rec := range l.loadPlugins(ctx) {
 		switch rec.Tag {
 		case ltex.LTEX:
+			// https://github.com/OpenMW/openmw/blob/c06f94fee875ccc67801016b8bcc56936949e7ae/components/esmterrain/storage.cpp#L378
 			idx, path, err := parseLtex(rec)
 			if err != nil {
 				return fmt.Errorf("failed to parse LTEX record")
@@ -120,6 +121,8 @@ func (l *LandParser) ParsePlugins() error {
 				err = fmt.Errorf("failed to load texture %q from disk: %w", normalizedPath, err)
 				fmt.Printf("%v\n", err)
 			} else {
+				// TODO: might have to add 1 to idx
+				// according to components/esmterrain/storage.cpp#L378
 				l.LandTextures[idx] = img
 			}
 		case land.LAND:
