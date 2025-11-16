@@ -2,6 +2,112 @@ package hdmap
 
 import "fmt"
 
+type Direction string
+
+const (
+	North Direction = "north"
+	South Direction = "south"
+	West  Direction = "west"
+	East  Direction = "east"
+)
+
+type SubmapID int
+
+type SubmapNode struct {
+	Extents     MapCoords
+	ID          SubmapID
+	ConnectedTo map[Direction]SubmapID
+	CenterX     int32
+	CenterY     int32
+}
+
+func connectMapCoords(coords []MapCoords) []SubmapNode {
+	nodes := make([]SubmapNode, len(coords))
+
+	// Precompute centers and initialize nodes
+	for i := range coords {
+		cx, cy := coords[i].Center()
+
+		nodes[i] = SubmapNode{
+			Extents:     coords[i],
+			ID:          SubmapID(i),
+			ConnectedTo: make(map[Direction]SubmapID),
+			CenterX:     cx,
+			CenterY:     cy,
+		}
+	}
+
+	sq := func(a int32) int64 { return int64(a) * int64(a) }
+
+	for i, c := range nodes {
+		cx, cy := c.CenterX, c.CenterY
+
+		type best struct {
+			id    int
+			dist2 int64
+			found bool
+		}
+
+		var north, south, left, right best
+
+		for j, nn := range nodes {
+			if j == i {
+				continue
+			}
+
+			ox := nn.CenterX
+			oy := nn.CenterY
+
+			dx := ox - cx
+			dy := oy - cy
+			dist2 := sq(dx) + sq(dy)
+
+			// NORTH
+			if oy > cy {
+				if !north.found || dist2 < north.dist2 {
+					north = best{id: j, dist2: dist2, found: true}
+				}
+			}
+
+			// SOUTH
+			if oy < cy {
+				if !south.found || dist2 < south.dist2 {
+					south = best{id: j, dist2: dist2, found: true}
+				}
+			}
+
+			// RIGHT
+			if ox > cx {
+				if !right.found || dist2 < right.dist2 {
+					right = best{id: j, dist2: dist2, found: true}
+				}
+			}
+
+			// LEFT
+			if ox < cx {
+				if !left.found || dist2 < left.dist2 {
+					left = best{id: j, dist2: dist2, found: true}
+				}
+			}
+		}
+
+		if north.found {
+			nodes[i].ConnectedTo[North] = SubmapID(north.id)
+		}
+		if south.found {
+			nodes[i].ConnectedTo[South] = SubmapID(south.id)
+		}
+		if left.found {
+			nodes[i].ConnectedTo[West] = SubmapID(left.id)
+		}
+		if right.found {
+			nodes[i].ConnectedTo[East] = SubmapID(right.id)
+		}
+	}
+
+	return nodes
+}
+
 type MapCoords struct {
 	// Positive direction, North. Inclusive.
 	Top int32
@@ -22,6 +128,9 @@ func (m MapCoords) String() string {
 		m.Right,
 	)
 }
+func (m MapCoords) Center() (x int32, y int32) {
+	return (m.Left + m.Right) / 2, (m.Bottom + m.Top) / 2
+}
 
 func (m MapCoords) NotContainsPoint(x int32, y int32) bool {
 	return x < m.Left || x > m.Right || y < m.Bottom || y > m.Top
@@ -41,7 +150,7 @@ func (a MapCoords) SupersetOf(b MapCoords) bool {
 	return verticalContained && horizontalContained
 }
 
-func (a MapCoords) maybeQuadrants() []MapCoords {
+func (a MapCoords) quadrants() []MapCoords {
 	width := 1 + a.Right - a.Left
 	height := 1 + a.Top - a.Bottom
 
@@ -96,20 +205,20 @@ func (a MapCoords) maybeQuadrants() []MapCoords {
 
 // Partition will return between 1 and 8 partitions of m.
 // All partitions will be squares, and may overlap.
-func Partition(m MapCoords) []MapCoords {
+func Partition(m MapCoords) []SubmapNode {
 	partitions := []MapCoords{}
 	for _, square := range findSquares(m) {
 		// If the square is small enough, don't subdivide it.
 		width := 1 + square.Right - square.Left
 		height := 1 + square.Top - square.Bottom
 		// Vvardenfell is 43x41.
-		if width*height <= 20*20 {
+		if width*height <= 43*41 {
 			partitions = append(partitions, square)
 			continue
 		}
 		// It's a big square, so we're going to chunk it up
 		// into overlapping sub-squares.
-		for _, quad := range square.maybeQuadrants() {
+		for _, quad := range square.quadrants() {
 			// If the parent map is close to a square already,
 			// then our initial subdivide is going to have two
 			// big squares that overlap a ton. So when we do
@@ -128,7 +237,7 @@ func Partition(m MapCoords) []MapCoords {
 			}
 		}
 	}
-	return partitions
+	return connectMapCoords(partitions)
 }
 
 // We're actually going to fit the two largest squares
