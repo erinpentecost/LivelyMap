@@ -114,6 +114,42 @@ func (d *TexRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 			iy := gridSize - y - 1
 			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
 			if p.heights[y][x] >= d.waterHeight {
+				// set the hue from the vertex color
+				if len(p.colors) == 65 && len(p.colors[y]) == 65 {
+					baseColor = hue.MulColor(baseColor, color.RGBA{
+						R: p.colors[y][x].R,
+						G: p.colors[y][x].G,
+						B: p.colors[y][x].B,
+						A: math.MaxUint8,
+					})
+					/*
+						texIndex := p.vtex[ty][tx]
+						tex, ok := d.textures[texIndex]
+						if ok {
+							baseHSL := hue.RGBToHSL(baseColor)
+							baseHSL.H = tex.avgHue
+							baseColor = hue.HSLToRGB(baseHSL)
+						}*/
+				}
+			}
+
+			img.SetRGBA(x, iy, baseColor)
+		}
+	}
+	return img
+}
+
+func (d *TexRenderer) renderHueFromTex(p *ParsedLandRecord) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
+
+	// Throw away the last column and row.
+	// This is how I'm sampling a quad into a single pixel.
+	for y := range gridSize {
+		for x := range gridSize {
+			// Need to invert y
+			iy := gridSize - y - 1
+			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
+			if p.heights[y][x] >= d.waterHeight {
 				// set the hue from the texture
 				ty := iy / 4
 				tx := x / 4

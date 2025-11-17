@@ -137,3 +137,24 @@ func HSLToRGB(hsl HSL) color.RGBA {
 		A: 255,
 	}
 }
+
+func MulColor(a, b color.Color) color.RGBA {
+	ar, ag, ab, _ := a.RGBA()
+	br, bg, bb, _ := b.RGBA()
+
+	// Convert to non-premultiplied 0–255
+	ar8 := float64(ar >> 8)
+	ag8 := float64(ag >> 8)
+	ab8 := float64(ab >> 8)
+
+	br8 := float64(br >> 8)
+	bg8 := float64(bg >> 8)
+	bb8 := float64(bb >> 8)
+
+	return color.RGBA{
+		R: uint8((ar8 * br8 / 255.0) + 0.5),
+		G: uint8((ag8 * bg8 / 255.0) + 0.5),
+		B: uint8((ab8 * bb8 / 255.0) + 0.5),
+		A: 255,
+	}
+}
