@@ -121,9 +121,8 @@ func (l *LandParser) ParsePlugins() error {
 				err = fmt.Errorf("failed to load texture %q from disk: %w", normalizedPath, err)
 				fmt.Printf("%v\n", err)
 			} else {
-				// TODO: might have to add 1 to idx
-				// according to components/esmterrain/storage.cpp#L378
-				l.LandTextures[idx] = img
+				// Have to add 1 to these according to components/esmterrain/storage.cpp#L378
+				l.LandTextures[idx+1] = img
 			}
 		case land.LAND:
 			parsed, err := l.parseLandRecord(rec)

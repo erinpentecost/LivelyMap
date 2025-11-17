@@ -8,11 +8,14 @@ import (
 	"math"
 	"os"
 
+	"github.com/erinpentecost/LivelyMap/internal/hue"
+
 	_ "embed"
 )
 
 type colorSampler struct {
 	source image.Image
+	avgHue float64
 	dx     int
 	dy     int
 }
@@ -23,8 +26,10 @@ func newColorSampler(source image.Image) *colorSampler {
 	if x == 0 || y == 0 {
 		return nil
 	}
+
 	return &colorSampler{
 		source: source,
+		avgHue: hue.GetAverageHue(source),
 		dx:     x,
 		dy:     y,
 	}
@@ -107,31 +112,24 @@ func (d *TexRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-
+			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
 			if p.heights[y][x] >= d.waterHeight {
+				// set the hue from the texture
 				ty := iy / 4
 				tx := x / 4
 				// get color from texture map if available
-				if len(p.vtex) < 16 || len(p.vtex[ty]) < 16 {
-					//fmt.Printf("Mangled VTEX record for cell %d,%d\n", p.x, p.y)
-					img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
-					continue
+				if len(p.vtex) == 16 && len(p.vtex[ty]) == 16 {
+					texIndex := p.vtex[ty][tx]
+					tex, ok := d.textures[texIndex]
+					if ok {
+						baseHSL := hue.RGBToHSL(baseColor)
+						baseHSL.H = tex.avgHue
+						baseColor = hue.HSLToRGB(baseHSL)
+					}
 				}
-				texIndex := p.vtex[ty][tx]
-				tex, ok := d.textures[texIndex]
-				if !ok {
-					//fmt.Printf("Unknown texture %d in VTEX record for cell %d,%d\n", texIndex, p.x, p.y)
-					continue
-					//img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
-				} else {
-					// sample color from tex
-					// todo: pick a random color instead
-					img.Set(x, iy, tex.Sample(x, iy))
-				}
-			} else {
-				// use water ramp color
-				img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
 			}
+
+			img.SetRGBA(x, iy, baseColor)
 		}
 	}
 	return img
