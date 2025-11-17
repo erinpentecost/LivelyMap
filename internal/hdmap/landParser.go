@@ -21,6 +21,7 @@ import (
 
 var fallbackNormals [][]land.VertexField
 var fallbackVtex [][]uint16
+var fallbackColors [][]land.ColorField
 
 func init() {
 	fallbackNormals = make([][]land.VertexField, 65)
@@ -41,6 +42,11 @@ func init() {
 		for b := range 16 {
 			fallbackVtex[i][b] = math.MaxUint16
 		}
+	}
+
+	fallbackColors = make([][]land.ColorField, 65)
+	for i := range fallbackColors {
+		fallbackColors[i] = make([]land.ColorField, 65)
 	}
 }
 
@@ -64,6 +70,7 @@ type ParsedLandRecord struct {
 	heights [][]float32
 	normals [][]land.VertexField
 	vtex    [][]uint16
+	colors  [][]land.ColorField
 }
 
 func NewLandParser(env *cfg.Environment) *LandParser {
@@ -327,6 +334,13 @@ func (l *LandParser) parseLandRecord(rec *esm.Record) (*ParsedLandRecord, error)
 				out.vtex = fallbackVtex
 			} else {
 				out.vtex = texes.Vertices
+			}
+		case land.VCLR:
+			colors := land.VCLRField{}
+			if err := colors.Unmarshal(subrec); err != nil {
+				out.colors = fallbackColors
+			} else {
+				out.colors = colors.Colors
 			}
 		}
 	}
