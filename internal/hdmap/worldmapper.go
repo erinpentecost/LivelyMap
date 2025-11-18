@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"image/png"
 	"iter"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
+	"golang.org/x/image/draw"
 )
 
 type WorldMapper struct {
@@ -26,9 +30,20 @@ func NewWorldMapper() *WorldMapper {
 	return &WorldMapper{}
 }
 
-func (w *WorldMapper) Write(ctx context.Context, mapExtents MapCoords, cells iter.Seq[*CellInfo], path string) error {
+func (w *WorldMapper) Write(
+	ctx context.Context,
+	mapExtents MapCoords,
+	cells iter.Seq[*CellInfo],
+	path string,
+	downScaleFactor int,
+) error {
+	w.outImage = nil
 	w.mapExtents = mapExtents
 	fmt.Printf("Map extents: %s\n", mapExtents)
+
+	if downScaleFactor < 1 {
+		return fmt.Errorf("downScaleFactor must be at least 1.")
+	}
 
 	if w.mapExtents.Bottom > w.mapExtents.Top || w.mapExtents.Left > w.mapExtents.Right {
 		return fmt.Errorf("invalid extents: %s", w.mapExtents)
@@ -40,13 +55,30 @@ func (w *WorldMapper) Write(ctx context.Context, mapExtents MapCoords, cells ite
 		}
 	}
 
+	if downScaleFactor > 1 {
+		fmt.Printf("Scaling down image...")
+		sourceBounds := w.outImage.Bounds()
+		downSize := image.NewRGBA(image.Rect(0, 0, sourceBounds.Dx()/2, sourceBounds.Dy()/2))
+		draw.CatmullRom.Scale(downSize, downSize.Bounds(), w.outImage, w.outImage.Bounds(), draw.Over, nil)
+		w.outImage = downSize
+	}
+
 	fmt.Printf("Writing map to %q\n", path)
 	out, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-	return dds.Encode(out, w.outImage)
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".dds":
+		return dds.Encode(out, w.outImage)
+	case ".png":
+		return png.Encode(out, w.outImage)
+	default:
+		return fmt.Errorf("bad extension %q", ext)
+	}
+
 }
 
 // handleCell copies cell.Image (must be *image.RGBA) into w.outImage.

@@ -66,10 +66,6 @@ func NewClassicRenderer(rampFilePath string) (*ClassicRenderer, error) {
 	return &ClassicRenderer{ramp: rmp}, nil
 }
 
-func (d *ClassicRenderer) GetCellResolution() (x uint32, y uint32) {
-	return gridSize, gridSize
-}
-
 func (d *ClassicRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
 	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
