@@ -17,7 +17,6 @@ type CellRenderer interface {
 	// Render turns a ParsedLandRecord into an image.
 	Render(p *ParsedLandRecord) *image.RGBA
 	SetHeightExtents(heightStats Stats, waterHeight float32)
-	GetCellResolution() (x uint32, y uint32)
 }
 
 type CellMapper struct {

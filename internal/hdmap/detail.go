@@ -5,68 +5,77 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"io"
 	"math"
 	"os"
 
-	_ "embed"
+	"github.com/erinpentecost/LivelyMap/internal/hue"
 
-	"golang.org/x/image/bmp"
+	_ "embed"
 )
 
-//go:embed ramp.bmp
-var classicRampFile []byte
-
-func LoadRamp(rawBmp io.Reader) ([256]color.RGBA, error) {
-	// height of 0.000 should be x=128
-	var ramp [256]color.RGBA
-	rampImg, err := bmp.Decode(rawBmp)
-	if err != nil {
-		return ramp, fmt.Errorf("failed to decode color ramp BMP: %w", err)
-	}
-	b := rampImg.Bounds()
-	if b.Dy() != 1 || b.Dx() < 256 {
-		return ramp, fmt.Errorf("invalid color ramp dimensions (expected 1x256, got %dx%d)", b.Dx(), b.Dy())
-	}
-	for x := range 256 {
-		r, g, b, a := rampImg.At(x, 0).RGBA()
-		ramp[x] = color.RGBA{
-			R: uint8(r >> 8),
-			G: uint8(g >> 8),
-			B: uint8(b >> 8),
-			A: uint8(a >> 8),
-		}
-	}
-	return ramp, nil
+type colorSampler struct {
+	source image.Image
+	avgHue float64
+	dx     int
+	dy     int
 }
 
-type ClassicRenderer struct {
+func newColorSampler(source image.Image) *colorSampler {
+	x := source.Bounds().Dx()
+	y := source.Bounds().Dy()
+	if x == 0 || y == 0 {
+		return nil
+	}
+
+	return &colorSampler{
+		source: source,
+		avgHue: hue.GetAverageHue(source),
+		dx:     x,
+		dy:     y,
+	}
+}
+
+func (c *colorSampler) Sample(x, y int) color.Color {
+	return c.source.At(
+		x%c.dx,
+		y%c.dy,
+	)
+}
+
+type DetailRenderer struct {
 	minHeight   float32
 	maxHeight   float32
 	waterHeight float32
-	ramp        [256]color.RGBA
+	// ramp is still used for water and as a fallback
+	ramp [256]color.RGBA
 }
 
-func NewClassicRenderer(rampFilePath string) (*ClassicRenderer, error) {
+func NewDetailRenderer(rampFilePath string, textures map[uint16]image.Image) (*DetailRenderer, error) {
+	out := &DetailRenderer{}
+
+	// load rampfile
 	if len(rampFilePath) == 0 {
 		rmp, err := LoadRamp(bytes.NewReader(classicRampFile))
 		if err != nil {
 			return nil, fmt.Errorf("loading default ramp: %w", err)
 		}
-		return &ClassicRenderer{ramp: rmp}, nil
+		out.ramp = rmp
+	} else {
+		file, err := os.Open(rampFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
+		}
+		rmp, err := LoadRamp(file)
+		if err != nil {
+			return nil, fmt.Errorf("loading default ramp: %w", err)
+		}
+		out.ramp = rmp
 	}
-	file, err := os.Open(rampFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
-	}
-	rmp, err := LoadRamp(file)
-	if err != nil {
-		return nil, fmt.Errorf("loading default ramp: %w", err)
-	}
-	return &ClassicRenderer{ramp: rmp}, nil
+
+	return out, nil
 }
 
-func (d *ClassicRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
+func (d *DetailRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
 	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight
 
@@ -78,11 +87,7 @@ func (d *ClassicRenderer) SetHeightExtents(heightStats Stats, waterHeight float3
 	}
 }
 
-// normalHeightMap generates a *_nh (normal height map) texture for openmw.
-// The RGB channels of the normal map are used to store XYZ components of
-// tangent space normals and the alpha channel of the normal map may be used
-// to store a height map used for parallax.
-func (d *ClassicRenderer) Render(p *ParsedLandRecord) *image.RGBA {
+func (d *DetailRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
 	// Throw away the last column and row.
@@ -91,13 +96,26 @@ func (d *ClassicRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-			img.SetRGBA(x, iy, d.ramp[d.transformHeight(p.heights[y][x])])
+			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
+			if p.heights[y][x] >= d.waterHeight {
+				// multiply vertex color onto the heightmap color
+				if len(p.colors) == 65 && len(p.colors[y]) == 65 {
+					baseColor = hue.MulColor(baseColor, color.RGBA{
+						R: p.colors[y][x].R,
+						G: p.colors[y][x].G,
+						B: p.colors[y][x].B,
+						A: math.MaxUint8,
+					})
+				}
+			}
+
+			img.SetRGBA(x, iy, baseColor)
 		}
 	}
 	return img
 }
 
-func (d *ClassicRenderer) transformHeight(v float32) byte {
+func (d *DetailRenderer) transformHeight(v float32) byte {
 	// clamp extremes
 	if v <= d.minHeight {
 		return 0

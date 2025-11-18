@@ -29,10 +29,6 @@ type NormalHeightRenderer struct {
 	waterHeight float32
 }
 
-func (d *NormalHeightRenderer) GetCellResolution() (x uint32, y uint32) {
-	return gridSize, gridSize
-}
-
 func (d *NormalHeightRenderer) SetHeightExtents(heightStats Stats, waterHeight float32) {
 	d.maxHeight = float32(heightStats.Max())
 	d.waterHeight = waterHeight

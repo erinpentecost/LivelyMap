@@ -34,16 +34,25 @@ func sync(path string) error {
 	return drawMaps(ctx, rootPath, env)
 }
 
-func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error {
+func getRampFile(rootPath string) string {
+	rampPath := filepath.Join(rootPath, "ramp.bmp")
+	if f, err := os.Stat(rampPath); err != nil || f.IsDir() {
+		fmt.Printf("Using built-in ramp file.\n")
+		return ""
+	}
+	fmt.Printf("Using %q as the ramp file.\n", rampPath)
+	return rampPath
+}
 
-	// todo : make this configurable
-	rampPath := ""
+func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error {
+	rampPath := getRampFile(rootPath)
 
 	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
 	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures")
-	core01TexturePath := filepath.Join(rootPath, "01 Color Map", "textures")
+	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures")
+	potatoTexturePath := filepath.Join(rootPath, "01 Potato Map", "textures")
 
-	for _, texturePath := range []string{core00TexturePath, core01TexturePath, core00DataPath} {
+	for _, texturePath := range []string{core00TexturePath, detailTexturePath, core00DataPath} {
 		if tdir, err := os.Stat(texturePath); err != nil {
 			return fmt.Errorf("open directory %q: %w", texturePath, err)
 		} else if !tdir.IsDir() {
@@ -56,7 +65,7 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	if err := parsedLands.ParsePlugins(); err != nil {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
-	fmt.Printf("Found %d land textures.", len(parsedLands.LandTextures))
+	fmt.Printf("Found %d land textures.\n", len(parsedLands.LandTextures))
 
 	fmt.Printf("Done parsing %d cells.\n", len(parsedLands.Lands))
 
@@ -76,16 +85,18 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	if err := classicColorCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
-	// Render individual textured color cells
-	fmt.Printf("Rendering %d textured cells...\n", len(parsedLands.Lands))
-	texturedRenderer, err := hdmap.NewTexRenderer(rampPath, parsedLands.LandTextures)
+	// Render individual vertex color "detail" cells
+	fmt.Printf("Rendering %d detailed cells...\n", len(parsedLands.Lands))
+	texturedRenderer, err := hdmap.NewDetailRenderer(rampPath, parsedLands.LandTextures)
 	if err != nil {
-		return fmt.Errorf("new textured renderer: %w", err)
+		return fmt.Errorf("new detailed renderer: %w", err)
 	}
 	texturedCells := hdmap.NewCellMapper(parsedLands, texturedRenderer)
 	if err := texturedCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
+
+	fmt.Printf("Setting up world map joiners...\n")
 
 	// Set up jobs to join the sub-images together.
 	mapInfos := []hdmap.SubmapNode{}
@@ -94,16 +105,41 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 		mapInfos = append(mapInfos, extents)
 
 		maps = append(maps, &mapRenderJob{
-			Directory: filepath.Join(core00TexturePath),
+			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
+			ScaleDown: 1,
 		})
 		maps = append(maps, &mapRenderJob{
-			Directory: filepath.Join(core00TexturePath),
+			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
+			ScaleDown: 4,
+		})
+
+		maps = append(maps, &mapRenderJob{
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     classicColorCells,
+			ScaleDown: 8,
+		})
+		maps = append(maps, &mapRenderJob{
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     normalCells,
+			ScaleDown: 8,
+		})
+
+		maps = append(maps, &mapRenderJob{
+			Directory: detailTexturePath,
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     texturedCells,
+			ScaleDown: 1,
 		})
 
 		maps = append(maps, &mapRenderJob{
@@ -114,8 +150,17 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 		})
 	}
 
+	// vanity map
+	maps = append(maps, &mapRenderJob{
+		Directory: rootPath,
+		Name:      "vanity.png",
+		Extents:   parsedLands.MapExtents,
+		Cells:     texturedCells,
+		ScaleDown: 1,
+	})
+
 	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(4)
+	g.SetLimit(6)
 	for _, m := range maps {
 		g.Go(func() error { return m.Draw(gctx) })
 	}
@@ -149,6 +194,7 @@ type mapRenderJob struct {
 	Name      string
 	Extents   hdmap.MapCoords
 	Cells     *hdmap.CellMapper
+	ScaleDown int
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
@@ -158,7 +204,9 @@ func (m *mapRenderJob) Draw(ctx context.Context) error {
 	err := classicWorldMapper.Write(ctx,
 		m.Extents,
 		slices.Values(m.Cells.Cells),
-		path.Join(m.Directory, m.Name))
+		path.Join(m.Directory, m.Name),
+		m.ScaleDown,
+	)
 	if err != nil {
 		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)
 	}
