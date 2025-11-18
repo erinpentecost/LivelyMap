@@ -13,35 +13,6 @@ import (
 	_ "embed"
 )
 
-type colorSampler struct {
-	source image.Image
-	avgHue float64
-	dx     int
-	dy     int
-}
-
-func newColorSampler(source image.Image) *colorSampler {
-	x := source.Bounds().Dx()
-	y := source.Bounds().Dy()
-	if x == 0 || y == 0 {
-		return nil
-	}
-
-	return &colorSampler{
-		source: source,
-		avgHue: hue.GetAverageHue(source),
-		dx:     x,
-		dy:     y,
-	}
-}
-
-func (c *colorSampler) Sample(x, y int) color.Color {
-	return c.source.At(
-		x%c.dx,
-		y%c.dy,
-	)
-}
-
 type TexRenderer struct {
 	minHeight   float32
 	maxHeight   float32
