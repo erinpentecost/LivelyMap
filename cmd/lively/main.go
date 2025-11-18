@@ -141,6 +141,13 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Cells:     texturedCells,
 			ScaleDown: 1,
 		})
+
+		maps = append(maps, &mapRenderJob{
+			Directory: filepath.Join(core01TexturePath),
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     texturedCells,
+		})
 	}
 
 	// vanity map
