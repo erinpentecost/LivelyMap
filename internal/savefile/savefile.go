@@ -7,39 +7,110 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/ernmw/omwpacker/esm"
+	"github.com/ernmw/omwpacker/esm/record/lua"
 )
 
 const magic_prefix = "!!LivelyMap!!STARTOFENTRY!!"
 const magic_suffix = "!!LivelyMap!!ENDOFENTRY!!"
 
+type SaveData struct {
+	Player string `json:"id"`
+	Paths  []PathEntry
+}
+
 type PathEntry struct {
 	TimeStamp uint64 `json:"t"`
 	Duration  uint64 `json:"d"`
-	Xposition int64  `json:"x"`
-	Yposition int64  `json:"y"`
-	CellID    string `json:"id"`
+	// Xposition is an exterior cell X position.
+	Xposition int64 `json:"x"`
+	// Yposition is an exterior cell Y position.
+	Yposition int64 `json:"y"`
+	// CellID is an interior cell ID.
+	CellID string `json:"id"`
 }
 
-func ExtractSaveData(savePath string) ([]byte, error) {
-	f, err := os.Open(savePath)
+func ExtractData(savePath string) (*SaveData, error) {
+	// open file and back it up
+	src, err := os.Open(savePath)
 	if err != nil {
-		return nil, fmt.Errorf("open save file: %w", err)
+		return nil, fmt.Errorf("read %q: %w", savePath, err)
 	}
-	defer f.Close()
+	backupPath := strings.TrimSuffix(savePath, filepath.Ext(savePath)) + ".bak"
+	backup, err := os.Create(backupPath)
+	if err != nil {
+		return nil, fmt.Errorf("create %q: %w", backupPath, err)
+	}
+	if _, err := io.Copy(backup, src); err != nil {
+		return nil, fmt.Errorf("back up %q to %q: %w", savePath, backupPath, err)
+	}
+	// parse file
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("seek to start of %q: %w", savePath, err)
+	}
+	records, err := esm.ParsePluginData("savefile", src)
+	if err != nil {
+		return nil, fmt.Errorf("parse %q: %w", savePath, err)
+	}
 
-	raw, err := extractBetween(f, []byte(magic_prefix), []byte(magic_suffix))
+	raw, err := extractRecord(records)
 	if err != nil {
-		return nil, fmt.Errorf("extract subslice: %w", err)
+		return nil, fmt.Errorf("extract data from %q: %w", savePath, err)
 	}
-	return raw, nil
+	data, err := Unmarshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal extracted data from %q: %w", savePath, err)
+	}
+	return data, nil
 }
 
-func Unmarshal(raw []byte) ([]PathEntry, error) {
-	var paths []PathEntry
-	if err := json.Unmarshal(raw, &paths); err != nil {
-		return nil, fmt.Errorf("unmarshal subslice: %w", err)
+func extractRecord(records []*esm.Record) ([]byte, error) {
+	var found []byte
+	for _, rec := range records {
+		// there's only one LUAM per save game
+		if rec.Tag != lua.LUAM {
+			continue
+		}
+		for i := 0; i < len(rec.Subrecords); i++ {
+			sub := rec.Subrecords[i]
+			if sub.Tag == lua.LUAS {
+				lf := lua.LUASField{}
+				if err := lf.Unmarshal(sub); err != nil {
+					return nil, fmt.Errorf("parse LUAS subrecord: %w", err)
+				}
+				if lf.Value == "scripts/LivelyMap/player.lua" {
+					// the next record should be LUAD
+					if rec.Subrecords[i+1].Tag != lua.LUAD {
+						return nil, fmt.Errorf("expected LUAD after LUAS")
+					}
+					// Extract our JSON data from it.
+					var err error
+					found, err = extractBetween(
+						bytes.NewReader(rec.Subrecords[i+1].Data),
+						[]byte(magic_prefix),
+						[]byte(magic_suffix))
+					if err != nil {
+						return nil, fmt.Errorf("read JSON in LUAD: %w", err)
+					}
+					// Snip the current record and next one.
+					rec.Subrecords = append(rec.Subrecords[:i], rec.Subrecords[i+2:]...)
+					break
+				}
+			}
+		}
 	}
-	return paths, nil
+	return found, nil
+}
+
+func Unmarshal(raw []byte) (*SaveData, error) {
+	var data SaveData
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return nil, fmt.Errorf("unmarshal save data: %w", err)
+	}
+	return &data, nil
 }
 
 // ExtractBetween reads from r and returns the first byte slice found between prefix and suffix.
