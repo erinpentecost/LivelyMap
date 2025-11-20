@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const saveFile = "testdata/livelymap.omwsave"
-const backupFile = "testdata/livelymap.bak"
+const saveFile = "testdata/maptestfile.omwsave"
+const backupFile = "testdata/maptestfile.bak"
 
 func TestOpenMwCfg(t *testing.T) {
 	t.Cleanup(func() {
@@ -36,6 +36,37 @@ func TestOpenMwCfg(t *testing.T) {
 	require.NotNil(t, saveData)
 	require.NotEmpty(t, saveData.Paths)
 
+	t.Run("data read", func(t *testing.T) {
+		require.Equal(t, "erintestcharacter", saveData.Player)
+		require.Len(t, saveData.Paths, 5)
+		paths := []PathEntry{
+			{
+				TimeStamp: 120754,
+				Xposition: -2,
+				Yposition: -9,
+			},
+			{
+				TimeStamp: 120905,
+				CellID:    "seyda neen, census and excise office",
+			},
+			{
+				TimeStamp: 122214,
+				Xposition: -2,
+				Yposition: -9,
+			},
+			{
+				TimeStamp: 122357,
+				CellID:    "seyda neen, census and excise office",
+			},
+			{
+				TimeStamp: 122568,
+				Xposition: -2,
+				Yposition: -9,
+			},
+		}
+		require.Equal(t, paths, saveData.Paths)
+	})
+
 	// did the backup work?
 	backupSaveData, err := os.ReadFile(backupFile)
 	require.NoError(t, err)
@@ -48,4 +79,5 @@ func TestOpenMwCfg(t *testing.T) {
 
 	// did the extract work?
 	require.True(t, !bytes.Contains(newSaveData, []byte(magic_prefix)))
+
 }

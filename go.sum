@@ -53,6 +53,8 @@ github.com/ernmw/omwpacker v0.0.0-20251116045327-10400d08e97d h1:APymB8bTFXn7Hio
 github.com/ernmw/omwpacker v0.0.0-20251116045327-10400d08e97d/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
 github.com/ernmw/omwpacker v0.3.0 h1:jVTAshjNoqAYVNWeGhJXD2mBILTdywJQ7+vKGm+IKxQ=
 github.com/ernmw/omwpacker v0.3.0/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
+github.com/ernmw/omwpacker v0.3.1 h1:mcrCpOdP883Z/P6rZqG9UVFcr3Pp5l1Mti4+/CMbim4=
+github.com/ernmw/omwpacker v0.3.1/go.mod h1:a6EUEDlfWwDo8ZrHkPU+bVfWzxEm9IRybotlCXRVsD8=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/galaco/dxt v0.0.0-20190227194637-c61fd9851f0b h1:9bq7/AiG+NnLDLo8bIZFXDIGuxTMM973mgNzEJ5tbBI=
 github.com/galaco/dxt v0.0.0-20190227194637-c61fd9851f0b/go.mod h1:X/6UtAHv99sFgg/2as6275XXCm3AXrG3O5vkBzxTwe4=

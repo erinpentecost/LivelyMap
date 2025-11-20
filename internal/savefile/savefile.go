@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ernmw/omwpacker/esm"
@@ -18,27 +19,28 @@ const magic_prefix = "!!LivelyMap!!STARTOFENTRY!!"
 const magic_suffix = "!!LivelyMap!!ENDOFENTRY!!"
 
 type SaveData struct {
-	Player string `json:"id"`
-	Paths  []PathEntry
+	Player string      `json:"id"`
+	Paths  []PathEntry `json:"paths"`
 }
 
 type PathEntry struct {
+	// TimeStamp the player entered the cell.
 	TimeStamp uint64 `json:"t"`
-	Duration  uint64 `json:"d"`
 	// Xposition is an exterior cell X position.
 	Xposition int64 `json:"x"`
 	// Yposition is an exterior cell Y position.
 	Yposition int64 `json:"y"`
 	// CellID is an interior cell ID.
-	CellID string `json:"id"`
+	CellID string `json:"c"`
 }
 
 func ExtractData(savePath string) (*SaveData, error) {
 	// open file and back it up
-	src, err := os.Open(savePath)
+	src, err := os.OpenFile(savePath, os.O_RDWR, 0666)
 	if err != nil {
 		return nil, fmt.Errorf("read %q: %w", savePath, err)
 	}
+	defer src.Close()
 	backupPath := strings.TrimSuffix(savePath, filepath.Ext(savePath)) + ".bak"
 	backup, err := os.Create(backupPath)
 	if err != nil {
@@ -55,7 +57,8 @@ func ExtractData(savePath string) (*SaveData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse %q: %w", savePath, err)
 	}
-
+	// find the data we are interested in
+	// as a side-effect, records will be mutated to drop the records.
 	raw, err := extractRecord(records)
 	if err != nil {
 		return nil, fmt.Errorf("extract data from %q: %w", savePath, err)
@@ -64,6 +67,17 @@ func ExtractData(savePath string) (*SaveData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal extracted data from %q: %w", savePath, err)
 	}
+	// overwrite the file with one that has the data removed.
+	if err := src.Truncate(0); err != nil {
+		return nil, fmt.Errorf("truncate save file: %w", err)
+	}
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return nil, fmt.Errorf("seek save file: %w", err)
+	}
+	if err := esm.WriteRecords(src, slices.Values(records)); err != nil {
+		return nil, fmt.Errorf("rewrite save file %q: %w", savePath, err)
+	}
+
 	return data, nil
 }
 
@@ -71,7 +85,7 @@ func extractRecord(records []*esm.Record) ([]byte, error) {
 	var found []byte
 	for _, rec := range records {
 		// there's only one LUAM per save game
-		if rec.Tag != lua.LUAM {
+		if rec.Tag != esm.RecordTag("PLAY") {
 			continue
 		}
 		for i := 0; i < len(rec.Subrecords); i++ {
@@ -81,7 +95,7 @@ func extractRecord(records []*esm.Record) ([]byte, error) {
 				if err := lf.Unmarshal(sub); err != nil {
 					return nil, fmt.Errorf("parse LUAS subrecord: %w", err)
 				}
-				if lf.Value == "scripts/LivelyMap/player.lua" {
+				if lf.Value == "scripts/livelymap/player.lua" {
 					// the next record should be LUAD
 					if rec.Subrecords[i+1].Tag != lua.LUAD {
 						return nil, fmt.Errorf("expected LUAD after LUAS")
@@ -97,12 +111,12 @@ func extractRecord(records []*esm.Record) ([]byte, error) {
 					}
 					// Snip the current record and next one.
 					rec.Subrecords = append(rec.Subrecords[:i], rec.Subrecords[i+2:]...)
-					break
+					return found, nil
 				}
 			}
 		}
 	}
-	return found, nil
+	return nil, fmt.Errorf("didn't find any data")
 }
 
 func Unmarshal(raw []byte) (*SaveData, error) {
@@ -113,51 +127,54 @@ func Unmarshal(raw []byte) (*SaveData, error) {
 	return &data, nil
 }
 
-// ExtractBetween reads from r and returns the first byte slice found between prefix and suffix.
+// extractBetween reads from r and returns the first byte slice found between prefix and suffix.
 func extractBetween(r io.Reader, prefix, suffix []byte) ([]byte, error) {
 	const bufSize = 4096
 	br := bufio.NewReader(r)
 
-	var (
-		data        []byte
-		buf         = make([]byte, bufSize)
-		prefixFound bool
-	)
-
-	// A rolling buffer in case the pattern spans chunks
-	var window []byte
+	window := make([]byte, 0, bufSize*2)
+	prefixFound := false
+	var data []byte
 
 	for {
-		n, err := br.Read(buf)
+		// Read next chunk
+		chunk := make([]byte, bufSize)
+		n, err := br.Read(chunk)
 		if n > 0 {
-			window = append(window, buf[:n]...)
+			window = append(window, chunk[:n]...)
+		}
 
-			if !prefixFound {
-				// Search for prefix
-				if idx := bytes.Index(window, prefix); idx >= 0 {
-					prefixFound = true
-					window = window[idx+len(prefix):]
-				} else if len(window) > len(prefix) {
-					// Keep only possible overlap
-					window = window[len(window)-len(prefix):]
-				}
+		// If prefix not yet found, search for it
+		if !prefixFound {
+			if idx := bytes.Index(window, prefix); idx >= 0 {
+				prefixFound = true
+				// keep only data after prefix in the window
+				window = window[idx+len(prefix):]
 			} else {
-				// Already found prefix; search for suffix
-				if idx := bytes.Index(window, suffix); idx >= 0 {
-					// Found suffix, return data up to it
-					data = append(data, window[:idx]...)
-					return data, nil
-				}
-
-				// Otherwise, accumulate data and keep tail overlap
-				keep := max(0, len(suffix)-1)
-				if len(window) > keep {
-					data = append(data, window[:len(window)-keep]...)
-					window = window[len(window)-keep:]
+				// keep only possible prefix overlap to handle prefix across boundary
+				if len(window) > len(prefix) {
+					window = window[len(window)-len(prefix):]
 				}
 			}
 		}
 
+		// If prefix found, always check for suffix in the current window
+		if prefixFound {
+			if idx := bytes.Index(window, suffix); idx >= 0 {
+				// found suffix — append bytes before suffix and return
+				data = append(data, window[:idx]...)
+				return data, nil
+			}
+
+			// No suffix yet — move safe bytes into data but keep a tail for overlap
+			keep := max(0, len(suffix)-1)
+			if len(window) > keep {
+				data = append(data, window[:len(window)-keep]...)
+				window = window[len(window)-keep:]
+			}
+		}
+
+		// Handle errors / EOF
 		if err == io.EOF {
 			break
 		}
@@ -166,8 +183,10 @@ func extractBetween(r io.Reader, prefix, suffix []byte) ([]byte, error) {
 		}
 	}
 
+	// After reading all input, determine proper error
 	if !prefixFound {
 		return nil, fmt.Errorf("prefix not found")
 	}
+	// If prefix was found but we never found the suffix
 	return nil, fmt.Errorf("suffix not found after prefix")
 }
