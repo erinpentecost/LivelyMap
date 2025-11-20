@@ -27,6 +27,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 local MOD_NAME = require("scripts.LivelyMap.ns")
 local util = require('openmw.util')
+local types = require('openmw.types')
 local json = require('scripts.LivelyMap.json.json')
 local core = require('openmw.core')
 local interfaces = require("openmw.interfaces")
@@ -45,105 +46,67 @@ local function unwrapMagic(str)
     return string.sub(str, #magicPrefix + 1, #str - #magicSuffix)
 end
 
-local logList = {}
+local function playerName()
+    return types.NPC.record(pself.recordId).name
+end
 
 local persist = {
-    lastCellid = nil,
-    cellX = nil,
-    cellY = nil,
-    enterTime = nil,
-    jsonLog = nil
+    id = playerName(),
+    paths = {},
 }
-
-local function log(data)
-    print(aux_util.deepToString(data))
-    table.insert(logList, data)
-end
 
 local function onSave()
     -- debug
-    print("onSave:" .. aux_util.deepToString(logList, 3))
-    -- do the save
-    persist.jsonLog = wrapInMagic(json.encode(logList))
-    return persist
+    print("onSave:" .. aux_util.deepToString(persist, 3))
+    -- do the save. this needs to be in json
+    -- so the Go code can unmarshal it.
+    return { json = wrapInMagic(json.encode(persist)) }
 end
 
 local function onLoad(data)
-    -- load working data
+    -- load from in-game storage
     if data ~= nil then
-        persist = data
+        persist = json.decode(unwrapMagic(data.json))
     end
-    -- load long-term data
-    logList = json.decode(unwrapMagic(data.jsonLog))
+    -- TODO: merge with dumped JSON file from Go code.
+
     -- debug
-    print("onLoad:" .. aux_util.deepToString(logList, 3))
+    print("onLoad:" .. aux_util.deepToString(persist, 3))
 end
 
-local function initPersist(now)
-    persist.enterTime = now
-    persist.lastCellid = pself.cell.id
-    if pself.cell.isExterior then
-        persist.cellX = pself.cell.gridX
-        persist.cellY = pself.cell.gridY
-    else
-        persist.cellX = nil
-        persist.cellY = nil
+local function addEntry()
+    local entry = {
+        t = math.ceil(core.getGameTime()),
+        x = pself.cell.isExterior and pself.cell.gridX or nil,
+        y = pself.cell.isExterior and pself.cell.gridY or nil,
+        c = (not pself.cell.isExterior) and pself.cell.id or nil
+    }
+
+    -- make a new list and add the entry to it
+    if persist == nil or #persist.paths == 0 then
+        persist = {
+            id = playerName(),
+            paths = { entry }
+        }
+        print("Initialized new local storage with entry: " .. aux_util.deepToString(entry, 3))
+        return
     end
+    -- otherwise, don't do anything if the cell is the same.
+    local tail = persist.paths[#persist.paths]
+    if tail.c == entry.c and tail.x == entry.x and tail.y == entry.y then
+        return
+    end
+    -- ok, now add to the end of the list.
+    table.insert(persist.paths, entry)
+    print("Added new entry: " .. aux_util.deepToString(entry, 3))
 end
 
 local function onUpdate(dt)
     if dt == 0 then
+        -- don't do anything if paused.
         return
     end
-    local now = core.getGameTime()
-
-    if persist.lastCellid == nil then
-        initPersist(now)
-    end
-    if persist.lastCellid ~= pself.cell.id then
-        local timeSpent = math.ceil(now - persist.enterTime)
-        if persist.cellX ~= nil then
-            -- this is an exterior
-            log({
-                -- timestamp
-                t = math.ceil(core.getGameTime()),
-                -- duration
-                d = timeSpent,
-                -- x pos
-                x = persist.cellX,
-                -- y pos
-                y = persist.cellY,
-            })
-        else
-            log({
-                -- timestamp
-                t = math.ceil(core.getGameTime()),
-                -- duration
-                d = timeSpent,
-                -- interior id
-                id = persist.lastCellid,
-            })
-        end
-
-        -- set up for next move
-        initPersist(now)
-    end
-end
-
-local function onConsoleCommand(mode, command, selectedObject)
-    local function getSuffixForCmd(prefix)
-        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
-            return string.sub(command, string.len(prefix) + 1)
-        else
-            return nil
-        end
-    end
-    local noTrespass = getSuffixForCmd("lua clearmap")
-
-    if noTrespass ~= nil then
-        print("Clearing data in " .. MOD_NAME .. ". You must save to confirm.")
-        logList = {}
-    end
+    addEntry()
 end
 
 return {
@@ -151,6 +114,5 @@ return {
         onUpdate = onUpdate,
         onSave = onSave,
         onLoad = onLoad,
-        onConsoleCommand = onConsoleCommand,
     }
 }

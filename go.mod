@@ -5,7 +5,7 @@ go 1.25.1
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dblezek/tga v0.0.0-20150626111426-80720cbc1017 // indirect
-	github.com/ernmw/omwpacker v0.3.0 // indirect
+	github.com/ernmw/omwpacker v0.3.1 // indirect
 	github.com/galaco/dxt v0.0.0-20190227194637-c61fd9851f0b // indirect
 	github.com/mauserzjeh/dxt v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
