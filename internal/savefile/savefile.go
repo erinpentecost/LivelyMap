@@ -19,8 +19,8 @@ const magic_prefix = "!!LivelyMap!!STARTOFENTRY!!"
 const magic_suffix = "!!LivelyMap!!ENDOFENTRY!!"
 
 type SaveData struct {
-	Player string      `json:"id"`
-	Paths  []PathEntry `json:"paths"`
+	Player string       `json:"id"`
+	Paths  []*PathEntry `json:"paths"`
 }
 
 type PathEntry struct {
@@ -32,6 +32,53 @@ type PathEntry struct {
 	Yposition int64 `json:"y"`
 	// CellID is an interior cell ID.
 	CellID string `json:"c"`
+}
+
+func Merge(a *SaveData, b *SaveData) (*SaveData, error) {
+	if a == nil && b == nil {
+		return nil, fmt.Errorf("nil savedatas")
+	}
+	if a == nil {
+		return b, nil
+	}
+	if b == nil {
+		return a, nil
+	}
+	if !strings.EqualFold(a.Player, b.Player) {
+		return nil, fmt.Errorf("mismatched player id: %q and %q", a.Player, b.Player)
+	}
+	if len(a.Paths) == 0 {
+		return b, nil
+	}
+	if len(b.Paths) == 0 {
+		return a, nil
+	}
+	if a.Paths[len(a.Paths)-1].TimeStamp < b.Paths[0].TimeStamp {
+		return &SaveData{
+			Player: a.Player,
+			Paths:  append(a.Paths, b.Paths...),
+		}, nil
+	}
+	if b.Paths[len(b.Paths)-1].TimeStamp < a.Paths[0].TimeStamp {
+		return &SaveData{
+			Player: a.Player,
+			Paths:  append(b.Paths, a.Paths...),
+		}, nil
+	}
+	// else we have some overlap in paths. we'll default to a.
+	// find the index in b.Paths that is the end of the overlap
+	oldestA := a.Paths[len(a.Paths)-1].TimeStamp
+	bIndex := slices.IndexFunc(b.Paths, func(p *PathEntry) bool {
+		return p.TimeStamp >= oldestA
+	})
+
+	if bIndex < 0 {
+		return nil, fmt.Errorf("merge paths")
+	}
+	return &SaveData{
+		Player: a.Player,
+		Paths:  append(a.Paths, b.Paths[bIndex:]...),
+	}, nil
 }
 
 func ExtractData(savePath string) (*SaveData, error) {

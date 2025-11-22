@@ -16,15 +16,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 
--- TODO: either don't use storage sections,
--- or use global storage. never player storage.
---
--- Global storage would let us read the data regardless of current player,
--- so we could show all local history.
---
--- Saving into the player object with onSave/onLoad would bind the data
--- into the player omwsave file, which would make it transferable.
-
 local MOD_NAME = require("scripts.LivelyMap.ns")
 local util = require('openmw.util')
 local types = require('openmw.types')
