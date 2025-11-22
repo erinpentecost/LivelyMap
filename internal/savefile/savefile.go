@@ -19,8 +19,8 @@ const magic_prefix = "!!LivelyMap!!STARTOFENTRY!!"
 const magic_suffix = "!!LivelyMap!!ENDOFENTRY!!"
 
 type SaveData struct {
-	Player string      `json:"id"`
-	Paths  []PathEntry `json:"paths"`
+	Player string       `json:"id"`
+	Paths  []*PathEntry `json:"paths"`
 }
 
 type PathEntry struct {
@@ -32,6 +32,59 @@ type PathEntry struct {
 	Yposition int64 `json:"y"`
 	// CellID is an interior cell ID.
 	CellID string `json:"c"`
+}
+
+// Merge: keep the prefix of a.Paths with TimeStamp < earliest(B),
+// then append all of b.Paths. If b entirely precedes a, return b+a.
+// Handles nil/empty and mismatched player IDs.
+func Merge(a *SaveData, b *SaveData) (*SaveData, error) {
+	if a == nil && b == nil {
+		return nil, fmt.Errorf("nil savedatas")
+	}
+	if a == nil {
+		return b, nil
+	}
+	if b == nil {
+		return a, nil
+	}
+	if !strings.EqualFold(a.Player, b.Player) {
+		return nil, fmt.Errorf("mismatched player id: %q and %q", a.Player, b.Player)
+	}
+
+	// If either has no paths, return the other.
+	if len(a.Paths) == 0 {
+		return b, nil
+	}
+	if len(b.Paths) == 0 {
+		return a, nil
+	}
+
+	// If b entirely precedes a, return b + a (no truncation of a).
+	if b.Paths[len(b.Paths)-1].TimeStamp < a.Paths[0].TimeStamp {
+		out := make([]*PathEntry, 0, len(b.Paths)+len(a.Paths))
+		out = append(out, b.Paths...)
+		out = append(out, a.Paths...)
+		return &SaveData{Player: a.Player, Paths: out}, nil
+	}
+
+	earliestB := b.Paths[0].TimeStamp
+
+	// Find the prefix length of A where TimeStamp < earliestB.
+	prefixLen := 0
+	for ; prefixLen < len(a.Paths); prefixLen++ {
+		if a.Paths[prefixLen].TimeStamp >= earliestB {
+			break
+		}
+	}
+
+	// Keep a.Paths[:prefixLen] and append all of b.Paths
+	merged := make([]*PathEntry, 0, prefixLen+len(b.Paths))
+	if prefixLen > 0 {
+		merged = append(merged, a.Paths[:prefixLen]...)
+	}
+	merged = append(merged, b.Paths...)
+
+	return &SaveData{Player: a.Player, Paths: merged}, nil
 }
 
 func ExtractData(savePath string) (*SaveData, error) {

@@ -16,15 +16,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 
--- TODO: either don't use storage sections,
--- or use global storage. never player storage.
---
--- Global storage would let us read the data regardless of current player,
--- so we could show all local history.
---
--- Saving into the player object with onSave/onLoad would bind the data
--- into the player omwsave file, which would make it transferable.
-
 local MOD_NAME = require("scripts.LivelyMap.ns")
 local util = require('openmw.util')
 local types = require('openmw.types')
@@ -32,6 +23,7 @@ local json = require('scripts.LivelyMap.json.json')
 local core = require('openmw.core')
 local interfaces = require("openmw.interfaces")
 local pself = require("openmw.self")
+local vfs = require('openmw.vfs')
 local aux_util = require('openmw_aux.util')
 
 local storage = require('openmw.storage')
@@ -50,6 +42,46 @@ local function playerName()
     return types.NPC.record(pself.recordId).name
 end
 
+-- Merge two SaveData-like tables: a and b
+-- Returns a new table shaped like SaveData
+local function merge(a, b)
+    if a == nil then return b end
+    if b == nil then return a end
+    local apaths = a.paths or {}
+    local bpaths = b.paths or {}
+
+    -- If a or b is empty, easy cases
+    if #apaths == 0 then
+        return { id = b.id, paths = bpaths }
+    end
+    if #bpaths == 0 then
+        return { id = a.id, paths = apaths }
+    end
+
+    -- Find newest timestamp in b
+    local b_newest = bpaths[#bpaths].t
+
+    -- Copy from a until timestamps overlap
+    local result_paths = {}
+    for i = 1, #apaths do
+        if apaths[i].t >= b_newest then
+            break
+        end
+        result_paths[#result_paths + 1] = apaths[i]
+    end
+
+    -- Append all of b
+    for i = 1, #bpaths do
+        result_paths[#result_paths + 1] = bpaths[i]
+    end
+
+    return {
+        id = b.id or a.id,
+        paths = result_paths
+    }
+end
+
+
 local persist = {
     id = playerName(),
     paths = {},
@@ -64,11 +96,26 @@ local function onSave()
 end
 
 local function onLoad(data)
+    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
+    print("onLoad: Started. Path file: " .. path)
     -- load from in-game storage
+    local fromSave
     if data ~= nil then
-        persist = json.decode(unwrapMagic(data.json))
+        fromSave = json.decode(unwrapMagic(data.json))
     end
-    -- TODO: merge with dumped JSON file from Go code.
+    -- load from file. this is produced by the Go portion of the mod.
+    local fromFile
+
+    local handle, err = vfs.open(path)
+    if handle == nil then
+        print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
+        persist = fromSave
+        return
+    end
+    fromSave = json.decode(handle:read("*all"))
+
+    -- merge them
+    persist = merge(fromFile, fromSave)
 
     -- debug
     print("onLoad:" .. aux_util.deepToString(persist, 3))
