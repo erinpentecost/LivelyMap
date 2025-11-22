@@ -4,9 +4,7 @@ import (
 	"testing"
 )
 
-func newPE(t uint64) *PathEntry {
-	return &PathEntry{TimeStamp: t}
-}
+func pe(t uint64) *PathEntry { return &PathEntry{TimeStamp: t} }
 
 func TestMerge(t *testing.T) {
 	tests := []struct {
@@ -29,44 +27,90 @@ func TestMerge(t *testing.T) {
 		},
 		{
 			name:      "A empty",
-			a:         &SaveData{Player: "p", Paths: nil},
-			b:         &SaveData{Player: "p", Paths: []*PathEntry{newPE(1), newPE(2)}},
+			a:         &SaveData{Player: "p"},
+			b:         &SaveData{Player: "p", Paths: []*PathEntry{pe(1), pe(2)}},
 			wantPaths: []uint64{1, 2},
 		},
 		{
 			name:      "B empty",
-			a:         &SaveData{Player: "p", Paths: []*PathEntry{newPE(3)}},
+			a:         &SaveData{Player: "p", Paths: []*PathEntry{pe(1)}},
 			b:         &SaveData{Player: "p"},
-			wantPaths: []uint64{3},
+			wantPaths: []uint64{1},
 		},
+
+		// *** NEW RULE TESTS ***
+
 		{
-			name:      "A ends before B starts → append A→B",
-			a:         &SaveData{Player: "p", Paths: []*PathEntry{newPE(1), newPE(2)}},
-			b:         &SaveData{Player: "p", Paths: []*PathEntry{newPE(3), newPE(4)}},
-			wantPaths: []uint64{1, 2, 3, 4},
-		},
-		{
-			name:      "B ends before A starts → append B→A",
-			a:         &SaveData{Player: "p", Paths: []*PathEntry{newPE(5), newPE(6)}},
-			b:         &SaveData{Player: "p", Paths: []*PathEntry{newPE(1), newPE(2)}},
+			name: "No overlap → straight append",
+			// A: 1, 2
+			// B: 5, 6
+			// earliestB=5 → keep all A (<5)
+			a:         &SaveData{Player: "p", Paths: []*PathEntry{pe(1), pe(2)}},
+			b:         &SaveData{Player: "p", Paths: []*PathEntry{pe(5), pe(6)}},
 			wantPaths: []uint64{1, 2, 5, 6},
 		},
+
 		{
-			name: "Overlap → B minimally truncated",
-			// A:       5, 10, 15
-			// B:  1,  6, 11, 20
-			// oldestA = 15
-			// B entries <15 are [1,6,11] → index = 3
-			// result = A + B[3:] = [5,10,15,20]
+			name: "B entirely precedes A → B then A",
+			// B: 1, 2
+			// A: 5, 6
+			// b.latest < a.first → B + A with no truncation
+			a:         &SaveData{Player: "p", Paths: []*PathEntry{pe(5), pe(6)}},
+			b:         &SaveData{Player: "p", Paths: []*PathEntry{pe(1), pe(2)}},
+			wantPaths: []uint64{1, 2, 5, 6},
+		},
+
+		{
+			name: "Overlap → drop only overlapping suffix of A",
+			// A: 1, 2, 3, 14, 15
+			// B: 12, 13, 20, 21
+			// earliestB=12
+			// keep prefix of A only while <12 → [1,2,3]
+			// drop [14,15]
 			a: &SaveData{
 				Player: "p",
-				Paths:  []*PathEntry{newPE(5), newPE(10), newPE(15)},
+				Paths:  []*PathEntry{pe(1), pe(2), pe(3), pe(14), pe(15)},
 			},
 			b: &SaveData{
 				Player: "p",
-				Paths:  []*PathEntry{newPE(1), newPE(6), newPE(11), newPE(20)},
+				Paths:  []*PathEntry{pe(12), pe(13), pe(20), pe(21)},
 			},
-			wantPaths: []uint64{5, 10, 15, 20},
+			wantPaths: []uint64{1, 2, 3, 12, 13, 20, 21},
+		},
+
+		{
+			name: "Partial overlap → keep only prefix of A",
+			// A: 1, 4, 7
+			// B: 5, 6, 10
+			// earliestB=5
+			// keep A entries <5 → [1,4]
+			// drop 7
+			a:         &SaveData{Player: "p", Paths: []*PathEntry{pe(1), pe(4), pe(7)}},
+			b:         &SaveData{Player: "p", Paths: []*PathEntry{pe(5), pe(6), pe(10)}},
+			wantPaths: []uint64{1, 4, 5, 6, 10},
+		},
+
+		{
+			name: "All A entries overlap B → result is just B",
+			// A: 3, 6, 9, 12
+			// B: 10, 11, 20
+			// earliestB=10
+			// keep A entries <10 → only [3,6,9]
+			// but 12 is dropped
+			// merged = 3,6,9,10,11,20
+			a:         &SaveData{Player: "p", Paths: []*PathEntry{pe(3), pe(6), pe(9), pe(12)}},
+			b:         &SaveData{Player: "p", Paths: []*PathEntry{pe(10), pe(11), pe(20)}},
+			wantPaths: []uint64{3, 6, 9, 10, 11, 20},
+		},
+
+		{
+			name: "A already safe → keep all A",
+			// A: 1,2,3
+			// B: 4,5
+			// earliestB=4 → keep all A (<4)
+			a:         &SaveData{Player: "p", Paths: []*PathEntry{pe(1), pe(2), pe(3)}},
+			b:         &SaveData{Player: "p", Paths: []*PathEntry{pe(4), pe(5)}},
+			wantPaths: []uint64{1, 2, 3, 4, 5},
 		},
 	}
 
@@ -83,11 +127,11 @@ func TestMerge(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if len(got.Paths) != len(tt.wantPaths) {
-				t.Fatalf("wrong path count: got %d want %d", len(got.Paths), len(tt.wantPaths))
+				t.Fatalf("unexpected length: got %d want %d", len(got.Paths), len(tt.wantPaths))
 			}
-			for i, pe := range got.Paths {
-				if pe.TimeStamp != tt.wantPaths[i] {
-					t.Fatalf("paths[%d] = %d want %d", i, pe.TimeStamp, tt.wantPaths[i])
+			for i, p := range got.Paths {
+				if p.TimeStamp != tt.wantPaths[i] {
+					t.Fatalf("paths[%d] = %d want %d", i, p.TimeStamp, tt.wantPaths[i])
 				}
 			}
 		})
