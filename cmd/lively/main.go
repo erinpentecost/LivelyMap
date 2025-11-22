@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/erinpentecost/LivelyMap/internal/hdmap"
+	"github.com/erinpentecost/LivelyMap/internal/savefile"
 	"github.com/ernmw/omwpacker/cfg"
 )
 
@@ -27,7 +29,15 @@ func sync(ctx context.Context, path string) error {
 		}
 	}
 
-	return drawMaps(ctx, rootPath, env)
+	if err := hdmap.DrawMaps(ctx, rootPath, env); err != nil {
+		return fmt.Errorf("draw maps: %w", err)
+	}
+
+	if err := savefile.ExtractSaveData(rootPath, env); err != nil {
+		return fmt.Errorf("extract save data: %w", err)
+	}
+
+	return nil
 }
 
 func main() {

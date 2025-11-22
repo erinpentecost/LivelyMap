@@ -1,4 +1,4 @@
-package main
+package hdmap
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/erinpentecost/LivelyMap/internal/hdmap"
 	"github.com/ernmw/omwpacker/cfg"
 	"golang.org/x/sync/errgroup"
 )
@@ -24,7 +23,7 @@ func getRampFile(rootPath string) string {
 	return rampPath
 }
 
-func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error {
+func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error {
 	rampPath := getRampFile(rootPath)
 
 	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
@@ -41,7 +40,7 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	}
 
 	fmt.Printf("Parsing %d plugins...\n", len(env.Plugins))
-	parsedLands := hdmap.NewLandParser(env)
+	parsedLands := NewLandParser(env)
 	if err := parsedLands.ParsePlugins(); err != nil {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
@@ -51,27 +50,27 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 
 	// Render individual normal cells
 	fmt.Printf("Rendering %d normalheightmap cells...\n", len(parsedLands.Lands))
-	normalCells := hdmap.NewCellMapper(parsedLands, &hdmap.NormalHeightRenderer{})
+	normalCells := NewCellMapper(parsedLands, &NormalHeightRenderer{})
 	if err := normalCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
 	// Render individual classic color cells
 	fmt.Printf("Rendering %d classic color cells...\n", len(parsedLands.Lands))
-	renderer, err := hdmap.NewClassicRenderer(rampPath)
+	renderer, err := NewClassicRenderer(rampPath)
 	if err != nil {
 		return fmt.Errorf("new classic renderer")
 	}
-	classicColorCells := hdmap.NewCellMapper(parsedLands, renderer)
+	classicColorCells := NewCellMapper(parsedLands, renderer)
 	if err := classicColorCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
 	// Render individual vertex color "detail" cells
 	fmt.Printf("Rendering %d detailed cells...\n", len(parsedLands.Lands))
-	texturedRenderer, err := hdmap.NewDetailRenderer(rampPath, parsedLands.LandTextures)
+	texturedRenderer, err := NewDetailRenderer(rampPath, parsedLands.LandTextures)
 	if err != nil {
 		return fmt.Errorf("new detailed renderer: %w", err)
 	}
-	texturedCells := hdmap.NewCellMapper(parsedLands, texturedRenderer)
+	texturedCells := NewCellMapper(parsedLands, texturedRenderer)
 	if err := texturedCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
@@ -79,9 +78,9 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	fmt.Printf("Setting up world map joiners...\n")
 
 	// Set up jobs to join the sub-images together.
-	mapInfos := []hdmap.SubmapNode{}
+	mapInfos := []SubmapNode{}
 	maps := []*mapRenderJob{}
-	for _, extents := range hdmap.Partition(parsedLands.MapExtents) {
+	for _, extents := range Partition(parsedLands.MapExtents) {
 		mapInfos = append(mapInfos, extents)
 
 		maps = append(maps, &mapRenderJob{
@@ -149,9 +148,9 @@ func drawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	return g.Wait()
 }
 
-func printMapInfo(path string, maps []hdmap.SubmapNode) error {
+func printMapInfo(path string, maps []SubmapNode) error {
 	container := struct {
-		Maps []hdmap.SubmapNode
+		Maps []SubmapNode
 	}{
 		Maps: maps,
 	}
@@ -165,15 +164,15 @@ func printMapInfo(path string, maps []hdmap.SubmapNode) error {
 type mapRenderJob struct {
 	Directory string
 	Name      string
-	Extents   hdmap.MapCoords
-	Cells     *hdmap.CellMapper
+	Extents   MapCoords
+	Cells     *CellMapper
 	ScaleDown int
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
 	fullPath := path.Join(m.Directory, m.Name)
 	fmt.Printf("Combining cells for %q...\n", fullPath)
-	classicWorldMapper := hdmap.NewWorldMapper()
+	classicWorldMapper := NewWorldMapper()
 	err := classicWorldMapper.Write(ctx,
 		m.Extents,
 		slices.Values(m.Cells.Cells),

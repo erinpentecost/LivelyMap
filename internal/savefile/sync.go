@@ -1,4 +1,4 @@
-package main
+package savefile
 
 import (
 	"encoding/json"
@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/erinpentecost/LivelyMap/internal/savefile"
 	"github.com/ernmw/omwpacker/cfg"
 )
 
@@ -36,7 +35,7 @@ func newestFileInFolder(path string, ext string) (fs.FileInfo, error) {
 	return latestSave, nil
 }
 
-func extractSaveData(
+func ExtractSaveData(
 	rootPath string,
 	env *cfg.Environment) error {
 	for _, userDir := range env.User {
@@ -63,19 +62,28 @@ func extractSaveData(
 				"scripts",
 				"LivelyMap",
 				"data",
-				fmt.Sprintf("character_%s.json", entry.Name()))
-			existingData, _ := os.ReadFile(dumpPath) // drop error
-			parsedExistingData, err := savefile.Unmarshal(existingData)
-			if err != nil {
-				return fmt.Errorf("bad path data in %q: %w", dumpPath, err)
+				"paths",
+				fmt.Sprintf("%s.json", entry.Name()))
+			var parsedExistingData *SaveData
+			{
+				existingData, _ := os.ReadFile(dumpPath) // drop error
+				if len(existingData) > 0 {
+					parsedExistingData, err = Unmarshal(existingData)
+					if err != nil {
+						return fmt.Errorf("bad path data in %q: %w", dumpPath, err)
+					}
+				}
 			}
+
 			// this next call will edit the save file
 			newestSaveFileName := filepath.Join(characterDir, newestSave.Name())
-			data, err := savefile.ExtractData(newestSaveFileName)
+			data, err := ExtractData(newestSaveFileName)
 			if err != nil {
-				return fmt.Errorf("extract save data in %q: %w", newestSaveFileName, err)
+				// no data to extract.
+				fmt.Printf("extract save data in %q: %v\n", newestSaveFileName, err)
+				continue
 			}
-			newData, err := savefile.Merge(parsedExistingData, data)
+			newData, err := Merge(parsedExistingData, data)
 			if err != nil {
 				return fmt.Errorf("merge %q and %q: %w", dumpPath, newestSaveFileName, err)
 			}
