@@ -1,10 +1,13 @@
+local MOD_NAME = require("scripts.LivelyMap.ns")
 local world = require('openmw.world')
+local core = require('openmw.core')
 local types = require('openmw.types')
 local aux_util = require('openmw_aux.util')
 local vfs = require('openmw.vfs')
 local json = require('scripts.LivelyMap.json.json')
+local localization = core.l10n(MOD_NAME)
 
-local MOD_NAME = require("scripts.LivelyMap.ns")
+
 
 -- persist is saved to disk
 local persist = {
@@ -21,6 +24,7 @@ local persist = {
 local function getMapRecord(name)
     if not persist.meshToRecordId[name] then
         local recordFields = {
+            name = localization("map", {}),
             model = "meshes\\livelymap\\" .. name .. ".nif",
         }
         local draftRecord = types.Activator.createRecordDraft(recordFields)
