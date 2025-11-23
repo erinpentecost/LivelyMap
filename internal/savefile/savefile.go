@@ -19,24 +19,26 @@ const magic_prefix = "!!LivelyMap!!STARTOFENTRY!!"
 const magic_suffix = "!!LivelyMap!!ENDOFENTRY!!"
 
 type SaveData struct {
-	Player string       `json:"id"`
-	Paths  []*PathEntry `json:"paths"`
+	Player string           `json:"id"`
+	Paths  []*PathEntry     `json:"paths"`
+	Extra  *json.RawMessage `json:"extra,omitempty"`
 }
 
 type PathEntry struct {
 	// TimeStamp the player entered the cell.
-	TimeStamp uint64 `json:"t"`
+	TimeStamp uint64 `json:"t,omitempty"`
 	// Xposition is an exterior cell X position.
-	Xposition int64 `json:"x"`
+	Xposition int64 `json:"x,omitempty"`
 	// Yposition is an exterior cell Y position.
-	Yposition int64 `json:"y"`
+	Yposition int64 `json:"y,omitempty"`
 	// CellID is an interior cell ID.
-	CellID string `json:"c"`
+	CellID string `json:"c,omitempty"`
 }
 
 // Merge: keep the prefix of a.Paths with TimeStamp < earliest(B),
 // then append all of b.Paths. If b entirely precedes a, return b+a.
 // Handles nil/empty and mismatched player IDs.
+// b should generally be the more up-to-date data.
 func Merge(a *SaveData, b *SaveData) (*SaveData, error) {
 	if a == nil && b == nil {
 		return nil, fmt.Errorf("nil savedatas")
@@ -64,7 +66,7 @@ func Merge(a *SaveData, b *SaveData) (*SaveData, error) {
 		out := make([]*PathEntry, 0, len(b.Paths)+len(a.Paths))
 		out = append(out, b.Paths...)
 		out = append(out, a.Paths...)
-		return &SaveData{Player: a.Player, Paths: out}, nil
+		return &SaveData{Player: a.Player, Paths: out, Extra: b.Extra}, nil
 	}
 
 	earliestB := b.Paths[0].TimeStamp
@@ -84,7 +86,7 @@ func Merge(a *SaveData, b *SaveData) (*SaveData, error) {
 	}
 	merged = append(merged, b.Paths...)
 
-	return &SaveData{Player: a.Player, Paths: merged}, nil
+	return &SaveData{Player: a.Player, Paths: merged, Extra: b.Extra}, nil
 }
 
 func ExtractData(savePath string) (*SaveData, error) {

@@ -81,25 +81,44 @@ local function merge(a, b)
     }
 end
 
-
-local persist = {
+-- fromSave contains the data from this savegame.
+local fromSave = {
     id = playerName(),
     paths = {},
+    extra = {},
+}
+
+-- mergedData contains the merged data from the savegame and file
+local mergedData = {
+    id = playerName(),
+    paths = {},
+    -- extra can contain arbitrary json that will also be persisted.
+    -- any other data saved by this script will be deleted on extract.
+    extra = {},
 }
 
 local function onSave()
     -- debug
-    print("onSave:" .. aux_util.deepToString(persist, 3))
+    print("onSave:" .. aux_util.deepToString(fromSave, 3))
     -- do the save. this needs to be in json
     -- so the Go code can unmarshal it.
-    return { json = wrapInMagic(json.encode(persist)) }
+    return { json = wrapInMagic(json.encode(fromSave)) }
+end
+
+local function newEntry()
+    return {
+        t = math.ceil(core.getGameTime()),
+        x = pself.cell.isExterior and pself.cell.gridX or nil,
+        y = pself.cell.isExterior and pself.cell.gridY or nil,
+        c = (not pself.cell.isExterior) and pself.cell.id or nil
+    }
 end
 
 local function onLoad(data)
     local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
     print("onLoad: Started. Path file: " .. path)
     -- load from in-game storage
-    local fromSave
+
     if data ~= nil then
         fromSave = json.decode(unwrapMagic(data.json))
     end
@@ -109,29 +128,24 @@ local function onLoad(data)
     local handle, err = vfs.open(path)
     if handle == nil then
         print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
-        persist = fromSave
+        mergedData = fromSave
         return
     end
-    fromSave = json.decode(handle:read("*all"))
+    fromFile = json.decode(handle:read("*all"))
 
     -- merge them
-    persist = merge(fromFile, fromSave)
+    mergedData = merge(fromFile, fromSave)
 
     -- debug
-    print("onLoad:" .. aux_util.deepToString(persist, 3))
+    print("onLoad:" .. aux_util.deepToString(mergedData, 3))
 end
 
 local function addEntry()
-    local entry = {
-        t = math.ceil(core.getGameTime()),
-        x = pself.cell.isExterior and pself.cell.gridX or nil,
-        y = pself.cell.isExterior and pself.cell.gridY or nil,
-        c = (not pself.cell.isExterior) and pself.cell.id or nil
-    }
+    local entry = newEntry()
 
     -- make a new list and add the entry to it
-    if persist == nil or #persist.paths == 0 then
-        persist = {
+    if mergedData == nil or #mergedData.paths == 0 then
+        mergedData = {
             id = playerName(),
             paths = { entry }
         }
@@ -139,19 +153,26 @@ local function addEntry()
         return
     end
     -- otherwise, don't do anything if the cell is the same.
-    local tail = persist.paths[#persist.paths]
+    local tail = mergedData.paths[#mergedData.paths]
     if tail.c == entry.c and tail.x == entry.x and tail.y == entry.y then
         return
     end
     -- ok, now add to the end of the list.
-    table.insert(persist.paths, entry)
+    table.insert(mergedData.paths, entry)
+    table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
 end
 
+local cachedCellId
 local function onUpdate(dt)
     if dt == 0 then
         -- don't do anything if paused.
         return
+    end
+    if pself.cell.id == cachedCellId then
+        return
+    else
+        cachedCellId = pself.cell.id
     end
     addEntry()
 end
@@ -161,5 +182,6 @@ return {
         onUpdate = onUpdate,
         onSave = onSave,
         onLoad = onLoad,
+        onInit = function() onLoad(nil) end,
     }
 }
