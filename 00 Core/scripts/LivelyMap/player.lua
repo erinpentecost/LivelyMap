@@ -88,13 +88,13 @@ local fromSave = {
     extra = {},
 }
 
--- mergedData contains the merged data from the savegame and file
-local mergedData = {
-    id = playerName(),
-    paths = {},
-    -- extra can contain arbitrary json that will also be persisted.
-    -- any other data saved by this script will be deleted on extract.
-    extra = {},
+-- mergedData contains the merged data from the savegame and file,
+-- for all saves. The key is the playerName.
+local allData = {}
+allData[playerName()] = {
+  id = playerName(),
+  paths = {},
+  extra = {},
 }
 
 local function onSave()
@@ -114,37 +114,65 @@ local function newEntry()
     }
 end
 
-local function onLoad(data)
-    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
-    print("onLoad: Started. Path file: " .. path)
-    -- load from in-game storage
-
-    if data ~= nil then
-        fromSave = json.decode(unwrapMagic(data.json))
-    end
-    -- load from file. this is produced by the Go portion of the mod.
-    local fromFile
-
+local function parseFile(path)
     local handle, err = vfs.open(path)
     if handle == nil then
         print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
-        mergedData = fromSave
+        allData[playerName()] = fromSave
         return
     end
-    fromFile = json.decode(handle:read("*all"))
+    return json.decode(handle:read("*all"))
+end
+
+local function endsWith(str, ending)
+  if ending == "" then
+    return true
+  end
+  if #str < #ending then
+    return false
+  end
+  return str:sub(-#ending) == ending
+end
+
+local function onLoad(data)
+    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
+    print("onLoad: Started. Path file: " .. path)
+
+    -- load from in-game storage
+    if data ~= nil then
+        fromSave = json.decode(unwrapMagic(data.json))
+    end
+
+    -- load from file. this is produced by the Go portion of the mod.
+    local fromFile = parseFile(path)
 
     -- merge them
-    mergedData = merge(fromFile, fromSave)
+    allData[playerName()] = merge(fromFile, fromSave)
 
     -- debug
-    print("onLoad:" .. aux_util.deepToString(mergedData, 3))
+    print("onLoad: " .. aux_util.deepToString(allData, 3))
+
+    -- now load all other character data
+    local allSaves = "scripts\\" .. MOD_NAME .. "\\data\\paths\\"
+    for fileName in vfs.pathsWithPrefix(allSaves) do
+        if fileName ~= path and endsWith(fileName, ".json") then
+            -- this is for a different character
+            local lastSlash = math.max(path:find("/", 1, true) or 0, path:find("\\", 1, true) or 0)
+            local characterName = fileName:sub(lastSlash):gsub("%.json", "")
+            if not allData[characterName] then
+              allData[characterName] = parseFile(path)
+              print("onLoad completed for " .. characterName)
+            end
+        end
+    end
 end
 
 local function addEntry()
     local entry = newEntry()
+    name = playerName()
 
     -- make a new list and add the entry to it
-    if mergedData == nil or #mergedData.paths == 0 then
+    if allData[name] == nil or #allData[name].paths == 0 then
         mergedData = {
             id = playerName(),
             paths = { entry }
@@ -153,12 +181,12 @@ local function addEntry()
         return
     end
     -- otherwise, don't do anything if the cell is the same.
-    local tail = mergedData.paths[#mergedData.paths]
+    local tail = allData[name].paths[#allData[name].paths]
     if tail.c == entry.c and tail.x == entry.x and tail.y == entry.y then
         return
     end
     -- ok, now add to the end of the list.
-    table.insert(mergedData.paths, entry)
+    table.insert(allData[name].paths, entry)
     table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
 end

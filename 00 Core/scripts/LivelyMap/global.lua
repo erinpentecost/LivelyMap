@@ -58,7 +58,9 @@ end
 
 local function onLoad(data)
     -- load persist
-    persist = data
+    if data ~= nil then
+        persist = data
+    end
 
     -- load from file
     local path = "scripts\\" .. MOD_NAME .. "\\data\\maps.json"
@@ -73,10 +75,12 @@ local function onLoad(data)
     -- also turn it into a map instead of array
     maps = {}
     local mapsList = json.decode(handle:read("*all")).Maps
-    for i, v in ipairs(mapsList) do
-        v.object = getMapObject("world_" .. maps[i].ID)
+    for _, v in ipairs(mapsList) do
+        print("Parsing map: " .. v.ID)
+        v.object = getMapObject("world_" .. v.ID)
         maps[v.ID] = v
     end
+    print("Maps: " .. aux_util.deepToString(maps, 3))
 end
 
 
