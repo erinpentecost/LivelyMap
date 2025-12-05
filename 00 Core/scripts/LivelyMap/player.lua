@@ -81,57 +81,99 @@ local function merge(a, b)
     }
 end
 
-
-local persist = {
+-- fromSave contains the data from this savegame.
+local fromSave = {
     id = playerName(),
     paths = {},
+    extra = {},
+}
+
+-- mergedData contains the merged data from the savegame and file,
+-- for all saves. The key is the playerName.
+local allData = {}
+allData[playerName()] = {
+  id = playerName(),
+  paths = {},
+  extra = {},
 }
 
 local function onSave()
     -- debug
-    print("onSave:" .. aux_util.deepToString(persist, 3))
+    print("onSave:" .. aux_util.deepToString(fromSave, 3))
     -- do the save. this needs to be in json
     -- so the Go code can unmarshal it.
-    return { json = wrapInMagic(json.encode(persist)) }
+    return { json = wrapInMagic(json.encode(fromSave)) }
 end
 
-local function onLoad(data)
-    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
-    print("onLoad: Started. Path file: " .. path)
-    -- load from in-game storage
-    local fromSave
-    if data ~= nil then
-        fromSave = json.decode(unwrapMagic(data.json))
-    end
-    -- load from file. this is produced by the Go portion of the mod.
-    local fromFile
-
-    local handle, err = vfs.open(path)
-    if handle == nil then
-        print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
-        persist = fromSave
-        return
-    end
-    fromSave = json.decode(handle:read("*all"))
-
-    -- merge them
-    persist = merge(fromFile, fromSave)
-
-    -- debug
-    print("onLoad:" .. aux_util.deepToString(persist, 3))
-end
-
-local function addEntry()
-    local entry = {
+local function newEntry()
+    return {
         t = math.ceil(core.getGameTime()),
         x = pself.cell.isExterior and pself.cell.gridX or nil,
         y = pself.cell.isExterior and pself.cell.gridY or nil,
         c = (not pself.cell.isExterior) and pself.cell.id or nil
     }
+end
+
+local function parseFile(path)
+    local handle, err = vfs.open(path)
+    if handle == nil then
+        print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
+        allData[playerName()] = fromSave
+        return
+    end
+    return json.decode(handle:read("*all"))
+end
+
+local function endsWith(str, ending)
+  if ending == "" then
+    return true
+  end
+  if #str < #ending then
+    return false
+  end
+  return str:sub(-#ending) == ending
+end
+
+local function onLoad(data)
+    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
+    print("onLoad: Started. Path file: " .. path)
+
+    -- load from in-game storage
+    if data ~= nil then
+        fromSave = json.decode(unwrapMagic(data.json))
+    end
+
+    -- load from file. this is produced by the Go portion of the mod.
+    local fromFile = parseFile(path)
+
+    -- merge them
+    allData[playerName()] = merge(fromFile, fromSave)
+
+    -- debug
+    print("onLoad: " .. aux_util.deepToString(allData, 3))
+
+    -- now load all other character data
+    local allSaves = "scripts\\" .. MOD_NAME .. "\\data\\paths\\"
+    for fileName in vfs.pathsWithPrefix(allSaves) do
+        if fileName ~= path and endsWith(fileName, ".json") then
+            -- this is for a different character
+            local lastSlash = math.max(path:find("/", 1, true) or 0, path:find("\\", 1, true) or 0)
+            local characterName = fileName:sub(lastSlash):gsub("%.json", "")
+            if not allData[characterName] then
+              allData[characterName] = parseFile(path)
+              print("onLoad completed for " .. characterName)
+            end
+        end
+    end
+end
+
+local function addEntry()
+    local entry = newEntry()
+    name = playerName()
 
     -- make a new list and add the entry to it
-    if persist == nil or #persist.paths == 0 then
-        persist = {
+    if allData[name] == nil or #allData[name].paths == 0 then
+        mergedData = {
             id = playerName(),
             paths = { entry }
         }
@@ -139,19 +181,26 @@ local function addEntry()
         return
     end
     -- otherwise, don't do anything if the cell is the same.
-    local tail = persist.paths[#persist.paths]
+    local tail = allData[name].paths[#allData[name].paths]
     if tail.c == entry.c and tail.x == entry.x and tail.y == entry.y then
         return
     end
     -- ok, now add to the end of the list.
-    table.insert(persist.paths, entry)
+    table.insert(allData[name].paths, entry)
+    table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
 end
 
+local cachedCellId
 local function onUpdate(dt)
     if dt == 0 then
         -- don't do anything if paused.
         return
+    end
+    if pself.cell.id == cachedCellId then
+        return
+    else
+        cachedCellId = pself.cell.id
     end
     addEntry()
 end
@@ -161,5 +210,6 @@ return {
         onUpdate = onUpdate,
         onSave = onSave,
         onLoad = onLoad,
+        onInit = function() onLoad(nil) end,
     }
 }
