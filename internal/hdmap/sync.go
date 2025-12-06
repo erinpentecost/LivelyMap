@@ -65,17 +65,20 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	if err := classicColorCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
+
+	fmt.Printf("Rendering %d specular cells...\n", len(parsedLands.Lands))
+	specRenderer, err := NewSpecularRenderer()
+	if err != nil {
+		return fmt.Errorf("new specular renderer")
+	}
+	specularCells := NewCellMapper(parsedLands, specRenderer)
+	if err := specularCells.Generate(ctx); err != nil {
+		return fmt.Errorf("generate cell maps: %w", err)
+	}
+
 	// Special "sky" cell
-	{
-		skyImg := renderer.Render(NewFallbackLandRecord())
-		fullPath := path.Join(core00TexturePath, "sky.dds")
-		out, err := os.Create(fullPath)
-		if err != nil {
-			return fmt.Errorf("create %q: %w", fullPath, err)
-		}
-		if err := dds.Encode(out, skyImg); err != nil {
-			return fmt.Errorf("encode sky texture: %w", err)
-		}
+	if err := renderSky(core00TexturePath, renderer, specRenderer); err != nil {
+		return fmt.Errorf("render sky texture: %w", err)
 	}
 
 	// Render individual vertex color "detail" cells
@@ -102,14 +105,27 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
+			Codec:     dds.Lossless,
 			ScaleDown: 1,
+			Square:    true,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
-			ScaleDown: 4,
+			Codec:     dds.DXT5,
+			ScaleDown: 1,
+			Square:    true,
+		})
+		maps = append(maps, &mapRenderJob{
+			Directory: core00TexturePath,
+			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     specularCells,
+			Codec:     dds.DXT5,
+			ScaleDown: 1,
+			Square:    true,
 		})
 
 		maps = append(maps, &mapRenderJob{
@@ -118,6 +134,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
 			ScaleDown: 8,
+			Codec:     dds.DXT1,
+			Square:    true,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: potatoTexturePath,
@@ -125,6 +143,17 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     normalCells,
 			ScaleDown: 8,
+			Codec:     dds.DXT5,
+			Square:    true,
+		})
+		maps = append(maps, &mapRenderJob{
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     specularCells,
+			Codec:     dds.DXT5,
+			ScaleDown: 8,
+			Square:    true,
 		})
 
 		maps = append(maps, &mapRenderJob{
@@ -132,7 +161,9 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     texturedCells,
+			Codec:     dds.Lossless,
 			ScaleDown: 1,
+			Square:    true,
 		})
 	}
 
@@ -162,6 +193,32 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	return g.Wait()
 }
 
+func renderSky(textureFolder string, colorRenderer CellRenderer, specularRenderer *SpecularRenderer) error {
+	{
+		skyImg := colorRenderer.Render(NewFallbackLandRecord())
+		fullPath := path.Join(textureFolder, "sky.dds")
+		out, err := os.Create(fullPath)
+		if err != nil {
+			return fmt.Errorf("create %q: %w", fullPath, err)
+		}
+		if err := dds.Encode(out, skyImg, dds.DXT1); err != nil {
+			return fmt.Errorf("encode sky texture: %w", err)
+		}
+	}
+	{
+		skyImgSpec := specularRenderer.Render(NewFallbackLandRecord())
+		fullPath := path.Join(textureFolder, "sky_spec.dds")
+		out, err := os.Create(fullPath)
+		if err != nil {
+			return fmt.Errorf("create %q: %w", fullPath, err)
+		}
+		if err := dds.Encode(out, skyImgSpec, dds.DXT5); err != nil {
+			return fmt.Errorf("encode sky texture: %w", err)
+		}
+	}
+	return nil
+}
+
 func printMapInfo(path string, maps []SubmapNode) error {
 	container := struct {
 		Maps []SubmapNode
@@ -181,6 +238,8 @@ type mapRenderJob struct {
 	Extents   MapCoords
 	Cells     *CellMapper
 	ScaleDown int
+	Codec     dds.Codec
+	Square    bool
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
@@ -192,6 +251,8 @@ func (m *mapRenderJob) Draw(ctx context.Context) error {
 		slices.Values(m.Cells.Cells),
 		path.Join(m.Directory, m.Name),
 		m.ScaleDown,
+		m.Square,
+		m.Codec,
 	)
 	if err != nil {
 		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)

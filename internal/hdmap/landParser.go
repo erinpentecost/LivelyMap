@@ -77,6 +77,9 @@ func NewFallbackLandRecord() *ParsedLandRecord {
 	fallbackHeights := make([][]float32, 65)
 	for i := range fallbackHeights {
 		fallbackHeights[i] = make([]float32, 65)
+		for j := range fallbackHeights[i] {
+			fallbackHeights[i][j] = -1 * math.MaxFloat32
+		}
 	}
 
 	return &ParsedLandRecord{
