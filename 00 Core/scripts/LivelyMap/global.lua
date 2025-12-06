@@ -42,7 +42,6 @@ local persist = {
 local function getMapRecord(name)
     if not persist.meshToRecordId[name] then
         local recordFields = {
-            name = localization("map", {}),
             model = "meshes\\livelymap\\" .. name .. ".nif",
         }
         local draftRecord = types.Activator.createRecordDraft(recordFields)
