@@ -4,6 +4,7 @@ local core = require('openmw.core')
 local types = require('openmw.types')
 local aux_util = require('openmw_aux.util')
 local vfs = require('openmw.vfs')
+local util = require('openmw.util')
 local json = require('scripts.LivelyMap.json.json')
 local localization = core.l10n(MOD_NAME)
 
@@ -93,8 +94,8 @@ local function onShowMap(data)
         error("onShowMap data parameter has nil ID field.")
         return
     end
-    if not data.cell then
-        error("onShowMap data parameter has nil cell field.")
+    if not data.cellID then
+        error("onShowMap data parameter has nil cellID field.")
         return
     end
     if not data.position then
@@ -111,12 +112,12 @@ local function onShowMap(data)
 
     -- enable the new map etc
     activeMap = maps[data.ID]
-    if not activeMap then
+    if activeMap == nil then
         error("Unknown map ID: " .. data.ID)
     end
 
     -- teleport enables the object for free
-    activeMap.object:teleport(data.cell, data.position, data.transform)
+    activeMap.object:teleport(world.getCellById(data.cellID), util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
 end
 
 

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/erinpentecost/LivelyMap/internal/dds"
 	"github.com/ernmw/omwpacker/cfg"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,6 +65,19 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	if err := classicColorCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
+	// Special "sky" cell
+	{
+		skyImg := renderer.Render(NewFallbackLandRecord())
+		fullPath := path.Join(core00TexturePath, "sky.dds")
+		out, err := os.Create(fullPath)
+		if err != nil {
+			return fmt.Errorf("create %q: %w", fullPath, err)
+		}
+		if err := dds.Encode(out, skyImg); err != nil {
+			return fmt.Errorf("encode sky texture: %w", err)
+		}
+	}
+
 	// Render individual vertex color "detail" cells
 	fmt.Printf("Rendering %d detailed cells...\n", len(parsedLands.Lands))
 	texturedRenderer, err := NewDetailRenderer(rampPath, parsedLands.LandTextures)

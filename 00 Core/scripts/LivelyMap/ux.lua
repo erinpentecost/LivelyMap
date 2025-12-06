@@ -1,0 +1,72 @@
+--[[
+LivelyMap for OpenMW.
+Copyright (C) 2025
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+]]
+local MOD_NAME = require("scripts.LivelyMap.ns")
+local core         = require("openmw.core")
+local pself        = require("openmw.self")
+local aux_util = require('openmw_aux.util')
+
+local function splitString(str)
+    local out = {}
+    for item in str:gmatch("([^,%s]+)") do
+        table.insert(out, item)
+    end
+    return out
+end
+
+local function onConsoleCommand(mode, command, selectedObject)
+    local function getSuffixForCmd(prefix)
+        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
+            return string.sub(command, string.len(prefix) + 1)
+        else
+            return nil
+        end
+    end
+    local showMap = getSuffixForCmd("lua map")
+
+    if showMap ~= nil then
+        core.sendGlobalEvent(MOD_NAME .. "onNoTrespass", {
+            player = pself,
+            selectedObject = selectedObject
+        })
+
+        print("Show Map: " .. tostring(showMap))
+        local id = splitString(showMap)
+        if #id == 0 then
+            id = 0
+        else
+            id = tonumber(id)
+        end
+        local data = {
+            ID = id,
+            cellID = pself.cell.id,
+            position = {
+                x = pself.position.x,
+                y = pself.position.y,
+                z = pself.position.z,
+            },
+        }
+        print("onSave:" .. aux_util.deepToString(data, 3))
+        core.sendGlobalEvent(MOD_NAME .. "onShowMap", data)
+    end
+end
+
+return {
+    engineHandlers = {
+        onConsoleCommand = onConsoleCommand,
+    }
+}

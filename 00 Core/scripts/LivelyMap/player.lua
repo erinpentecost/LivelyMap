@@ -206,6 +206,11 @@ local function onUpdate(dt)
 end
 
 return {
+    interfaceName = MOD_NAME.."Path",
+    interface = {
+        version = 1,
+        getPaths = function() return allData end,
+    },
     engineHandlers = {
         onUpdate = onUpdate,
         onSave = onSave,
