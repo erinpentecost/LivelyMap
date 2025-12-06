@@ -109,7 +109,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
-			ScaleDown: 4,
+			ScaleDown: 1,
 		})
 
 		maps = append(maps, &mapRenderJob{
