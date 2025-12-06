@@ -10,8 +10,8 @@ import (
 	"math"
 )
 
-// Encode writes m encoded as DDS DXT5 (BC3) into w.
-func Encode(w io.Writer, m image.Image) error {
+// EncodeDXT5 writes m encoded as DDS DXT5 (BC3) into w.
+func EncodeDXT5(w io.Writer, m image.Image) error {
 	var rgba *image.RGBA
 	if im, ok := m.(*image.RGBA); ok {
 		rgba = im

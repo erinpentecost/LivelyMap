@@ -39,13 +39,26 @@ func previousPoT(n uint64) uint64 {
 	return 1 << (63 - bits.LeadingZeros64(n))
 }
 
+func nextPoT(n uint64) uint64 {
+	if n == 0 {
+		return 1
+	}
+	// If n is already a power of two, return n
+	if n&(n-1) == 0 {
+		return n
+	}
+	// bits.Len64 gives position of highest bit + 1
+	return 1 << bits.Len64(n)
+}
+
 func (w *WorldMapper) Write(
 	ctx context.Context,
 	mapExtents MapCoords,
 	cells iter.Seq[*CellInfo],
 	path string,
 	downScaleFactor int,
-	dxt1 bool,
+	powerOfTwo bool,
+	codec dds.Codec,
 ) error {
 	w.outImage = nil
 	w.mapExtents = mapExtents
@@ -65,13 +78,15 @@ func (w *WorldMapper) Write(
 		}
 	}
 
-	ext := strings.ToLower(filepath.Ext(path))
 	// OpenMW barfs if NIFs aren't exactly powers of two.
-	bounds := w.outImage.Bounds()
-	if bounds.Dx() == bounds.Dy() && ext == ".dds" {
+	if downScaleFactor > 1 || powerOfTwo {
+		bounds := w.outImage.Bounds()
 		fmt.Printf("Scaling down square image...")
-		potLength := previousPoT(uint64(max(bounds.Dx(), bounds.Dy()) / downScaleFactor))
-		downSize := image.NewRGBA(image.Rect(0, 0, int(potLength), int(potLength)))
+		newLength := uint64(max(bounds.Dx(), bounds.Dy()) / downScaleFactor)
+		if powerOfTwo {
+			newLength = nextPoT(newLength)
+		}
+		downSize := image.NewRGBA(image.Rect(0, 0, int(newLength), int(newLength)))
 		draw.CatmullRom.Scale(downSize, downSize.Bounds(), w.outImage, w.outImage.Bounds(), draw.Over, nil)
 		w.outImage = downSize
 	}
@@ -83,14 +98,10 @@ func (w *WorldMapper) Write(
 	}
 	defer out.Close()
 
+	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".dds":
-		if dxt1 {
-			// dxt1 doesn't support alpha
-			return dds.EncodeDXT1(out, w.outImage)
-		} else {
-			return dds.Encode(out, w.outImage)
-		}
+		return dds.Encode(out, w.outImage, codec)
 	case ".png":
 		return png.Encode(out, w.outImage)
 	default:

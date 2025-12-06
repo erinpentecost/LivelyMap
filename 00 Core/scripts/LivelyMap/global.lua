@@ -82,9 +82,9 @@ local function onLoad(data)
     -- attach object to map data
     maps = mapData:asTable()
     for _, v in pairs(maps) do
-        v.object = getMapObject("world_" .. v.ID)
+        v.object = getMapObject("world_" .. tostring(v.ID))
     end
-
+    print("IDs to records: " .. aux_util.deepToString(persist.meshToRecordId, 3))
 end
 
 
@@ -119,9 +119,11 @@ local function onShowMap(data)
     if activeMap == nil then
         error("Unknown map ID: " .. data.ID)
     end
+    print("Showing map " .. tostring(data.ID))
 
     -- teleport enables the object for free
-    activeMap.object:teleport(world.getCellById(data.cellID), util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
+    activeMap.object:teleport(world.getCellById(data.cellID),
+        util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
 end
 
 

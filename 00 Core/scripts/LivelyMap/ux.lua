@@ -16,8 +16,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 local MOD_NAME = require("scripts.LivelyMap.ns")
-local core         = require("openmw.core")
-local pself        = require("openmw.self")
+local mutil    = require("scripts.LivelyMap.mutil")
+local core     = require("openmw.core")
+local pself    = require("openmw.self")
 local aux_util = require('openmw_aux.util')
 
 local function splitString(str)
@@ -39,18 +40,15 @@ local function onConsoleCommand(mode, command, selectedObject)
     local showMap = getSuffixForCmd("lua map")
 
     if showMap ~= nil then
-        core.sendGlobalEvent(MOD_NAME .. "onNoTrespass", {
-            player = pself,
-            selectedObject = selectedObject
-        })
-
-        print("Show Map: " .. tostring(showMap))
         local id = splitString(showMap)
         if #id == 0 then
-            id = 0
+            local closest = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
+            id = closest.ID
         else
             id = tonumber(id)
         end
+
+        print("Show Map: " .. tostring(id))
         local data = {
             ID = id,
             cellID = pself.cell.id,

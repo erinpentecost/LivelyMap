@@ -105,23 +105,27 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
+			Codec:     dds.Lossless,
 			ScaleDown: 1,
+			Square:    true,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
-			HasAlpha:  true,
+			Codec:     dds.DXT5,
 			ScaleDown: 1,
+			Square:    true,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     specularCells,
-			HasAlpha:  true,
-			ScaleDown: 2,
+			Codec:     dds.DXT5,
+			ScaleDown: 1,
+			Square:    true,
 		})
 
 		maps = append(maps, &mapRenderJob{
@@ -130,6 +134,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
 			ScaleDown: 8,
+			Codec:     dds.DXT1,
+			Square:    true,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: potatoTexturePath,
@@ -137,7 +143,17 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     normalCells,
 			ScaleDown: 8,
-			HasAlpha:  true,
+			Codec:     dds.DXT5,
+			Square:    true,
+		})
+		maps = append(maps, &mapRenderJob{
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     specularCells,
+			Codec:     dds.DXT5,
+			ScaleDown: 8,
+			Square:    true,
 		})
 
 		maps = append(maps, &mapRenderJob{
@@ -145,7 +161,9 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     texturedCells,
+			Codec:     dds.Lossless,
 			ScaleDown: 1,
+			Square:    true,
 		})
 	}
 
@@ -183,7 +201,7 @@ func renderSky(textureFolder string, colorRenderer CellRenderer, specularRendere
 		if err != nil {
 			return fmt.Errorf("create %q: %w", fullPath, err)
 		}
-		if err := dds.Encode(out, skyImg); err != nil {
+		if err := dds.Encode(out, skyImg, dds.DXT1); err != nil {
 			return fmt.Errorf("encode sky texture: %w", err)
 		}
 	}
@@ -194,7 +212,7 @@ func renderSky(textureFolder string, colorRenderer CellRenderer, specularRendere
 		if err != nil {
 			return fmt.Errorf("create %q: %w", fullPath, err)
 		}
-		if err := dds.Encode(out, skyImgSpec); err != nil {
+		if err := dds.Encode(out, skyImgSpec, dds.DXT5); err != nil {
 			return fmt.Errorf("encode sky texture: %w", err)
 		}
 	}
@@ -220,7 +238,8 @@ type mapRenderJob struct {
 	Extents   MapCoords
 	Cells     *CellMapper
 	ScaleDown int
-	HasAlpha  bool
+	Codec     dds.Codec
+	Square    bool
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
@@ -232,7 +251,8 @@ func (m *mapRenderJob) Draw(ctx context.Context) error {
 		slices.Values(m.Cells.Cells),
 		path.Join(m.Directory, m.Name),
 		m.ScaleDown,
-		!m.HasAlpha,
+		m.Square,
+		m.Codec,
 	)
 	if err != nil {
 		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)
