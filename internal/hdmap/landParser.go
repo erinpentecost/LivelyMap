@@ -73,6 +73,20 @@ type ParsedLandRecord struct {
 	colors  [][]land.ColorField
 }
 
+func NewFallbackLandRecord() *ParsedLandRecord {
+	fallbackHeights := make([][]float32, 65)
+	for i := range fallbackHeights {
+		fallbackHeights[i] = make([]float32, 65)
+	}
+
+	return &ParsedLandRecord{
+		heights: fallbackHeights,
+		normals: fallbackNormals,
+		vtex:    fallbackVtex,
+		colors:  fallbackColors,
+	}
+}
+
 func NewLandParser(env *cfg.Environment) *LandParser {
 	return &LandParser{
 		Heights:      tdigest.New(),
