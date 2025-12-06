@@ -150,6 +150,7 @@ func (a MapCoords) SupersetOf(b MapCoords) bool {
 	return verticalContained && horizontalContained
 }
 
+// TODO: select quad sizes that are powers of two, if possible
 func (a MapCoords) quadrants() []MapCoords {
 	width := 1 + a.Right - a.Left
 	height := 1 + a.Top - a.Bottom
