@@ -22,6 +22,7 @@ local storage = require('openmw.storage')
 
 -- This file just loads the JSON map data into global storage.
 -- This makes it available to player and global scripts alike.
+-- Do NOT `require` this file anywhere.
 
 local mapData = storage.globalSection(MOD_NAME .. "_mapData")
 mapData:setLifeTime(storage.LIFE_TIME.Temporary)
