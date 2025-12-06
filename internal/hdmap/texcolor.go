@@ -1,13 +1,12 @@
 package hdmap
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"os"
 
+	"github.com/erinpentecost/LivelyMap/internal/hdmap/ramp"
 	"github.com/erinpentecost/LivelyMap/internal/hue"
 
 	_ "embed"
@@ -18,7 +17,7 @@ type TexRenderer struct {
 	maxHeight   float32
 	waterHeight float32
 	// ramp is still used for water and as a fallback
-	ramp     [256]color.RGBA
+	ramp     *ramp.ColorRamp
 	textures map[uint16]*colorSampler
 }
 
@@ -26,23 +25,11 @@ func NewTexRenderer(rampFilePath string, textures map[uint16]image.Image) (*TexR
 	out := &TexRenderer{}
 
 	// load rampfile
-	if len(rampFilePath) == 0 {
-		rmp, err := LoadRamp(bytes.NewReader(classicRampFile))
-		if err != nil {
-			return nil, fmt.Errorf("loading default ramp: %w", err)
-		}
-		out.ramp = rmp
-	} else {
-		file, err := os.Open(rampFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
-		}
-		rmp, err := LoadRamp(file)
-		if err != nil {
-			return nil, fmt.Errorf("loading default ramp: %w", err)
-		}
-		out.ramp = rmp
+	rmp, err := ramp.LoadRamp(rampFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("loading default ramp: %w", err)
 	}
+	out.ramp = rmp
 
 	// textures
 	out.textures = map[uint16]*colorSampler{}
@@ -83,7 +70,7 @@ func (d *TexRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
+			baseColor := d.ramp.Color(p.heights[y][x], d.minHeight, d.maxHeight, d.waterHeight)
 			if p.heights[y][x] >= d.waterHeight {
 				// set the hue from the vertex color
 				if len(p.colors) == 65 && len(p.colors[y]) == 65 {
@@ -119,7 +106,7 @@ func (d *TexRenderer) renderHueFromTex(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
+			baseColor := d.ramp.Color(p.heights[y][x], d.minHeight, d.maxHeight, d.waterHeight)
 			if p.heights[y][x] >= d.waterHeight {
 				// set the hue from the texture
 				ty := iy / 4
@@ -140,51 +127,4 @@ func (d *TexRenderer) renderHueFromTex(p *ParsedLandRecord) *image.RGBA {
 		}
 	}
 	return img
-}
-
-func (d *TexRenderer) transformHeight(v float32) byte {
-	// clamp extremes
-	if v <= d.minHeight {
-		return 0
-	}
-	if v >= d.maxHeight {
-		return 0xFF // 255
-	}
-
-	// exact water line -> the first value of the upper half
-	if v == d.waterHeight {
-		return 128
-	}
-
-	if v < d.waterHeight {
-		denom := d.waterHeight - d.minHeight
-		if denom == 0 {
-			return 0
-		}
-		normalized := float64((v - d.minHeight) / denom) // 0..1
-		// map to 0..127 (128 values)
-		val := math.Round(normalized * 127.0)
-		if val < 0 {
-			val = 0
-		}
-		if val > 127 {
-			val = 127
-		}
-		return byte(uint8(val))
-	}
-
-	// v > waterHeight -> map to 128..255 (128 values)
-	denom := d.maxHeight - d.waterHeight
-	if denom == 0 {
-		return 0xFF
-	}
-	normalized := float64((v - d.waterHeight) / denom) // 0..1
-	val := math.Round(normalized * 127.0)              // 0..127
-	if val < 0 {
-		val = 0
-	}
-	if val > 127 {
-		val = 127
-	}
-	return byte(uint8(128 + int(val)))
 }
