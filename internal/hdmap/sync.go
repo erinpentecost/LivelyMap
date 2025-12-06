@@ -125,6 +125,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     normalCells,
 			ScaleDown: 8,
+			HasAlpha:  true,
 		})
 
 		maps = append(maps, &mapRenderJob{
@@ -181,6 +182,7 @@ type mapRenderJob struct {
 	Extents   MapCoords
 	Cells     *CellMapper
 	ScaleDown int
+	HasAlpha  bool
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
@@ -192,6 +194,7 @@ func (m *mapRenderJob) Draw(ctx context.Context) error {
 		slices.Values(m.Cells.Cells),
 		path.Join(m.Directory, m.Name),
 		m.ScaleDown,
+		m.HasAlpha,
 	)
 	if err != nil {
 		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)

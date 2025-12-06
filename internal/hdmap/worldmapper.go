@@ -45,6 +45,7 @@ func (w *WorldMapper) Write(
 	cells iter.Seq[*CellInfo],
 	path string,
 	downScaleFactor int,
+	dxt1 bool,
 ) error {
 	w.outImage = nil
 	w.mapExtents = mapExtents
@@ -84,7 +85,12 @@ func (w *WorldMapper) Write(
 
 	switch ext {
 	case ".dds":
-		return dds.Encode(out, w.outImage)
+		if dxt1 {
+			// dxt1 doesn't support alpha
+			return dds.EncodeDXT1(out, w.outImage)
+		} else {
+			return dds.Encode(out, w.outImage)
+		}
 	case ".png":
 		return png.Encode(out, w.outImage)
 	default:
