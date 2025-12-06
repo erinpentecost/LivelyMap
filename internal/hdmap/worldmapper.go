@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/png"
 	"iter"
+	"math/bits"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,14 @@ type WorldMapper struct {
 
 func NewWorldMapper() *WorldMapper {
 	return &WorldMapper{}
+}
+
+func previousPoT(n uint64) uint64 {
+	if n == 0 {
+		return 0
+	}
+	// position of highest set bit = 63 - LeadingZeros64(n)
+	return 1 << (63 - bits.LeadingZeros64(n))
 }
 
 func (w *WorldMapper) Write(
@@ -55,10 +64,13 @@ func (w *WorldMapper) Write(
 		}
 	}
 
-	if downScaleFactor > 1 {
-		fmt.Printf("Scaling down image...")
-		sourceBounds := w.outImage.Bounds()
-		downSize := image.NewRGBA(image.Rect(0, 0, sourceBounds.Dx()/2, sourceBounds.Dy()/2))
+	ext := strings.ToLower(filepath.Ext(path))
+	// OpenMW barfs if NIFs aren't exactly powers of two.
+	bounds := w.outImage.Bounds()
+	if bounds.Dx() == bounds.Dy() && ext == ".dds" {
+		fmt.Printf("Scaling down square image...")
+		potLength := previousPoT(uint64(max(bounds.Dx(), bounds.Dy()) / downScaleFactor))
+		downSize := image.NewRGBA(image.Rect(0, 0, int(potLength), int(potLength)))
 		draw.CatmullRom.Scale(downSize, downSize.Bounds(), w.outImage, w.outImage.Bounds(), draw.Over, nil)
 		w.outImage = downSize
 	}
@@ -69,7 +81,7 @@ func (w *WorldMapper) Write(
 		return err
 	}
 	defer out.Close()
-	ext := strings.ToLower(filepath.Ext(path))
+
 	switch ext {
 	case ".dds":
 		return dds.Encode(out, w.outImage)
