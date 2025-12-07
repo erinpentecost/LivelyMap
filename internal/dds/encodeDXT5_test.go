@@ -23,7 +23,7 @@ func TestEncodeProducesHeaderAndBlocks(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := Encode(&buf, img); err != nil {
+	if err := EncodeDXT5(&buf, img); err != nil {
 		t.Fatalf("Encode failed: %v", err)
 	}
 

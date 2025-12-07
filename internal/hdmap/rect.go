@@ -1,6 +1,9 @@
 package hdmap
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 type Direction string
 
@@ -150,7 +153,39 @@ func (a MapCoords) SupersetOf(b MapCoords) bool {
 	return verticalContained && horizontalContained
 }
 
+// powerOfTwoInRange returns a power of two p such that a <= p <= b.
+// If no such power of two exists, it returns an error.
+func powerOfTwoInRange(a, b int32) (int32, error) {
+	if a > b {
+		return 0, errors.New("invalid range: a > b")
+	}
+	if b < 1 {
+		return 0, errors.New("no power of two in range")
+	}
+
+	// Find smallest power of two >= a.
+	p := int32(1)
+	for p < a {
+		p <<= 1
+		// Prevent infinite loop or overflow beyond int.
+		if p <= 0 {
+			return 0, errors.New("overflow while searching for power of two")
+		}
+	}
+
+	if p > b {
+		return 0, errors.New("no power of two in range")
+	}
+	return p, nil
+}
+
+// TODO: select quad sizes that are powers of two, if possible
 func (a MapCoords) quadrants() []MapCoords {
+	// Textures used for NIFs need to be in powers of two.
+	// Each cell is 64x64 pixels.
+	// We should try to select cell region square sizes that will
+	// result in a final image whose dimensions are a power of 2.
+
 	width := 1 + a.Right - a.Left
 	height := 1 + a.Top - a.Bottom
 
@@ -164,7 +199,12 @@ func (a MapCoords) quadrants() []MapCoords {
 
 	// Compute child square side length ≈ 2/3 side.
 	// Bias upward for better coverage.
-	childSide := (2*side + 2) / 3 // integer
+	// Can we find some length >= side/2 and <= side that is
+	// a power of 2?
+	childSide, err := powerOfTwoInRange(side/2, side)
+	if err != nil {
+		childSide = (2*side + 2) / 3
+	}
 
 	// How much the child window slides before falling off edge
 	offset := side - childSide

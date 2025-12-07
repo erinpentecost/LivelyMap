@@ -1,13 +1,12 @@
 package hdmap
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"os"
 
+	"github.com/erinpentecost/LivelyMap/internal/hdmap/ramp"
 	"github.com/erinpentecost/LivelyMap/internal/hue"
 
 	_ "embed"
@@ -19,7 +18,7 @@ type ColorRenderer struct {
 	maxHeight   float32
 	waterHeight float32
 	// ramp is still used for water and as a fallback
-	ramp     [256]color.RGBA
+	ramp     *ramp.ColorRamp
 	textures map[uint16]*colorSampler
 }
 
@@ -27,23 +26,11 @@ func NewColorRenderer(rampFilePath string, textures map[uint16]image.Image) (*Co
 	out := &ColorRenderer{}
 
 	// load rampfile
-	if len(rampFilePath) == 0 {
-		rmp, err := LoadRamp(bytes.NewReader(classicRampFile))
-		if err != nil {
-			return nil, fmt.Errorf("loading default ramp: %w", err)
-		}
-		out.ramp = rmp
-	} else {
-		file, err := os.Open(rampFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
-		}
-		rmp, err := LoadRamp(file)
-		if err != nil {
-			return nil, fmt.Errorf("loading default ramp: %w", err)
-		}
-		out.ramp = rmp
+	rmp, err := ramp.LoadRamp(rampFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("loading default ramp: %w", err)
 	}
+	out.ramp = rmp
 
 	// textures
 	out.textures = map[uint16]*colorSampler{}
@@ -90,7 +77,7 @@ func (d *ColorRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
+			baseColor := d.ramp.Color(p.heights[y][x], d.minHeight, d.maxHeight, d.waterHeight)
 			if p.heights[y][x] >= d.waterHeight {
 				//ty := iy / 4
 				ty := (gridSize - 1 - y) / 4 // flip before 4x4 reduction
@@ -134,7 +121,7 @@ func (d *ColorRenderer) renderHueFromTex(p *ParsedLandRecord) *image.RGBA {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
-			baseColor := d.ramp[d.transformHeight(p.heights[y][x])]
+			baseColor := d.ramp.Color(p.heights[y][x], d.minHeight, d.maxHeight, d.waterHeight)
 			if p.heights[y][x] >= d.waterHeight {
 				// set the hue from the texture
 				ty := iy / 4
