@@ -16,17 +16,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 
+-- This file is in charge of tracking and exposing path information.
+-- Interact with it via the interface it exposes.
+
 local MOD_NAME = require("scripts.LivelyMap.ns")
-local util = require('openmw.util')
 local types = require('openmw.types')
 local json = require('scripts.LivelyMap.json.json')
 local core = require('openmw.core')
-local interfaces = require("openmw.interfaces")
 local pself = require("openmw.self")
 local vfs = require('openmw.vfs')
 local aux_util = require('openmw_aux.util')
-
-local storage = require('openmw.storage')
 
 local magicPrefix = "!!" .. MOD_NAME .. "!!STARTOFENTRY!!"
 local magicSuffix = "!!" .. MOD_NAME .. "!!ENDOFENTRY!!"
@@ -38,9 +37,7 @@ local function unwrapMagic(str)
     return string.sub(str, #magicPrefix + 1, #str - #magicSuffix)
 end
 
-local function playerName()
-    return types.NPC.record(pself.recordId).name
-end
+local playerName = types.NPC.record(pself.recordId).name
 
 -- Merge two SaveData-like tables: a and b
 -- Returns a new table shaped like SaveData
@@ -83,7 +80,7 @@ end
 
 -- fromSave contains the data from this savegame.
 local fromSave = {
-    id = playerName(),
+    id = playerName,
     paths = {},
     extra = {},
 }
@@ -91,10 +88,10 @@ local fromSave = {
 -- mergedData contains the merged data from the savegame and file,
 -- for all saves. The key is the playerName.
 local allData = {}
-allData[playerName()] = {
-  id = playerName(),
-  paths = {},
-  extra = {},
+allData[playerName] = {
+    id = playerName,
+    paths = {},
+    extra = {},
 }
 
 local function onSave()
@@ -118,24 +115,24 @@ local function parseFile(path)
     local handle, err = vfs.open(path)
     if handle == nil then
         print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
-        allData[playerName()] = fromSave
+        allData[playerName] = fromSave
         return
     end
     return json.decode(handle:read("*all"))
 end
 
 local function endsWith(str, ending)
-  if ending == "" then
-    return true
-  end
-  if #str < #ending then
-    return false
-  end
-  return str:sub(-#ending) == ending
+    if ending == "" then
+        return true
+    end
+    if #str < #ending then
+        return false
+    end
+    return str:sub(- #ending) == ending
 end
 
 local function onLoad(data)
-    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName() .. ".json"
+    local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName .. ".json"
     print("onLoad: Started. Path file: " .. path)
 
     -- load from in-game storage
@@ -147,7 +144,7 @@ local function onLoad(data)
     local fromFile = parseFile(path)
 
     -- merge them
-    allData[playerName()] = merge(fromFile, fromSave)
+    allData[playerName] = merge(fromFile, fromSave)
 
     -- debug
     print("onLoad: " .. aux_util.deepToString(allData, 3))
@@ -160,8 +157,8 @@ local function onLoad(data)
             local lastSlash = math.max(path:find("/", 1, true) or 0, path:find("\\", 1, true) or 0)
             local characterName = fileName:sub(lastSlash):gsub("%.json", "")
             if not allData[characterName] then
-              allData[characterName] = parseFile(path)
-              print("onLoad completed for " .. characterName)
+                allData[characterName] = parseFile(path)
+                print("onLoad completed for " .. characterName)
             end
         end
     end
@@ -169,24 +166,23 @@ end
 
 local function addEntry()
     local entry = newEntry()
-    name = playerName()
 
     -- make a new list and add the entry to it
-    if allData[name] == nil or #allData[name].paths == 0 then
+    if allData[playerName] == nil or #allData[playerName].paths == 0 then
         mergedData = {
-            id = playerName(),
+            id = playerName,
             paths = { entry }
         }
         print("Initialized new local storage with entry: " .. aux_util.deepToString(entry, 3))
         return
     end
     -- otherwise, don't do anything if the cell is the same.
-    local tail = allData[name].paths[#allData[name].paths]
+    local tail = allData[playerName].paths[#allData[playerName].paths]
     if tail.c == entry.c and tail.x == entry.x and tail.y == entry.y then
         return
     end
     -- ok, now add to the end of the list.
-    table.insert(allData[name].paths, entry)
+    table.insert(allData[playerName].paths, entry)
     table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
 end
@@ -206,7 +202,7 @@ local function onUpdate(dt)
 end
 
 return {
-    interfaceName = MOD_NAME.."Path",
+    interfaceName = MOD_NAME .. "Path",
     interface = {
         version = 1,
         getPaths = function() return allData end,
