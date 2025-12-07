@@ -17,3 +17,7 @@ Don't add `LivelyMap.omwscripts` if you see it.
 
 This will generate all the required textures and metadata from your install.
 It will also extract path data from your saved games.
+
+## Showing the Map (debugging)
+
+While in-game, bring up your console and type `lua map`. Optionally provide a number from 0 to 7, inclusive (ex: `lua map 6`).
