@@ -23,6 +23,7 @@ local aux_util = require('openmw_aux.util')
 local vfs = require('openmw.vfs')
 local util = require('openmw.util')
 local json = require('scripts.LivelyMap.json.json')
+local mutil = require('scripts.LivelyMap.mutil')
 local localization = core.l10n(MOD_NAME)
 local storage = require('openmw.storage')
 local mapData = storage.globalSection(MOD_NAME .. "_mapData")
@@ -54,26 +55,22 @@ local function getMapRecord(id)
     return persist.idToRecordId[id]
 end
 
-local function newMapObject(data, playerID)
-    if type(data) == "string" then
-        -- find the full map data
-        data = mapData:asTable()[data]
-    elseif type(data) == "number" then
-        -- find the full map data
-        data = mapData:asTable()[tostring(data)]
-    end
+local function newMapObject(data, player)
+    local map = mutil.getMap(data)
 
-    local record = getMapRecord(data.ID)
+    local record = getMapRecord(map.ID)
     if not record then
         error("No record for map " .. name)
         return nil
     end
-    -- embed the owning player ID, too.
-    data.playerID = playerID
+    -- embed the owning player, too.
+    map.player = player
+    -- actually make the map object
     local new = world.createObject(record, 1)
-    new:addScript("scripts\\LivelyMap\\mapnif.lua", data)
-    data.object = new
-    return data
+    new:addScript("scripts\\LivelyMap\\mapnif.lua", map)
+    map.object = new
+    new:setScale(mutil.getScale(map))
+    return map
 end
 
 local function onSave()
@@ -103,34 +100,35 @@ local function onShowMap(data)
         error("onShowMap data parameter has nil position field.")
         return
     end
-    if not data.playerID then
-        error("onShowMap data parameter has nil playerID field.")
+    if not data.player then
+        error("onShowMap data parameter has nil player field.")
         return
     end
 
-    if persist.activeMaps[data.playerID] == nil then
-        persist.activeMaps[data.playerID] = {}
+    local playerID = data.player.id
+    if persist.activeMaps[playerID] == nil then
+        persist.activeMaps[playerID] = {}
     end
     print("Showing map " .. tostring(data.ID))
 
     local activeMap = nil
-    if persist.activeMaps[data.playerID][data.ID] == nil then
+    if persist.activeMaps[playerID][data.ID] == nil then
         -- enable the new map etc
-        activeMap = newMapObject(data.ID, data.playerID)
+        activeMap = newMapObject(data.ID, playerID)
         if activeMap == nil then
             error("Unknown map ID: " .. data.ID)
         end
         print("Showing new map " .. tostring(data.ID))
-        persist.activeMaps[data.playerID][data.ID] = activeMap
+        persist.activeMaps[playerID][data.ID] = activeMap
     else
         -- get the existing map
         print("Moving existing map" .. tostring(data.ID))
-        activeMap = persist.activeMaps[data.playerID][data.ID]
+        activeMap = persist.activeMaps[playerID][data.ID]
     end
 
     -- we should only show one map per player, so clean up everything else
     local toDelete = {}
-    for k, v in pairs(persist.activeMaps[data.playerID]) do
+    for k, v in pairs(persist.activeMaps[playerID]) do
         if k ~= data.ID then
             print("Deleting map " .. tostring(v.ID))
             v.object:remove()
@@ -138,7 +136,7 @@ local function onShowMap(data)
         end
     end
     for _, k in ipairs(toDelete) do
-        persist.activeMaps[data.playerID][k] = nil
+        persist.activeMaps[playerID][k] = nil
     end
 
 

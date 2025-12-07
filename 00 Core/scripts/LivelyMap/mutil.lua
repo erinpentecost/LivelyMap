@@ -20,6 +20,17 @@ local storage = require('openmw.storage')
 local mapData = storage.globalSection(MOD_NAME .. "_mapData")
 local util = require('openmw.util')
 
+local function getMap(data)
+    if type(data) == "string" then
+        -- find the full map data
+        data = mapData:asTable()[data]
+    elseif type(data) == "number" then
+        -- find the full map data
+        data = mapData:asTable()[tostring(data)]
+    end
+    return data
+end
+
 local function getClosestMap(x, y)
     local myLocation = util.vector2(x, y)
     local closest = nil
@@ -39,6 +50,18 @@ local function getClosestMap(x, y)
     return closest
 end
 
+-- getScale returns a number that is the scaling factor to use
+-- with this map.
+-- This is used to ensure that all extents have the same in-game
+-- DPI.
+local function getScale(map)
+    local extents = getMap(map).Extents
+    -- the "default" size is 16x16 cells
+    return (extents.Top - extents.Bottom) / 16
+end
+
 return {
+    getMap = getMap,
+    getScale = getScale,
     getClosestMap = getClosestMap,
 }

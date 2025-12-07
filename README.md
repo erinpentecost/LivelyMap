@@ -18,6 +18,10 @@ Don't add `LivelyMap.omwscripts` if you see it.
 This will generate all the required textures and metadata from your install.
 It will also extract path data from your saved games.
 
+## Customizing the map
+
+You can specify a custom ramp.bmp by placing it in this folder and then running the sync tool. This should be a 1x512 resolution file, with the midpoint representing the water level.
+
 ## Updating the mod
 
 Make sure `cmd/lively/lively` or `cmd/lively/lively.exe` are deleted after you pull in the new files.

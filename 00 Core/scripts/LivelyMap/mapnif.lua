@@ -16,9 +16,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 local MOD_NAME = require("scripts.LivelyMap.ns")
-local storage = require('openmw.storage')
 local aux_util = require('openmw_aux.util')
 
+-- This script is attached to the 3d floating map objects.
+
+-- mapData holds read-only map metadata for this extent.
+-- It also contains "player", which is the player that
+-- summoned it.
 local mapData = nil
 
 local function onStart(initData)
