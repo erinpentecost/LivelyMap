@@ -41,17 +41,19 @@ local function onConsoleCommand(mode, command, selectedObject)
 
     if showMap ~= nil then
         local id = splitString(showMap)
+        print("Show Map: " .. aux_util.deepToString(id, 3))
+
         if #id == 0 then
             local closest = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
             id = closest.ID
         else
-            id = tonumber(id)
+            id = tonumber(id[1])
         end
 
-        print("Show Map: " .. tostring(id))
         local data = {
             ID = id,
             cellID = pself.cell.id,
+            playerID = pself.id,
             position = {
                 x = pself.position.x,
                 y = pself.position.y,

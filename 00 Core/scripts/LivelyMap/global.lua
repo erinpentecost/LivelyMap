@@ -29,65 +29,64 @@ local mapData = storage.globalSection(MOD_NAME .. "_mapData")
 
 -- persist is saved to disk
 local persist = {
-    -- map name to static record id
+    -- map id to static record id
     -- these are created dynamically, but should be re-used
     -- this needs to be persisted in the save
-    meshToRecordId = {},
-    -- map name to object instance id.
-    -- just enable/disable these to show them
-    meshToObject = {},
+    idToRecordId = {},
+    -- activeMaps is a table of player -> id -> object
+    -- that are currently active.
+    activeMaps = {},
 }
 
 -- getMapRecord gets or creates an activator with the given mesh name.
-local function getMapRecord(name)
-    if not persist.meshToRecordId[name] then
+local function getMapRecord(id)
+    id = tostring(id)
+    if not persist.idToRecordId[id] then
         local recordFields = {
-            model = "meshes\\livelymap\\" .. name .. ".nif",
+            model = "meshes\\livelymap\\world_" .. id .. ".nif",
         }
         local draftRecord = types.Activator.createRecordDraft(recordFields)
+        -- createRecord can't be used until the game is actually started.
         local record = world.createRecord(draftRecord)
-        persist.meshToRecordId[name] = record.id
-        print("New activator for " .. name .. ": " .. record.id)
+        persist.idToRecordId[id] = record.id
+        print("New activator record for " .. id .. ": " .. record.id)
     end
-    return persist.meshToRecordId[name]
+    return persist.idToRecordId[id]
 end
 
-local function getMapObject(name)
-    if not persist.meshToObject[name] then
-        local record = getMapRecord(name)
-        if not record then
-            error("No record for map " .. name)
-            return
-        end
-        return world.createObject(record, 1)
+local function newMapObject(data, playerID)
+    if type(data) == "string" then
+        -- find the full map data
+        data = mapData:asTable()[data]
+    elseif type(data) == "number" then
+        -- find the full map data
+        data = mapData:asTable()[tostring(data)]
     end
-    return persist.meshToObject[name]
-end
 
--- this is derived from maps.json.
--- it's a map of map infos (not an array)
--- and there's an additional "object" field.
-local maps = {}
+    local record = getMapRecord(data.ID)
+    if not record then
+        error("No record for map " .. name)
+        return nil
+    end
+    -- embed the owning player ID, too.
+    data.playerID = playerID
+    local new = world.createObject(record, 1)
+    new:addScript("scripts\\LivelyMap\\mapnif.lua", data)
+    data.object = new
+    return data
+end
 
 local function onSave()
     return persist
 end
 
-local function onLoad(data)
+local function start(data)
     -- load persist
     if data ~= nil then
         persist = data
     end
-    -- attach object to map data
-    maps = mapData:asTable()
-    for _, v in pairs(maps) do
-        v.object = getMapObject("world_" .. tostring(v.ID))
-    end
-    print("IDs to records: " .. aux_util.deepToString(persist.meshToRecordId, 3))
 end
 
-
-local activeMap = nil
 local function onShowMap(data)
     if not data then
         error("onShowMap has nil data parameter.")
@@ -104,21 +103,44 @@ local function onShowMap(data)
         error("onShowMap data parameter has nil position field.")
         return
     end
-    if activeMap and activeMap.ID == data.ID then
-        -- this is the same map. don't make a new one.
+    if not data.playerID then
+        error("onShowMap data parameter has nil playerID field.")
         return
-    elseif activeMap then
-        -- delete the current map
-        activeMap.object.enabled = false
     end
 
-    -- enable the new map etc
-    data.ID = tostring(data.ID)
-    activeMap = maps[data.ID]
-    if activeMap == nil then
-        error("Unknown map ID: " .. data.ID)
+    if persist.activeMaps[data.playerID] == nil then
+        persist.activeMaps[data.playerID] = {}
     end
     print("Showing map " .. tostring(data.ID))
+
+    local activeMap = nil
+    if persist.activeMaps[data.playerID][data.ID] == nil then
+        -- enable the new map etc
+        activeMap = newMapObject(data.ID, data.playerID)
+        if activeMap == nil then
+            error("Unknown map ID: " .. data.ID)
+        end
+        print("Showing new map " .. tostring(data.ID))
+        persist.activeMaps[data.playerID][data.ID] = activeMap
+    else
+        -- get the existing map
+        print("Moving existing map" .. tostring(data.ID))
+        activeMap = persist.activeMaps[data.playerID][data.ID]
+    end
+
+    -- we should only show one map per player, so clean up everything else
+    local toDelete = {}
+    for k, v in pairs(persist.activeMaps[data.playerID]) do
+        if k ~= data.ID then
+            print("Deleting map " .. tostring(v.ID))
+            v.object:remove()
+            table.insert(toDelete, k)
+        end
+    end
+    for _, k in ipairs(toDelete) do
+        persist.activeMaps[data.playerID][k] = nil
+    end
+
 
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
@@ -132,7 +154,7 @@ return {
     },
     engineHandlers = {
         onSave = onSave,
-        onLoad = onLoad,
-        onInit = function() onLoad(nil) end,
+        onLoad = start,
+        onInit = start,
     }
 }
