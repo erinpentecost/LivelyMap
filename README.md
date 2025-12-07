@@ -13,10 +13,14 @@ Don't add `LivelyMap.omwscripts` if you see it.
 ## Run the Sync Tool
 
 1. Install Go: https://go.dev/doc/install
-1. Run `sync.sh`
+1. Run `sync.sh <location of my openmw.cfg>` or `sync.bat <location of my openmw.cfg>`.
 
 This will generate all the required textures and metadata from your install.
 It will also extract path data from your saved games.
+
+## Updating the mod
+
+Make sure `cmd/lively/lively` or `cmd/lively/lively.exe` are deleted after you pull in the new files.
 
 ## Showing the Map (debugging)
 
