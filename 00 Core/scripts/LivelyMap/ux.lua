@@ -21,6 +21,27 @@ local core     = require("openmw.core")
 local pself    = require("openmw.self")
 local aux_util = require('openmw_aux.util')
 
+local function summonMap(id)
+    if id == "" or id == nil then
+        local closest = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
+        id = closest.ID
+    else
+        id = tonumber(id)
+    end
+
+    local data = {
+        ID = id,
+        cellID = pself.cell.id,
+        player = pself,
+        position = {
+            x = pself.position.x,
+            y = pself.position.y,
+            z = pself.position.z,
+        },
+    }
+    core.sendGlobalEvent(MOD_NAME .. "onShowMap", data)
+end
+
 local function splitString(str)
     local out = {}
     for item in str:gmatch("([^,%s]+)") do
@@ -44,28 +65,23 @@ local function onConsoleCommand(mode, command, selectedObject)
         print("Show Map: " .. aux_util.deepToString(id, 3))
 
         if #id == 0 then
-            local closest = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
-            id = closest.ID
+            id = nil
         else
             id = tonumber(id[1])
         end
 
-        local data = {
-            ID = id,
-            cellID = pself.cell.id,
-            player = pself,
-            position = {
-                x = pself.position.x,
-                y = pself.position.y,
-                z = pself.position.z,
-            },
-        }
-        print("onSave:" .. aux_util.deepToString(data, 3))
-        core.sendGlobalEvent(MOD_NAME .. "onShowMap", data)
+        summonMap(id)
     end
 end
 
+local function onMapMoved(data)
+    print("onMapMoved" .. aux_util.deepToString(data, 3))
+end
+
 return {
+    eventHandlers = {
+        [MOD_NAME .. "onMapMoved"] = onMapMoved,
+    },
     engineHandlers = {
         onConsoleCommand = onConsoleCommand,
     }

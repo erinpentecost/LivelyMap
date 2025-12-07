@@ -139,10 +139,10 @@ local function onShowMap(data)
         persist.activeMaps[playerID][k] = nil
     end
 
-
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
         util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
+    activeMap.object:sendEvent(MOD_NAME .. "onTeleported", data)
 end
 
 
