@@ -53,7 +53,7 @@ local function onConsoleCommand(mode, command, selectedObject)
         local data = {
             ID = id,
             cellID = pself.cell.id,
-            playerID = pself.id,
+            player = pself,
             position = {
                 x = pself.position.x,
                 y = pself.position.y,
