@@ -2,34 +2,66 @@ package ramp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image/color"
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 
-	_ "embed"
+	"embed"
 
 	"golang.org/x/image/bmp"
 )
 
-//go:embed ramp_hemaris.bmp
-var classicRampFile []byte
+//go:embed *.bmp
+var ramps embed.FS
 
 type ColorRamp struct {
 	ramp [512]color.RGBA
 }
 
+func fileExists(filePath string) (bool, error) {
+	_, err := os.Stat(filePath)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
 func LoadRamp(rampFilePath string) (*ColorRamp, error) {
 	var reader io.Reader
-	if len(rampFilePath) != 0 {
+
+	exists, err := fileExists(rampFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("can't read file %q: %w", rampFilePath, err)
+	}
+
+	if exists {
 		var err error
 		reader, err = os.Open(rampFilePath)
 		if err != nil {
 			return nil, fmt.Errorf("loading ramp file %q: %w", rampFilePath, err)
 		}
+	} else if len(rampFilePath) != 0 {
+		if len(filepath.Ext(rampFilePath)) == 0 {
+			rampFilePath = rampFilePath + ".bmp"
+		}
+		raw, err := ramps.ReadFile(rampFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("loading built-in ramp file %q: %w", rampFilePath, err)
+		}
+		reader = bytes.NewReader(raw)
 	} else {
-		reader = bytes.NewReader(classicRampFile)
+		raw, err := ramps.ReadFile("classic.bmp")
+		if err != nil {
+			return nil, fmt.Errorf("loading built-in ramp file %q: %w", rampFilePath, err)
+		}
+		reader = bytes.NewReader(raw)
 	}
 
 	var ramp [512]color.RGBA
