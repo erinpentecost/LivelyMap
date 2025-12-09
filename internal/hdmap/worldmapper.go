@@ -51,22 +51,35 @@ func nextPoT(n uint64) uint64 {
 	return 1 << bits.Len64(n)
 }
 
+type PostProcessor interface {
+	Process(src *image.RGBA) (*image.RGBA, error)
+}
+
+type PowerOfTwoProcessor struct {
+	DownScaleFactor int
+}
+
+func (p *PowerOfTwoProcessor) Process(src *image.RGBA) (*image.RGBA, error) {
+	bounds := src.Bounds()
+	fmt.Printf("Scaling down square image...")
+	newLength := uint64(max(bounds.Dx(), bounds.Dy()) / p.DownScaleFactor)
+	newLength = nextPoT(newLength)
+	downSize := image.NewRGBA(image.Rect(0, 0, int(newLength), int(newLength)))
+	draw.CatmullRom.Scale(downSize, downSize.Bounds(), src, src.Bounds(), draw.Over, nil)
+	return downSize, nil
+}
+
 func (w *WorldMapper) Write(
 	ctx context.Context,
 	mapExtents MapCoords,
 	cells iter.Seq[*CellInfo],
 	path string,
-	downScaleFactor int,
-	powerOfTwo bool,
+	postProcessors []PostProcessor,
 	codec dds.Codec,
 ) error {
 	w.outImage = nil
 	w.mapExtents = mapExtents
 	fmt.Printf("Map extents: %s\n", mapExtents)
-
-	if downScaleFactor < 1 {
-		return fmt.Errorf("downScaleFactor must be at least 1.")
-	}
 
 	if w.mapExtents.Bottom > w.mapExtents.Top || w.mapExtents.Left > w.mapExtents.Right {
 		return fmt.Errorf("invalid extents: %s", w.mapExtents)
@@ -78,17 +91,12 @@ func (w *WorldMapper) Write(
 		}
 	}
 
-	// OpenMW barfs if NIFs aren't exactly powers of two.
-	if downScaleFactor > 1 || powerOfTwo {
-		bounds := w.outImage.Bounds()
-		fmt.Printf("Scaling down square image...")
-		newLength := uint64(max(bounds.Dx(), bounds.Dy()) / downScaleFactor)
-		if powerOfTwo {
-			newLength = nextPoT(newLength)
+	for _, pp := range postProcessors {
+		var err error
+		w.outImage, err = pp.Process(w.outImage)
+		if err != nil {
+			return fmt.Errorf("postprocess %T failure: %w", pp, err)
 		}
-		downSize := image.NewRGBA(image.Rect(0, 0, int(newLength), int(newLength)))
-		draw.CatmullRom.Scale(downSize, downSize.Bounds(), w.outImage, w.outImage.Bounds(), draw.Over, nil)
-		w.outImage = downSize
 	}
 
 	fmt.Printf("Writing map to %q\n", path)
