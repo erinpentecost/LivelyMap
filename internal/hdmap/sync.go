@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
+	"github.com/erinpentecost/LivelyMap/internal/hdmap/postprocessors"
 	"github.com/ernmw/omwpacker/cfg"
 	"golang.org/x/sync/errgroup"
 )
@@ -101,69 +102,78 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 		mapInfos = append(mapInfos, extents)
 
 		maps = append(maps, &mapRenderJob{
-			Directory: core00TexturePath,
-			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     classicColorCells,
-			Codec:     dds.Lossless,
-			ScaleDown: 1,
-			Square:    true,
+			Directory:      core00TexturePath,
+			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:        extents.Extents,
+			Cells:          classicColorCells,
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
+			Codec:          dds.Lossless,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
-			Codec:     dds.DXT5,
-			ScaleDown: 1,
-			Square:    true,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				&postprocessors.LocalToneMapAlpha{
+					WindowRadiusDenom: 10,
+				},
+				&postprocessors.MinimumEdgeTransparencyProcessor{
+					Minimum: 255,
+				},
+			},
+			Codec: dds.DXT5,
 		})
 		maps = append(maps, &mapRenderJob{
-			Directory: core00TexturePath,
-			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     specularCells,
-			Codec:     dds.DXT5,
-			ScaleDown: 1,
-			Square:    true,
+			Directory:      core00TexturePath,
+			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:        extents.Extents,
+			Cells:          specularCells,
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
+			Codec:          dds.DXT5,
 		})
 
 		maps = append(maps, &mapRenderJob{
-			Directory: potatoTexturePath,
-			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     classicColorCells,
-			ScaleDown: 8,
-			Codec:     dds.DXT1,
-			Square:    true,
+			Directory:      potatoTexturePath,
+			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:        extents.Extents,
+			Cells:          classicColorCells,
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
+			Codec:          dds.DXT1,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory: potatoTexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
-			ScaleDown: 8,
-			Codec:     dds.DXT5,
-			Square:    true,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+				&postprocessors.LocalToneMapAlpha{
+					WindowRadiusDenom: 10,
+				},
+				&postprocessors.MinimumEdgeTransparencyProcessor{
+					Minimum: 255,
+				},
+			},
+			Codec: dds.DXT5,
 		})
 		maps = append(maps, &mapRenderJob{
-			Directory: potatoTexturePath,
-			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     specularCells,
-			Codec:     dds.DXT5,
-			ScaleDown: 8,
-			Square:    true,
+			Directory:      potatoTexturePath,
+			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:        extents.Extents,
+			Cells:          specularCells,
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
+			Codec:          dds.DXT5,
 		})
 
 		maps = append(maps, &mapRenderJob{
-			Directory: detailTexturePath,
-			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     texturedCells,
-			Codec:     dds.Lossless,
-			ScaleDown: 1,
-			Square:    true,
+			Directory:      detailTexturePath,
+			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:        extents.Extents,
+			Cells:          texturedCells,
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
+			Codec:          dds.Lossless,
 		})
 	}
 
@@ -173,7 +183,6 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 		Name:      "vanity.png",
 		Extents:   parsedLands.MapExtents,
 		Cells:     texturedCells,
-		ScaleDown: 1,
 	})
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -233,13 +242,12 @@ func printMapInfo(path string, maps []SubmapNode) error {
 }
 
 type mapRenderJob struct {
-	Directory string
-	Name      string
-	Extents   MapCoords
-	Cells     *CellMapper
-	ScaleDown int
-	Codec     dds.Codec
-	Square    bool
+	Directory      string
+	Name           string
+	Extents        MapCoords
+	Cells          *CellMapper
+	Codec          dds.Codec
+	PostProcessors []PostProcessor
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
@@ -250,8 +258,7 @@ func (m *mapRenderJob) Draw(ctx context.Context) error {
 		m.Extents,
 		slices.Values(m.Cells.Cells),
 		path.Join(m.Directory, m.Name),
-		m.ScaleDown,
-		m.Square,
+		m.PostProcessors,
 		m.Codec,
 	)
 	if err != nil {

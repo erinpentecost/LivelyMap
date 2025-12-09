@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
-	"golang.org/x/image/draw"
 )
 
 type WorldMapper struct {
@@ -39,34 +38,17 @@ func previousPoT(n uint64) uint64 {
 	return 1 << (63 - bits.LeadingZeros64(n))
 }
 
-func nextPoT(n uint64) uint64 {
-	if n == 0 {
-		return 1
-	}
-	// If n is already a power of two, return n
-	if n&(n-1) == 0 {
-		return n
-	}
-	// bits.Len64 gives position of highest bit + 1
-	return 1 << bits.Len64(n)
-}
-
 func (w *WorldMapper) Write(
 	ctx context.Context,
 	mapExtents MapCoords,
 	cells iter.Seq[*CellInfo],
 	path string,
-	downScaleFactor int,
-	powerOfTwo bool,
+	postProcessors []PostProcessor,
 	codec dds.Codec,
 ) error {
 	w.outImage = nil
 	w.mapExtents = mapExtents
 	fmt.Printf("Map extents: %s\n", mapExtents)
-
-	if downScaleFactor < 1 {
-		return fmt.Errorf("downScaleFactor must be at least 1.")
-	}
 
 	if w.mapExtents.Bottom > w.mapExtents.Top || w.mapExtents.Left > w.mapExtents.Right {
 		return fmt.Errorf("invalid extents: %s", w.mapExtents)
@@ -78,17 +60,12 @@ func (w *WorldMapper) Write(
 		}
 	}
 
-	// OpenMW barfs if NIFs aren't exactly powers of two.
-	if downScaleFactor > 1 || powerOfTwo {
-		bounds := w.outImage.Bounds()
-		fmt.Printf("Scaling down square image...")
-		newLength := uint64(max(bounds.Dx(), bounds.Dy()) / downScaleFactor)
-		if powerOfTwo {
-			newLength = nextPoT(newLength)
+	for _, pp := range postProcessors {
+		var err error
+		w.outImage, err = pp.Process(w.outImage)
+		if err != nil {
+			return fmt.Errorf("postprocess %T failure: %w", pp, err)
 		}
-		downSize := image.NewRGBA(image.Rect(0, 0, int(newLength), int(newLength)))
-		draw.CatmullRom.Scale(downSize, downSize.Bounds(), w.outImage, w.outImage.Bounds(), draw.Over, nil)
-		w.outImage = downSize
 	}
 
 	fmt.Printf("Writing map to %q\n", path)
