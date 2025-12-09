@@ -1,6 +1,7 @@
 package postprocessors
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -12,11 +13,10 @@ type MinimumEdgeTransparencyProcessor struct {
 	Minimum uint8 // This is the target full opacity value (e.g., 255)
 }
 
-const vignetteDistance = 32.0
+const vignetteDistance = 128.0
 
 func (p *MinimumEdgeTransparencyProcessor) Process(src *image.RGBA) (*image.RGBA, error) {
-	// TODO: don't make it linear. the seam with 0 should be smooth.
-
+	fmt.Printf("Applying vignette...\n")
 	bounds := src.Bounds()
 	width := float64(bounds.Dx())
 	height := float64(bounds.Dy())
@@ -27,7 +27,6 @@ func (p *MinimumEdgeTransparencyProcessor) Process(src *image.RGBA) (*image.RGBA
 	// Alpha at the interior edge of the vignette zone (e.g., 0)
 	interiorAlpha := 0.0
 
-	// Difference between the edge target and the interior start (e.g., 255 - 0 = 255)
 	alphaRange := targetAlpha - interiorAlpha
 
 	effectiveVignetteDistance := math.Min(vignetteDistance, math.Min(width/2.0, height/2.0))
@@ -47,23 +46,11 @@ func (p *MinimumEdgeTransparencyProcessor) Process(src *image.RGBA) (*image.RGBA
 
 				currentAlpha := uint8(a >> 8)
 
-				// Calculate the interpolation factor based on distance:
-				// factor goes from 0.0 at the interior limit to 1.0 at the edge (minDist = 0)
-				// To get the ramp from 0 (interior) to 255 (edge), we use the distance factor
-				// in reverse (1 - (distance / max distance))
-
-				// Distance factor goes from 1.0 at the edge (minDist=0) to 0.0 at the interior limit (minDist=32)
 				factor := 1.0 - (minDist / effectiveVignetteDistance)
+				factor = factor * factor * factor
 
-				// Calculate the *required* alpha at this location:
-				// RequiredAlpha = InteriorAlpha + (AlphaRange * factor)
-				// E.g., RequiredAlpha = 0 + (255 * factor)
 				requiredAlpha := uint8(math.Round(interiorAlpha + (alphaRange * factor)))
 
-				// --- The Crucial Change ---
-				// The final alpha is the MAXIMUM of the original alpha and the new required alpha.
-				// This ensures that even if the original pixel was transparent (e.g., 10), it
-				// is forced up to the higher requiredAlpha (e.g., 200), enforcing the opaque vignette.
 				finalAlpha := currentAlpha
 				if requiredAlpha > currentAlpha {
 					finalAlpha = requiredAlpha

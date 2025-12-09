@@ -14,7 +14,7 @@ type PowerOfTwoProcessor struct {
 
 func (p *PowerOfTwoProcessor) Process(src *image.RGBA) (*image.RGBA, error) {
 	bounds := src.Bounds()
-	fmt.Printf("Scaling down square image...")
+	fmt.Printf("Scaling square image...\n")
 	newLength := uint64(max(bounds.Dx(), bounds.Dy()) / p.DownScaleFactor)
 	newLength = nextPoT(newLength)
 	downSize := image.NewRGBA(image.Rect(0, 0, int(newLength), int(newLength)))

@@ -11,7 +11,7 @@ type LocalToneMapAlpha struct {
 }
 
 func (p *LocalToneMapAlpha) Process(src *image.RGBA) (*image.RGBA, error) {
-	fmt.Printf("Exaggerating bumps...")
+	fmt.Printf("Exaggerating bumps...\n")
 	b := src.Bounds()
 	w := b.Dx()
 	h := b.Dy()
@@ -64,13 +64,16 @@ func (p *LocalToneMapAlpha) Process(src *image.RGBA) (*image.RGBA, error) {
 			R, G, B, A := src.At(b.Min.X+x, b.Min.Y+y).RGBA()
 			alpha := float64(A >> 8)
 
-			// --- NEW: adaptive mean-based scaling ---
+			// --- adaptive mean-based scaling ---
 			scale := targetMean / (localMean + eps)
 			norm := alpha * scale
 
-			// --- NEW: soft-knee highlight compression (prevents 255 pileup) ---
+			// --- soft-knee highlight compression (prevents 255 pileup) ---
 			// reduces overshoot while keeping relative contrasts
 			compressed := norm - (norm*norm)/255.0*0.25
+
+			// average it with the actual values.
+			compressed = (compressed + float64(alpha)) / 2
 
 			// clamp
 			if compressed < 0 {
