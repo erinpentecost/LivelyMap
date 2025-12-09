@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
-	"golang.org/x/image/draw"
 )
 
 type WorldMapper struct {
@@ -49,24 +48,6 @@ func nextPoT(n uint64) uint64 {
 	}
 	// bits.Len64 gives position of highest bit + 1
 	return 1 << bits.Len64(n)
-}
-
-type PostProcessor interface {
-	Process(src *image.RGBA) (*image.RGBA, error)
-}
-
-type PowerOfTwoProcessor struct {
-	DownScaleFactor int
-}
-
-func (p *PowerOfTwoProcessor) Process(src *image.RGBA) (*image.RGBA, error) {
-	bounds := src.Bounds()
-	fmt.Printf("Scaling down square image...")
-	newLength := uint64(max(bounds.Dx(), bounds.Dy()) / p.DownScaleFactor)
-	newLength = nextPoT(newLength)
-	downSize := image.NewRGBA(image.Rect(0, 0, int(newLength), int(newLength)))
-	draw.CatmullRom.Scale(downSize, downSize.Bounds(), src, src.Bounds(), draw.Over, nil)
-	return downSize, nil
 }
 
 func (w *WorldMapper) Write(

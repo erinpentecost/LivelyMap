@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
+	"github.com/erinpentecost/LivelyMap/internal/hdmap/heightexaggerator"
 	"github.com/ernmw/omwpacker/cfg"
 	"golang.org/x/sync/errgroup"
 )
@@ -109,12 +110,20 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Codec:          dds.Lossless,
 		})
 		maps = append(maps, &mapRenderJob{
-			Directory:      core00TexturePath,
-			Name:           fmt.Sprintf("world_%d_nh.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          normalCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 1}},
-			Codec:          dds.DXT5,
+			Directory: core00TexturePath,
+			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     normalCells,
+			PostProcessors: []PostProcessor{
+				&PowerOfTwoProcessor{DownScaleFactor: 1},
+				&heightexaggerator.LocalToneMapAlpha{
+					WindowRadiusDenom: 10,
+				},
+				&MinimumEdgeTransparencyProcessor{
+					Minimum: 255,
+				},
+			},
+			Codec: dds.DXT5,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory:      core00TexturePath,
@@ -134,12 +143,14 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Codec:          dds.DXT1,
 		})
 		maps = append(maps, &mapRenderJob{
-			Directory:      potatoTexturePath,
-			Name:           fmt.Sprintf("world_%d_nh.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          normalCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 8}},
-			Codec:          dds.DXT5,
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     normalCells,
+			PostProcessors: []PostProcessor{
+				&PowerOfTwoProcessor{DownScaleFactor: 8},
+			},
+			Codec: dds.DXT5,
 		})
 		maps = append(maps, &mapRenderJob{
 			Directory:      potatoTexturePath,
