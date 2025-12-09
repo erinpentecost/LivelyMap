@@ -38,18 +38,6 @@ func previousPoT(n uint64) uint64 {
 	return 1 << (63 - bits.LeadingZeros64(n))
 }
 
-func nextPoT(n uint64) uint64 {
-	if n == 0 {
-		return 1
-	}
-	// If n is already a power of two, return n
-	if n&(n-1) == 0 {
-		return n
-	}
-	// bits.Len64 gives position of highest bit + 1
-	return 1 << bits.Len64(n)
-}
-
 func (w *WorldMapper) Write(
 	ctx context.Context,
 	mapExtents MapCoords,

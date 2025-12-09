@@ -1,16 +1,12 @@
-package heightexaggerator
+package postprocessors
 
 import (
 	"fmt"
 	"image"
 	"image/color"
-	"math"
 )
 
 type LocalToneMapAlpha struct {
-	// WindowRadius defines how many pixels around each location
-	// are considered in the "local mean".
-	// Good starting values: 50 - 100
 	WindowRadiusDenom int
 }
 
@@ -21,12 +17,11 @@ func (p *LocalToneMapAlpha) Process(src *image.RGBA) (*image.RGBA, error) {
 	h := b.Dy()
 
 	windowRadius := max(b.Max.X, b.Max.Y) / p.WindowRadiusDenom
-
 	if windowRadius < 1 {
 		return src, nil
 	}
 
-	// Step 1: Build integral image for alpha channel
+	// ---- Build Integral Image ----
 	intImg := make([][]int, h+1)
 	for i := range intImg {
 		intImg[i] = make([]int, w+1)
@@ -43,11 +38,12 @@ func (p *LocalToneMapAlpha) Process(src *image.RGBA) (*image.RGBA, error) {
 		}
 	}
 
-	// Step 2: Apply local tone mapping
+	// ---- Tone Mapping ----
 	r := windowRadius
 	dst := image.NewRGBA(b)
 
 	eps := 1e-3
+	targetMean := 64.0 // keep midrange stable
 
 	for y := 0; y < h; y++ {
 		y0 := max(0, y-r)
@@ -57,7 +53,6 @@ func (p *LocalToneMapAlpha) Process(src *image.RGBA) (*image.RGBA, error) {
 			x0 := max(0, x-r)
 			x1 := min(w-1, x+r)
 
-			// Integral-image fast rectangle sum
 			sum := intImg[y1+1][x1+1] -
 				intImg[y0][x1+1] -
 				intImg[y1+1][x0] +
@@ -66,22 +61,30 @@ func (p *LocalToneMapAlpha) Process(src *image.RGBA) (*image.RGBA, error) {
 			area := float64((y1 - y0 + 1) * (x1 - x0 + 1))
 			localMean := float64(sum) / area
 
-			// Get source pixel
 			R, G, B, A := src.At(b.Min.X+x, b.Min.Y+y).RGBA()
 			alpha := float64(A >> 8)
 
-			// Tone Mapping:
-			// amplify contrast relative to local mean
-			// A' = A / (mean + ε) * 128
-			// (128 chosen to keep dynamic range reasonable)
-			norm := alpha / (localMean + eps) * 128.0
-			norm = math.Max(0, math.Min(255, norm))
+			// --- NEW: adaptive mean-based scaling ---
+			scale := targetMean / (localMean + eps)
+			norm := alpha * scale
+
+			// --- NEW: soft-knee highlight compression (prevents 255 pileup) ---
+			// reduces overshoot while keeping relative contrasts
+			compressed := norm - (norm*norm)/255.0*0.25
+
+			// clamp
+			if compressed < 0 {
+				compressed = 0
+			}
+			if compressed > 255 {
+				compressed = 255
+			}
 
 			dst.Set(b.Min.X+x, b.Min.Y+y, color.RGBA{
 				R: uint8(R >> 8),
 				G: uint8(G >> 8),
 				B: uint8(B >> 8),
-				A: uint8(norm),
+				A: uint8(compressed),
 			})
 		}
 	}

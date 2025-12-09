@@ -10,7 +10,7 @@ import (
 	"slices"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
-	"github.com/erinpentecost/LivelyMap/internal/hdmap/heightexaggerator"
+	"github.com/erinpentecost/LivelyMap/internal/hdmap/postprocessors"
 	"github.com/ernmw/omwpacker/cfg"
 	"golang.org/x/sync/errgroup"
 )
@@ -106,7 +106,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:        extents.Extents,
 			Cells:          classicColorCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 1}},
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
 			Codec:          dds.Lossless,
 		})
 		maps = append(maps, &mapRenderJob{
@@ -115,11 +115,11 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     normalCells,
 			PostProcessors: []PostProcessor{
-				&PowerOfTwoProcessor{DownScaleFactor: 1},
-				&heightexaggerator.LocalToneMapAlpha{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				&postprocessors.LocalToneMapAlpha{
 					WindowRadiusDenom: 10,
 				},
-				&MinimumEdgeTransparencyProcessor{
+				&postprocessors.MinimumEdgeTransparencyProcessor{
 					Minimum: 255,
 				},
 			},
@@ -130,7 +130,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
 			Extents:        extents.Extents,
 			Cells:          specularCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 1}},
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
 			Codec:          dds.DXT5,
 		})
 
@@ -139,7 +139,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:        extents.Extents,
 			Cells:          classicColorCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 8}},
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
 			Codec:          dds.DXT1,
 		})
 		maps = append(maps, &mapRenderJob{
@@ -148,7 +148,13 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     normalCells,
 			PostProcessors: []PostProcessor{
-				&PowerOfTwoProcessor{DownScaleFactor: 8},
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+				&postprocessors.LocalToneMapAlpha{
+					WindowRadiusDenom: 10,
+				},
+				&postprocessors.MinimumEdgeTransparencyProcessor{
+					Minimum: 255,
+				},
 			},
 			Codec: dds.DXT5,
 		})
@@ -157,7 +163,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
 			Extents:        extents.Extents,
 			Cells:          specularCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 8}},
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
 			Codec:          dds.DXT5,
 		})
 
@@ -166,7 +172,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:        extents.Extents,
 			Cells:          texturedCells,
-			PostProcessors: []PostProcessor{&PowerOfTwoProcessor{DownScaleFactor: 1}},
+			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
 			Codec:          dds.Lossless,
 		})
 	}
