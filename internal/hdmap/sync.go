@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
+	"sync"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
 	"github.com/erinpentecost/LivelyMap/internal/hdmap/postprocessors"
@@ -96,12 +99,14 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	fmt.Printf("Setting up world map joiners...\n")
 
 	// Set up jobs to join the sub-images together.
+
 	mapInfos := []SubmapNode{}
-	maps := []*mapRenderJob{}
+	mapJobs := []*mapRenderJob{}
+	heightsMux := sync.Mutex{}
+	allHeights := map[string]float32{}
 	for _, extents := range Partition(parsedLands.MapExtents) {
 		mapInfos = append(mapInfos, extents)
-
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      core00TexturePath,
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:        extents.Extents,
@@ -109,7 +114,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
 			Codec:          dds.Lossless,
 		})
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory: core00TexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
@@ -123,9 +128,22 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 					Minimum: 255,
 				},
 			},
+			PostFunction: func(img *image.RGBA) error {
+				// We have to get heights from the finished heightmap
+				// since we do postprocessing on real heights.
+				manifest := NewHeightManifest()
+				heights, err := manifest.GetHeights(ctx, extents.Extents, img)
+				if err != nil {
+					return fmt.Errorf("getheights: %w", err)
+				}
+				heightsMux.Lock()
+				defer heightsMux.Unlock()
+				maps.Copy(allHeights, heights)
+				return nil
+			},
 			Codec: dds.DXT5,
 		})
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      core00TexturePath,
 			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
 			Extents:        extents.Extents,
@@ -134,7 +152,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Codec:          dds.DXT5,
 		})
 
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      potatoTexturePath,
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:        extents.Extents,
@@ -142,7 +160,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
 			Codec:          dds.DXT1,
 		})
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory: potatoTexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
@@ -158,7 +176,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			},
 			Codec: dds.DXT5,
 		})
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      potatoTexturePath,
 			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
 			Extents:        extents.Extents,
@@ -167,7 +185,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Codec:          dds.DXT5,
 		})
 
-		maps = append(maps, &mapRenderJob{
+		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      detailTexturePath,
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:        extents.Extents,
@@ -178,7 +196,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	}
 
 	// vanity map
-	maps = append(maps, &mapRenderJob{
+	mapJobs = append(mapJobs, &mapRenderJob{
 		Directory: rootPath,
 		Name:      "vanity.png",
 		Extents:   parsedLands.MapExtents,
@@ -187,19 +205,20 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(6)
-	for _, m := range maps {
+	for _, m := range mapJobs {
 		g.Go(func() error { return m.Draw(gctx) })
 	}
 
-	// Save map image info so the Lua mod knows what to do with them:
-	g.Go(func() error {
-		return printMapInfo(
-			filepath.Join(core00DataPath, "maps.json"),
-			mapInfos,
-		)
-	})
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("generate textures: %w", err)
+	}
 
-	return g.Wait()
+	// Save map image info so the Lua mod knows what to do with them:
+	return printMapInfo(
+		filepath.Join(core00DataPath, "maps.json"),
+		mapInfos,
+		allHeights,
+	)
 }
 
 func renderSky(textureFolder string, colorRenderer CellRenderer, specularRenderer *SpecularRenderer) error {
@@ -228,11 +247,13 @@ func renderSky(textureFolder string, colorRenderer CellRenderer, specularRendere
 	return nil
 }
 
-func printMapInfo(path string, maps []SubmapNode) error {
+func printMapInfo(path string, maps []SubmapNode, allHeights map[string]float32) error {
 	container := struct {
-		Maps []SubmapNode
+		Maps    []SubmapNode
+		Heights map[string]float32
 	}{
-		Maps: maps,
+		Maps:    maps,
+		Heights: allHeights,
 	}
 	raw, err := json.Marshal(container)
 	if err != nil {
@@ -248,6 +269,7 @@ type mapRenderJob struct {
 	Cells          *CellMapper
 	Codec          dds.Codec
 	PostProcessors []PostProcessor
+	PostFunction   func(img *image.RGBA) error
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
@@ -263,6 +285,12 @@ func (m *mapRenderJob) Draw(ctx context.Context) error {
 	)
 	if err != nil {
 		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)
+	}
+	if m.PostFunction != nil {
+		err := m.PostFunction(classicWorldMapper.outImage)
+		if err != nil {
+			return fmt.Errorf("PostFunction: %w", err)
+		}
 	}
 	return nil
 }
