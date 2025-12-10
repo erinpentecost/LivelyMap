@@ -139,10 +139,16 @@ local function onShowMap(data)
         persist.activeMaps[playerID][k] = nil
     end
 
+    -- attach the rendered object to the data
+    data.mapObject = activeMap
+
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
         util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
-    activeMap.object:sendEvent(MOD_NAME .. "onTeleported", data)
+
+    -- notify everything that cares
+    activeMap.object:sendEvent(MOD_NAME .. "onMapMoved", data)
+    data.player:sendEvent(MOD_NAME .. "onMapMoved", data)
 end
 
 

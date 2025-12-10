@@ -46,9 +46,9 @@ local function onInactive()
     print("inactivated " .. aux_util.deepToString(mapData, 3))
 end
 
--- onTeleported is called when the map is placed or moved.
+-- onMapMoved is called when the map is placed or moved.
 -- this should move/create all the annotations it owns
-local function onTeleported(data)
+local function onMapMoved(data)
     if data == nil then
         error("onTeleported data is nil")
     end
@@ -63,7 +63,7 @@ end
 
 return {
     eventHandlers = {
-        [MOD_NAME .. "onTeleported"] = onTeleported,
+        [MOD_NAME .. "onMapMoved"] = onMapMoved,
     },
     engineHandlers = {
         onActive = onActive,
