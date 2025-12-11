@@ -139,6 +139,22 @@ func (m MapCoords) NotContainsPoint(x int32, y int32) bool {
 	return x < m.Left || x > m.Right || y < m.Bottom || y > m.Top
 }
 
+func (m MapCoords) Width() int32 {
+	return 1 + m.Right - m.Left
+}
+func (m MapCoords) Height() int32 {
+	return 1 + m.Top - m.Bottom
+}
+
+func (m MapCoords) Extend(height int32, width int32) MapCoords {
+	return MapCoords{
+		Top:    m.Top + height/2,
+		Bottom: m.Bottom - height + height/2,
+		Left:   m.Left - width + width/2,
+		Right:  m.Right + width/2,
+	}
+}
+
 func (a MapCoords) SupersetOf(b MapCoords) bool {
 	// Vertical Containment (Top/Bottom):
 	// B's northern edge (Top) must be south of or equal to A's northern edge.
@@ -179,7 +195,6 @@ func powerOfTwoInRange(a, b int32) (int32, error) {
 	return p, nil
 }
 
-// TODO: select quad sizes that are powers of two, if possible
 func (a MapCoords) quadrants() []MapCoords {
 	// Textures used for NIFs need to be in powers of two.
 	// Each cell is 64x64 pixels.

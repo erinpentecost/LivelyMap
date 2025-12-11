@@ -104,7 +104,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	mapJobs := []*mapRenderJob{}
 	heightsMux := sync.Mutex{}
 	allHeights := map[string]float32{}
-	for _, extents := range Partition(parsedLands.MapExtents) {
+	for _, extents := range Partition2(parsedLands.MapExtents) {
 		mapInfos = append(mapInfos, extents)
 		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      core00TexturePath,
