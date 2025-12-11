@@ -60,8 +60,17 @@ local function getScale(map)
     return (extents.Top - extents.Bottom) / 16
 end
 
+local function lerpVec(a, b, t)
+    return util.vector3(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t
+    )
+end
+
 return {
     getMap = getMap,
     getScale = getScale,
     getClosestMap = getClosestMap,
+    lerpVec = lerpVec,
 }

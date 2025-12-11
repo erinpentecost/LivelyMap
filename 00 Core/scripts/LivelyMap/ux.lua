@@ -22,6 +22,7 @@ local util     = require("openmw.util")
 local pself    = require("openmw.self")
 local aux_util = require('openmw_aux.util')
 local camera   = require 'openmw.camera'
+local ui       = require 'openmw.ui'
 
 
 local function summonMap(id)
@@ -105,30 +106,83 @@ local function relativeMapPos(mapPos)
     return util.vector2(x, y)
 end
 
--- relativeMapPosToWorldPos turns a relative map position to a real-world rendered position.
-local function relativeMapPosToWorldPos(mapPos)
+-- relativeMapPosToWorldPos turns a relative map position to a 3D world position.
+local function relativeMapPosToWorldPos(relPos)
     if currentMapData == nil then
         error("no current map")
-        return
     end
     if currentMapData.mapObject == nil then
         error("missing mapObject")
-        return
     end
-    if mapPos == nil then
-        error("mapPos is nil")
+    if relPos == nil then
+        error("relativeMapPos is nil")
     end
 
-    -- assume the map is always not rotated
     local box = currentMapData.mapObject:getBoundingBox()
-    -- just guessing these indices
-    local topLeft = camera.worldToViewportVector(box.vertices[1])
-    local topRight = camera.worldToViewportVector(box.vertices[2])
-    local bottomLeft = camera.worldToViewportVector(box.vertices[3])
-    local bottomRight = camera.worldToViewportVector(box.vertices[4])
+    local topLeft = box.vertices[1]
+    local topRight = box.vertices[2]
+    local bottomLeft = box.vertices[3]
+    local bottomRight = box.vertices[4]
 
-    -- need to offset by topleft
-    -- https://gitlab.com/modding-openmw/s3ctors-s3cret-st4sh/-/blob/master/h3lp_yours3lf/scripts/s3/camHelper.lua?ref_type=heads
+    -- interpolate along X at bottom and top edges
+    local bottomPos = mutil.lerpVec(bottomLeft, bottomRight, relPos.x)
+    local topPos = mutil.lerpVec(topLeft, topRight, relPos.x)
+
+    -- interpolate along Y between bottom and top
+    local worldPos = mutil.lerpVec(bottomPos, topPos, relPos.y)
+
+    return worldPos
+end
+
+local function isObjectBehindCamera(worldPos)
+    -- https://gitlab.com/modding-openmw/s3ctors-s3cret-st4sh/-/blob/master/h3lp_yours3lf/scripts/s3/camHelper.lua
+    local cameraPos = camera.getPosition()
+    local cameraForward = util.transform.identity
+        * util.transform.rotateZ(camera.getYaw())
+        * util.vector3(0, 1, 0)
+
+    -- Direction vector from camera to object
+    local toObject = worldPos - cameraPos
+
+    -- Normalize both vectors
+    cameraForward = cameraForward:normalize()
+    toObject = toObject:normalize()
+
+    -- Calculate the dot product
+    local dotProduct = cameraForward:dot(toObject)
+
+    -- If the dot product is negative, the object is behind the camera
+    return dotProduct < 0
+end
+
+
+local function worldPositionToViewportPosition(worldPos)
+    -- https://gitlab.com/modding-openmw/s3ctors-s3cret-st4sh/-/blob/master/h3lp_yours3lf/scripts/s3/camHelper.lua
+    local viewportPos = camera.worldToViewportVector(worldPos)
+    local screenSize = ui.screenSize()
+
+    local validX = viewportPos.x > 0 and viewportPos.x < screenSize.x
+    local validY = viewportPos.y > 0 and viewportPos.y < screenSize.y
+    local withinViewDistance = viewportPos.z <= camera.getViewDistance()
+
+    if not validX or not validY or not withinViewDistance then return end
+
+    if isObjectBehindCamera(worldPos) then return end
+
+    local normalizedX = util.remap(viewportPos.x, 0, screenSize.x, 0.0, 1.0)
+    local normalizedY = util.remap(viewportPos.y, 0, screenSize.y, 0.0, 1.0)
+
+    return util.vector3(normalizedX, normalizedY, viewportPos.z)
+end
+
+local function mapPosToViewportPosition(mapPos)
+    -- TODO: I need to scale the UI component according to camera distance.
+    -- TODO: also shift it "down" according to the cell height.
+    local rel = relativeMapPos(mapPos)
+
+    local world = relativeMapPosToWorldPos(rel)
+
+    local screen = worldPositionToViewportPosition(world)
 end
 
 -- placeIcon moves the given uxComponent so it appears on the target cell.
