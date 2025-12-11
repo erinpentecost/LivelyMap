@@ -1,189 +1,214 @@
 package hdmap
 
-// Partition2 returns square sub-extents (power-of-two side lengths) that
-// cover m. Tiles overlap by at least 2 cells. We return at most 8 tiles.
+import "errors"
+
 func Partition2(m MapCoords) []SubmapNode {
-	const overlap = int32(2) // required overlap in cells
-
-	W := int(m.Width())
-	H := int(m.Height())
-
-	// quick degenerate case: tiny map -> single tile sized to next power of two >= max(W,H)
-	if W <= 0 || H <= 0 {
-		return connectMapCoords([]MapCoords{m})
-	}
-
-	// list all candidate powers-of-two S (descending) to try
-	// maxDim = max(W,H)
-	maxDim := W
-	if H > maxDim {
-		maxDim = H
-	}
-
-	// build power-of-two list up to maxDim
-	pows := []int{}
-	for p := 1; p <= maxDim*2; p <<= 1 { // allow slightly larger powers to reduce tile count
-		pows = append(pows, p)
-	}
-	// reverse so we try largest first
-	for i, j := 0, len(pows)-1; i < j; i, j = i+1, j-1 {
-		pows[i], pows[j] = pows[j], pows[i]
-	}
-
-	var chosenS int
-	var chosenNX, chosenNY int
-
-tryPows:
-	for _, S := range pows {
-		// step (stride) must be at least 1
-		step := S - int(overlap)
-		if step < 1 {
-			step = 1
-		}
-
-		nx := intCeilDiv(W-S, step) + 1
-		ny := intCeilDiv(H-S, step) + 1
-		if nx <= 0 {
-			nx = 1
-		}
-		if ny <= 0 {
-			ny = 1
-		}
-		if nx*ny <= 8 {
-			chosenS = S
-			chosenNX = nx
-			chosenNY = ny
-			break tryPows
-		}
-	}
-
-	// If nothing chosen (very unlikely), fall back to S=1
-	if chosenS == 0 {
-		chosenS = 1
-		chosenNX = intCeilDiv(W-chosenS, 1) + 1
-		chosenNY = intCeilDiv(H-chosenS, 1) + 1
-		if chosenNX*chosenNY > 8 {
-			// cap to 8 by increasing step (reduce count)
-			// naive reduction: make nx = min(nx,8), ny = 1 (best-effort)
-			if chosenNX > 8 {
-				chosenNX = 8
-			}
-			if chosenNX*chosenNY > 8 {
-				chosenNY = 1
-			}
-		}
-	}
-
-	S := int32(chosenS)
-	step := int32(chosenS) - overlap
-	if step < 1 {
-		step = 1
-	}
-
-	// Compute starting origin for X and Y such that the tiles cover [Left,Right] and [Bottom,Top].
-	// We compute an initial start that will place (count-1) steps before the final tile ends at
-	// start + (count-1)*step + S - 1 >= Right (inclusive). Solve for start:
-	// start = Right - (S-1) - (count-1)*step
-	startX := m.Right - (S - 1) - int32(chosenNX-1)*step
-	if startX > m.Left {
-		// ok
-	} else {
-		startX = m.Left
-	}
-
-	startY := m.Top - (S - 1) - int32(chosenNY-1)*step // bottoms grow upward; we'll use bottoms
-	if startY < m.Bottom {
-		startY = m.Bottom
-	}
-
-	tiles := make([]MapCoords, 0, chosenNX*chosenNY)
-	for ix := 0; ix < chosenNX; ix++ {
-		left := startX + int32(ix)*step
-		right := left + S - 1
-		for iy := 0; iy < chosenNY; iy++ {
-			bottom := startY + int32(iy)*step
-			top := bottom + S - 1
-
-			tile := MapCoords{
-				Left:   left,
-				Right:  right,
-				Bottom: bottom,
-				Top:    top,
-			}
-			tiles = append(tiles, tile)
-		}
-	}
-
-	// Remove tiles that don't intersect the original map at all (defensive).
-	intersecting := []MapCoords{}
-	for _, t := range tiles {
-		if !(t.Right < m.Left || t.Left > m.Right || t.Top < m.Bottom || t.Bottom > m.Top) {
-			intersecting = append(intersecting, t)
-		}
-	}
-
-	// Remove tiles wholly contained inside another tile (dedupe)
-	final := []MapCoords{}
-	for i, a := range intersecting {
-		contained := false
-		for j, b := range intersecting {
-			if i == j {
-				continue
-			}
-			if b.SupersetOf(a) {
-				contained = true
-				break
-			}
-		}
-		if !contained {
-			final = append(final, a)
-		}
-	}
-
-	// Safety cap to 8 if still >8 (trim smallest-area tiles last)
-	if len(final) > 8 {
-		// sort by area descending (prefer bigger tiles) - simple selection
-		type kv struct {
-			m    MapCoords
-			area int64
-		}
-		kvs := make([]kv, 0, len(final))
-		for _, mm := range final {
-			area := int64(mm.Width()) * int64(mm.Height())
-			kvs = append(kvs, kv{m: mm, area: area})
-		}
-		// simple selection sort to pick top 8 by area
-		selected := make([]MapCoords, 0, 8)
-		for k := 0; k < 8; k++ {
-			bestIdx := -1
-			var bestArea int64
-			for i := range kvs {
-				if kvs[i].area == 0 {
-					continue
-				}
-				if bestIdx == -1 || kvs[i].area > bestArea {
-					bestIdx = i
-					bestArea = kvs[i].area
-				}
-			}
-			if bestIdx == -1 {
-				break
-			}
-			selected = append(selected, kvs[bestIdx].m)
-			kvs[bestIdx].area = 0 // mark used
-		}
-		final = selected
-	}
-
-	return connectMapCoords(final)
+	// Step 1: ensure normal aspect ratio
+	m = ensureAspectRatio(m)
+	return Partition(m)
 }
 
-func intCeilDiv(a, b int) int {
-	if b <= 0 {
-		return 0
+func ensureAspectRatio(m MapCoords) MapCoords {
+	w := m.Width()
+	h := m.Height()
+
+	const shortSide = 4
+	const longSide = 10
+
+	if w*shortSide > h*longSide {
+		// Too wide, extend vertically
+		newHeight := max(h, (w*shortSide+2)/longSide) // integer division, round up
+		return m.Extend(newHeight, 0)
+	} else if h*shortSide > w*longSide {
+		// Too tall, extend horizontally
+		newWidth := max(w, (h*shortSide+2)/longSide)
+		return m.Extend(0, newWidth)
 	}
-	if a <= 0 {
-		return 1
+	return m
+}
+
+// powerOfTwoInRange returns a power of two p such that a <= p <= b.
+// If no such power of two exists, it returns an error.
+func powerOfTwoInRange(a, b int32) (int32, error) {
+	if a > b {
+		return 0, errors.New("invalid range: a > b")
 	}
-	return (a + b - 1) / b
+	if b < 1 {
+		return 0, errors.New("no power of two in range")
+	}
+
+	// Find smallest power of two >= a.
+	p := int32(1)
+	for p < a {
+		p <<= 1
+		// Prevent infinite loop or overflow beyond int.
+		if p <= 0 {
+			return 0, errors.New("overflow while searching for power of two")
+		}
+	}
+
+	if p > b {
+		return 0, errors.New("no power of two in range")
+	}
+	return p, nil
+}
+
+func quadrants(a MapCoords) []MapCoords {
+	// Textures used for NIFs need to be in powers of two.
+	// Each cell is 64x64 pixels.
+	// We should try to select cell region square sizes that will
+	// result in a final image whose dimensions are a power of 2.
+
+	width := 1 + a.Right - a.Left
+	height := 1 + a.Top - a.Bottom
+
+	// Require the parent to be a square.
+	// If not, just return the original.
+	if width != height {
+		return []MapCoords{a}
+	}
+
+	side := width
+
+	// Compute child square side length ≈ 2/3 side.
+	// Bias upward for better coverage.
+	// Can we find some length >= side/2 and <= side that is
+	// a power of 2?
+	childSide, err := powerOfTwoInRange(side/2, side)
+	if err != nil {
+		childSide = (2*side + 2) / 3
+	}
+
+	// How much the child window slides before falling off edge
+	offset := side - childSide
+
+	// Helper to create a square given origin (left,bottom)
+	newSquare := func(left, bottom int32) MapCoords {
+		return MapCoords{
+			Left:   left,
+			Right:  left + int32(childSide) - 1, // inclusive
+			Bottom: bottom,
+			Top:    bottom + int32(childSide) - 1, // inclusive
+		}
+	}
+
+	// NW origin (x = Left, y = Top - childSide + 1)
+	nwLeft := a.Left
+	nwBottom := a.Top - int32(childSide) + 1
+
+	// NE origin shifted by offset in X
+	neLeft := a.Left + int32(offset)
+	neBottom := nwBottom
+
+	// SW origin
+	swLeft := a.Left
+	swBottom := a.Bottom
+
+	// SE origin shifted by offset in X
+	seLeft := a.Left + int32(offset)
+	seBottom := a.Bottom
+
+	return []MapCoords{
+		newSquare(nwLeft, nwBottom),
+		newSquare(neLeft, neBottom),
+		newSquare(swLeft, swBottom),
+		newSquare(seLeft, seBottom),
+	}
+}
+
+// Partition will return between 1 and 8 partitions of m.
+// All partitions will be squares, and may overlap.
+func Partition(m MapCoords) []SubmapNode {
+	partitions := []MapCoords{}
+	for _, square := range findSquares(m) {
+		// If the square is small enough, don't subdivide it.
+		width := 1 + square.Right - square.Left
+		height := 1 + square.Top - square.Bottom
+		// Vvardenfell is 43x42.
+		if width*height <= 43*42 {
+			partitions = append(partitions, square)
+			continue
+		}
+		// It's a big square, so we're going to chunk it up
+		// into overlapping sub-squares.
+		for _, quad := range quadrants(square) {
+			// If the parent map is close to a square already,
+			// then our initial subdivide is going to have two
+			// big squares that overlap a ton. So when we do
+			// our second chopping, we'll make sure to throw away
+			// any square that are entirely contained by ones
+			// we've already seen.
+			contained := false
+			for _, donePart := range partitions {
+				if donePart.SupersetOf(quad) {
+					contained = true
+					break
+				}
+			}
+			if !contained {
+				partitions = append(partitions, quad)
+			}
+		}
+	}
+	return connectMapCoords(partitions)
+}
+
+// We're actually going to fit the two largest squares
+// we can into the map, and make images for both.
+// This way we can render them onto squar meshes and not worry about stretching.
+func findSquares(extents ...MapCoords) []MapCoords {
+	out := []MapCoords{}
+	for _, mapExtents := range extents {
+		width := 1 + mapExtents.Right - mapExtents.Left
+		height := 1 + mapExtents.Top - mapExtents.Bottom
+
+		// the map is not a square!
+		if width < height {
+			// Map is taller than it is wide. Chop into a top square and a bottom square.
+			// The side length of the squares is the full width of the map.
+			squareSize := width
+
+			// Top square: uses the full width, extends down by squareSize
+			topSquare := MapCoords{
+				Top:    mapExtents.Top,
+				Bottom: mapExtents.Top - squareSize + 1, // +1 for inclusive coordinate math
+				Left:   mapExtents.Left,
+				Right:  mapExtents.Right,
+			}
+
+			// Bottom square: uses the full width, extends up by squareSize
+			bottomSquare := MapCoords{
+				Top:    mapExtents.Bottom + squareSize - 1,
+				Bottom: mapExtents.Bottom,
+				Left:   mapExtents.Left,
+				Right:  mapExtents.Right,
+			}
+			out = append(out, topSquare, bottomSquare)
+		} else if width > height {
+			// Map is wider than it is tall. Chop into a left square and a right square.
+			// The side length of the squares is the full height of the map.
+			squareSize := height
+
+			// Left square: uses the full height, extends right by squareSize
+			leftSquare := MapCoords{
+				Top:    mapExtents.Top,
+				Bottom: mapExtents.Bottom,
+				Left:   mapExtents.Left,
+				Right:  mapExtents.Left + squareSize - 1,
+			}
+
+			// Right square: uses the full height, extends left by squareSize
+			rightSquare := MapCoords{
+				Top:    mapExtents.Top,
+				Bottom: mapExtents.Bottom,
+				Left:   mapExtents.Right - squareSize + 1,
+				Right:  mapExtents.Right,
+			}
+			out = append(out, leftSquare, rightSquare)
+		} else {
+			// If width == height, it is already a square. Return it.
+			out = append(out, mapExtents)
+		}
+	}
+	return out
 }

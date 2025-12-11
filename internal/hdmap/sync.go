@@ -132,7 +132,10 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 				// We have to get heights from the finished heightmap
 				// since we do postprocessing on real heights.
 				manifest := NewHeightManifest()
-				heights, err := manifest.GetHeights(ctx, extents.Extents, img)
+				// ignore heights along the edges.
+				// these are guaranteed to be present in other partitions,
+				// of if on an edge, they are just padding.
+				heights, err := manifest.GetHeights(ctx, extents.Extents.Extend(-2, -2), img)
 				if err != nil {
 					return fmt.Errorf("getheights: %w", err)
 				}

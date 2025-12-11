@@ -169,6 +169,9 @@ func (l *LandParser) ParsePlugins() error {
 		}
 	}
 
+	// Put in some padding.
+	l.MapExtents = l.MapExtents.Extend(2, 2)
+
 	// fill in empties
 	nearBottom := float32(l.Heights.Quantile(0.1))
 	fallbackHeights := make([][]float32, 65)
@@ -178,10 +181,13 @@ func (l *LandParser) ParsePlugins() error {
 			fallbackHeights[i][b] = nearBottom
 		}
 	}
-	fmt.Println("Faking records...")
+
+	fmt.Println("Faking cells...")
+	fakeCount := 0
 	for x := l.MapExtents.Left; x <= l.MapExtents.Right; x++ {
 		for y := l.MapExtents.Bottom; y <= l.MapExtents.Top; y++ {
 			if !present[coordKey(x, y)] {
+				fakeCount++
 				l.Lands = append(l.Lands, &ParsedLandRecord{
 					x:       x,
 					y:       y,
@@ -192,6 +198,7 @@ func (l *LandParser) ParsePlugins() error {
 			}
 		}
 	}
+	fmt.Printf("Faked %d cells.\n", fakeCount)
 
 	return nil
 }
