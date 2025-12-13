@@ -179,27 +179,121 @@ local function worldPosToViewportPos(worldPos)
     return util.vector2(viewportPos.x, viewportPos.y)
 end
 
+
 local function computePomDepth()
     if not currentMapData then
         error("no current map")
     end
+
     local bl                     = currentMapData.bounds.bottomLeft
     local br                     = currentMapData.bounds.bottomRight
     local tl                     = currentMapData.bounds.topLeft
 
-    local worldWidth             = (br - bl):length()
-    local worldHeight            = (tl - bl):length()
+    -- World-space map axes
+    local rightVec               = br - bl
+    local upVec                  = tl - bl
 
-    local worldUnitsPerUV        = (worldWidth + worldHeight) * 0.5
+    -- Average length for scaling
+    local worldUnitsPerUV        = (rightVec:length() + upVec:length()) * 0.5
 
-    --#define PARALLAX_SCALE_OBJECTS 0.04
     local PARALLAX_SCALE_OBJECTS = 0.04 -- MUST match shader
-
     return PARALLAX_SCALE_OBJECTS * worldUnitsPerUV
 end
 
+local function realPosToViewportPosBad(pos)
+    if not currentMapData then
+        error("no current map")
+    end
+
+    local cellPos = mutil.worldPosToCellPos(pos)
+    local rel = relativeCellPos(cellPos)
+
+    local mapWorldPos = relativeCellPosToMapPos(rel)
+
+    local maxHeight = heightData:get("MaxHeight")
+    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
+    local heightRatio = 1.0 - (height / maxHeight)
+
+    local camPos = camera.getPosition()
+    local viewDir = (mapWorldPos - camPos):normalize() -- world vector from camera to icon
+
+    local PARALLAX_BIAS = 0.3
+    local pomScale = computePomDepth()
+
+    -- shader match: divide by (abs(eyeDir.z) + bias)
+    local parallaxWorldOffset =
+        util.vector3(
+            viewDir.x / (math.abs(viewDir.z) + PARALLAX_BIAS),
+            -viewDir.y / (math.abs(viewDir.z) + PARALLAX_BIAS), -- Y-flip
+            0
+        ) * (pomScale * heightRatio)
+
+    -- optional distance fade
+    local dist = (camPos - mapWorldPos):length()
+    local fade = 1.0 - util.clamp(dist / 1000, 0, 1)
+    parallaxWorldOffset = parallaxWorldOffset * fade
+
+    local displacedPos = mapWorldPos + parallaxWorldOffset
+
+    -- debug print
+    print(string.format(
+        "mapWorldPos: %.3f,%.3f,%.3f  pomOffset: %.3f,%.3f,%.3f  displacedPos: %.3f,%.3f,%.3f",
+        mapWorldPos.x, mapWorldPos.y, mapWorldPos.z,
+        parallaxWorldOffset.x, parallaxWorldOffset.y, parallaxWorldOffset.z,
+        displacedPos.x, displacedPos.y, displacedPos.z
+    ))
+
+    return worldPosToViewportPos(displacedPos)
+end
+
+
+local function realPosToViewportPosugh(pos)
+    if not currentMapData then
+        error("no current map")
+    end
+
+    local cellPos = mutil.worldPosToCellPos(pos)
+    local rel = relativeCellPos(cellPos)
+
+    local mapWorldPos = relativeCellPosToMapPos(rel)
+
+    local maxHeight = heightData:get("MaxHeight")
+    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
+    local heightRatio = 1.0 - (height / maxHeight)
+
+    local camPos = camera.getPosition()
+    local viewDir = (camPos - mapWorldPos):normalize()
+
+
+
+    -- local pomScale = pom_depth
+    local pomScale = computePomDepth()
+    -- matches the shader
+    local PARALLAX_BIAS = 0.3
+    local safeZ = math.max(math.abs(viewDir.z + PARALLAX_BIAS), 0.1)
+
+    -- Match shader: (eyeDir.xy / eyeDir.z) * scale
+    local parallaxWorldOffset =
+        util.vector3(
+            viewDir.x / safeZ,
+            viewDir.y / safeZ,
+            0
+        ) * (pom_depth * heightRatio)
+
+    -- Distance fade (optional but recommended)
+    local maxPOMDistance = 1000
+    local dist = (camPos - mapWorldPos):length()
+    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
+
+    parallaxWorldOffset = parallaxWorldOffset * fade
+
+    return worldPosToViewportPos(mapWorldPos + parallaxWorldOffset)
+end
+
+
 
 local function realPosToViewportPos(pos)
+    -- this works ok, but fails when the camera gets too close.
     if not currentMapData then
         error("no current map")
     end
@@ -218,7 +312,8 @@ local function realPosToViewportPos(pos)
 
     local safeZ = math.max(math.abs(viewDir.z), 0.1)
 
-    --local calcPomDepth = computePomDepth()
+    -- local pomScale = pom_depth
+    local pomScale = computePomDepth()
 
     -- Match shader: (eyeDir.xy / eyeDir.z) * scale
     local parallaxWorldOffset =
