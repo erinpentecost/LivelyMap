@@ -1,0 +1,7 @@
+name: "Lively Map"
+description: "Overworld map replacer."
+
+map: "Map"
+
+pomDepthName: "Parallax Depth"
+pomDepthDescription: "Offset that matches the maximum parallax offset in your shader."

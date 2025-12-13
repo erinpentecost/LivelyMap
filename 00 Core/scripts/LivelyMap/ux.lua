@@ -24,9 +24,19 @@ local aux_util   = require('openmw_aux.util')
 local camera     = require("openmw.camera")
 local ui         = require("openmw.ui")
 local compass    = require("scripts.LivelyMap.compass")
+local settings   = require("scripts.LivelyMap.settings")
+local async      = require("openmw.async")
 
 local storage    = require('openmw.storage')
 local heightData = storage.globalSection(MOD_NAME .. "_heightData")
+
+local pom_depth  = settings.pomDepth
+
+settings.subscribe(async:callback(function(_, setting)
+    if setting == "pomDepth" then
+        pom_depth = settings.pomDepth
+    end
+end))
 
 local function summonMap(id)
     local mapData
@@ -124,7 +134,8 @@ local function relativeCellPos(cellPos)
     return util.vector3(x, y, cellPos.z)
 end
 
--- relativeMapPosToWorldPos turns a relative map position to a 3D world position.
+-- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
+-- which is the position on the map mesh.
 local function relativeCellPosToMapPos(relCellPos)
     if currentMapData == nil then
         error("no current map")
@@ -145,45 +156,21 @@ local function relativeCellPosToMapPos(relCellPos)
     -- interpolate along Y between bottom and top
     local worldPos  = mutil.lerpVec3(bottomPos, topPos, relCellPos.y)
 
-    -- TODO: also do Z.
-    -- this is the real-world offset as if the map was truly 3d.
-    -- all I need to do here is convert from cellpos to mesh cell width pos
-    -- and then add bounds.bottomLeft.z to it.
-    -- the problem with this is that it is not scaled by maxheight.
-    -- I should actually be normalizing between 0 and maxheight
-    --[[local mapWidth  = currentMapData.Extents.Right - currentMapData.Extents.Left + 1
-    local meshWidth = currentMapData.bounds.bottomRight.x - currentMapData.bounds.bottomLeft.x
-    local z         = currentMapData.bounds.bottomRight.z + relCellPos.z * meshWidth / mapWidth
-    --]]
     local maxHeight = heightData:get("MaxHeight")
 
-    local POM_DEPTH = 2
-    local z = currentMapData.bounds.bottomRight.z +
-        util.remap(relCellPos.z * mutil.CELL_SIZE / maxHeight, 0, maxHeight, 0, POM_DEPTH) - POM_DEPTH
-    -- TODO: restore this once I fix the 2d offset problem
-    z = currentMapData.bounds.bottomRight.z
+    -- this isn't right, because the strength of the POM (parallax occlusion mapping)
+    -- effect is diminished at large camera distances from this point.
+    -- but this would actually do the inverse: dropping the icon lower
+    -- as our angle becomes more oblique.
+    --local z         = currentMapData.bounds.bottomRight.z +
+    --    util.remap(relCellPos.z * mutil.CELL_SIZE, 0, maxHeight, 0, pom_depth) - pom_depth
 
-    return util.vector3(worldPos.x, worldPos.y, z)
-end
 
-local function relativeCellPosToMapPosTransform(bounds)
-    -- bounds: {bottomLeft, bottomRight, topLeft, topRight}, axis-aligned
-    local scaleX = bounds.bottomRight.x - bounds.bottomLeft.x
-    local scaleY = bounds.topLeft.y - bounds.bottomLeft.y
-    local scaleZ = 1 -- assume Z is constant along bounds
-    local moveX  = bounds.bottomLeft.x
-    local moveY  = bounds.bottomLeft.y
-    local moveZ  = bounds.bottomLeft.z
-
-    -- Return a util.transform that maps relCellPos (x,y in 0..1) → worldPos
-    return util.transform.identity
-        * util.transform.scale(scaleX, scaleY, scaleZ)
-        * util.transform.move(util.vector3(moveX, moveY, moveZ))
+    return util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
 end
 
 
-
-local function worldPosToViewportPos(worldPos)
+local function worldPosToViewportPos(worldPos, screenYOffset)
     -- this function works perfectly
     local viewportPos = camera.worldToViewportVector(worldPos)
     local screenSize = ui.screenSize()
@@ -196,36 +183,46 @@ local function worldPosToViewportPos(worldPos)
 
     if isObjectBehindCamera(worldPos) then return end
 
-
-    return util.vector2(viewportPos.x, viewportPos.y)
-end
-
-local function oldWay(worldPos)
-    local cellPos = mutil.worldPosToCellPos(worldPos)
-    local rel = relativeCellPos(cellPos)
-
-    --return relativeCellPosToMapPosTransform(currentMapData.bounds) * rel
-    return relativeCellPosToMapPos(rel)
+    return util.vector2(viewportPos.x, viewportPos.y + screenYOffset)
 end
 
 local function realPosToViewportPos(pos)
     if currentMapData == nil then
         error("no current map")
-        return
     end
-    -- expected is my current way of getting the correct position.
-    local expected = oldWay(pos)
-    print(expected)
-    return worldPosToViewportPos(expected)
+
+    local cellPos = mutil.worldPosToCellPos(pos)
+    local rel = relativeCellPos(cellPos)
+
+    local mapWorldPos = relativeCellPosToMapPos(rel)
+
+    -- y offset is not accurate at all
+
+    local maxHeight = heightData:get("MaxHeight")
+    local heightRatio =
+        1.0 - util.clamp((rel.z * mutil.CELL_SIZE) / maxHeight, 0, 1)
+
+    local camPos = camera.getPosition()
+    local viewDir = (camPos - mapWorldPos):normalize()
+
+    local normal = util.vector3(0, 0, 1)
+    local angleFactor = util.clamp(viewDir:dot(normal), 0, 1)
+
+    local screenYOffset = pom_depth * heightRatio * angleFactor
+
+    local maxPOMDistance = 1000
+    local dist = (camPos - mapWorldPos):length()
+    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
+    local screenYOffsetWithFade = screenYOffset * fade
+
+    print("heightRatio: " ..
+        heightRatio ..
+        ", screenYOffset: " ..
+        screenYOffset .. ", angleFactor: " .. angleFactor .. ", screenYOffsetWithFade: " .. screenYOffsetWithFade)
+
+    return worldPosToViewportPos(mapWorldPos, screenYOffsetWithFade)
 end
 
--- placeIcon moves the given uxComponent so it appears on the target cell.
-local function placeIcon(uxComponent, cellPos)
-    if currentMapData == nil then
-        error("no current map")
-        return
-    end
-end
 
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
@@ -260,9 +257,9 @@ local function onUpdate(dt)
         --local pos = cellPosToViewportPosition(icon.pos())
         local pos = realPosToViewportPos(icon.pos())
         if pos then
-            if pos ~= icon.widget.layout.props.position then
+            --[[if pos ~= icon.widget.layout.props.position then
                 print(pos)
-            end
+                end]]
             icon.widget.layout.props.visible = true
             icon.widget.layout.props.position = pos
             icon.widget:update()
