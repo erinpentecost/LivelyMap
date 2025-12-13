@@ -33,15 +33,15 @@ local function init()
         permanentStorage = true,
         settings = {
             {
-                key = "pomDepth",
-                name = "pomDepthName",
-                description = "pomDepthDescription",
-                default = 30,
+                key = "psoDepth",
+                name = "psoDepthName",
+                description = "psoDepthDescription",
+                default = 0.4,
                 renderer = "number",
                 argument = {
-                    integer = true,
+                    integer = false,
                     min = 0,
-                    max = 1000,
+                    max = 1,
                 }
             }
         }

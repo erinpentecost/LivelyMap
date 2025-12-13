@@ -15,77 +15,56 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME   = require("scripts.LivelyMap.ns")
-local mutil      = require("scripts.LivelyMap.mutil")
-local core       = require("openmw.core")
-local util       = require("openmw.util")
-local pself      = require("openmw.self")
-local aux_util   = require('openmw_aux.util')
-local camera     = require("openmw.camera")
-local ui         = require("openmw.ui")
-local compass    = require("scripts.LivelyMap.compass")
-local settings   = require("scripts.LivelyMap.settings")
-local async      = require("openmw.async")
+local MOD_NAME       = require("scripts.LivelyMap.ns")
+local mutil          = require("scripts.LivelyMap.mutil")
+local core           = require("openmw.core")
+local util           = require("openmw.util")
+local pself          = require("openmw.self")
+local aux_util       = require('openmw_aux.util')
+local camera         = require("openmw.camera")
+local ui             = require("openmw.ui")
+local compass        = require("scripts.LivelyMap.compass")
+local settings       = require("scripts.LivelyMap.settings")
+local async          = require("openmw.async")
 
-local storage    = require('openmw.storage')
-local heightData = storage.globalSection(MOD_NAME .. "_heightData")
+local storage        = require('openmw.storage')
+local heightData     = storage.globalSection(MOD_NAME .. "_heightData")
 
-local pom_depth  = settings.pomDepth
+local currentMapData = nil
 
+-- psoDepth is PARALLAX_SCALE_OBJECTS = 0.04
+local psoDepth       = settings.psoDepth
+-- pso is the calculated depth for the current map.
+local pso            = 0
+local function computePomDepth()
+    if not currentMapData then
+        error("no current map")
+    end
+
+    local bl              = currentMapData.bounds.bottomLeft
+    local br              = currentMapData.bounds.bottomRight
+    local tl              = currentMapData.bounds.topLeft
+
+    -- World-space map axes
+    local rightVec        = br - bl
+    local upVec           = tl - bl
+
+    -- Average length for scaling
+    local worldUnitsPerUV = (rightVec:length() + upVec:length()) * 0.5
+
+    --local PARALLAX_SCALE_OBJECTS = 0.04 -- MUST match shader
+    return psoDepth * worldUnitsPerUV
+end
 settings.subscribe(async:callback(function(_, setting)
-    if setting == "pomDepth" then
-        pom_depth = settings.pomDepth
+    if setting == "psoDepth" then
+        psoDepth = settings.psoDepth
+        if currentMapData then
+            pso = computePomDepth()
+        end
     end
 end))
 
-local function summonMap(id)
-    local mapData
-    if id == "" or id == nil then
-        mapData = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
-    else
-        mapData = mutil.getMap(id)
-    end
 
-    mapData.cellID = pself.cell.id
-    mapData.player = pself
-    mapData.position = {
-        x = pself.position.x,
-        y = pself.position.y,
-        z = pself.position.z,
-    }
-    core.sendGlobalEvent(MOD_NAME .. "onShowMap", mapData)
-end
-
-local function splitString(str)
-    local out = {}
-    for item in str:gmatch("([^,%s]+)") do
-        table.insert(out, item)
-    end
-    return out
-end
-
-local function onConsoleCommand(mode, command, selectedObject)
-    local function getSuffixForCmd(prefix)
-        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
-            return string.sub(command, string.len(prefix) + 1)
-        else
-            return nil
-        end
-    end
-    local showMap = getSuffixForCmd("lua map")
-
-    if showMap ~= nil then
-        local id = splitString(showMap)
-        print("Show Map: " .. aux_util.deepToString(id, 3))
-
-        if #id == 0 then
-            id = nil
-            summonMap(nil)
-        else
-            summonMap(id[1])
-        end
-    end
-end
 
 local function isObjectBehindCamera(worldPos)
     -- this function works perfectly
@@ -107,8 +86,6 @@ local function isObjectBehindCamera(worldPos)
     -- If the dot product is negative, the object is behind the camera
     return dotProduct < 0
 end
-
-local currentMapData = nil
 
 -- relativeCellPos return mapPos, but shifted by the current map Extents
 -- so the bottom left becomes 0,0 and top right becomes 1,1.
@@ -156,9 +133,6 @@ local function relativeCellPosToMapPos(relCellPos)
     -- interpolate along Y between bottom and top
     local worldPos  = mutil.lerpVec3(bottomPos, topPos, relCellPos.y)
 
-    local maxHeight = heightData:get("MaxHeight")
-
-
     return util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
 end
 
@@ -180,115 +154,6 @@ local function worldPosToViewportPos(worldPos)
 end
 
 
-local function computePomDepth()
-    if not currentMapData then
-        error("no current map")
-    end
-
-    local bl                     = currentMapData.bounds.bottomLeft
-    local br                     = currentMapData.bounds.bottomRight
-    local tl                     = currentMapData.bounds.topLeft
-
-    -- World-space map axes
-    local rightVec               = br - bl
-    local upVec                  = tl - bl
-
-    -- Average length for scaling
-    local worldUnitsPerUV        = (rightVec:length() + upVec:length()) * 0.5
-
-    local PARALLAX_SCALE_OBJECTS = 0.04 -- MUST match shader
-    return PARALLAX_SCALE_OBJECTS * worldUnitsPerUV
-end
-
-local function realPosToViewportPosBad(pos)
-    if not currentMapData then
-        error("no current map")
-    end
-
-    local cellPos = mutil.worldPosToCellPos(pos)
-    local rel = relativeCellPos(cellPos)
-
-    local mapWorldPos = relativeCellPosToMapPos(rel)
-
-    local maxHeight = heightData:get("MaxHeight")
-    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
-    local heightRatio = 1.0 - (height / maxHeight)
-
-    local camPos = camera.getPosition()
-    local viewDir = (mapWorldPos - camPos):normalize() -- world vector from camera to icon
-
-    local PARALLAX_BIAS = 0.3
-    local pomScale = computePomDepth()
-
-    -- shader match: divide by (abs(eyeDir.z) + bias)
-    local parallaxWorldOffset =
-        util.vector3(
-            viewDir.x / (math.abs(viewDir.z) + PARALLAX_BIAS),
-            -viewDir.y / (math.abs(viewDir.z) + PARALLAX_BIAS), -- Y-flip
-            0
-        ) * (pomScale * heightRatio)
-
-    -- optional distance fade
-    local dist = (camPos - mapWorldPos):length()
-    local fade = 1.0 - util.clamp(dist / 1000, 0, 1)
-    parallaxWorldOffset = parallaxWorldOffset * fade
-
-    local displacedPos = mapWorldPos + parallaxWorldOffset
-
-    -- debug print
-    print(string.format(
-        "mapWorldPos: %.3f,%.3f,%.3f  pomOffset: %.3f,%.3f,%.3f  displacedPos: %.3f,%.3f,%.3f",
-        mapWorldPos.x, mapWorldPos.y, mapWorldPos.z,
-        parallaxWorldOffset.x, parallaxWorldOffset.y, parallaxWorldOffset.z,
-        displacedPos.x, displacedPos.y, displacedPos.z
-    ))
-
-    return worldPosToViewportPos(displacedPos)
-end
-
-
-local function realPosToViewportPosugh(pos)
-    if not currentMapData then
-        error("no current map")
-    end
-
-    local cellPos = mutil.worldPosToCellPos(pos)
-    local rel = relativeCellPos(cellPos)
-
-    local mapWorldPos = relativeCellPosToMapPos(rel)
-
-    local maxHeight = heightData:get("MaxHeight")
-    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
-    local heightRatio = 1.0 - (height / maxHeight)
-
-    local camPos = camera.getPosition()
-    local viewDir = (camPos - mapWorldPos):normalize()
-
-
-
-    -- local pomScale = pom_depth
-    local pomScale = computePomDepth()
-    -- matches the shader
-    local PARALLAX_BIAS = 0.3
-    local safeZ = math.max(math.abs(viewDir.z + PARALLAX_BIAS), 0.1)
-
-    -- Match shader: (eyeDir.xy / eyeDir.z) * scale
-    local parallaxWorldOffset =
-        util.vector3(
-            viewDir.x / safeZ,
-            viewDir.y / safeZ,
-            0
-        ) * (pom_depth * heightRatio)
-
-    -- Distance fade (optional but recommended)
-    local maxPOMDistance = 1000
-    local dist = (camPos - mapWorldPos):length()
-    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
-
-    parallaxWorldOffset = parallaxWorldOffset * fade
-
-    return worldPosToViewportPos(mapWorldPos + parallaxWorldOffset)
-end
 
 
 
@@ -303,27 +168,22 @@ local function realPosToViewportPos(pos)
 
     local mapWorldPos = relativeCellPosToMapPos(rel)
 
+    -- POM: Calculate vertical offset so the icon appears glued
+    -- to the surface of the map, which has been distorted according
+    -- to the parallax shader.
     local maxHeight = heightData:get("MaxHeight")
     local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
     local heightRatio = 1.0 - (height / maxHeight)
-
     local camPos = camera.getPosition()
     local viewDir = (camPos - mapWorldPos):normalize()
-
     local safeZ = math.max(math.abs(viewDir.z), 0.1)
-
-    -- local pomScale = pom_depth
-    local pomScale = computePomDepth()
-
-    -- Match shader: (eyeDir.xy / eyeDir.z) * scale
     local parallaxWorldOffset =
         util.vector3(
             viewDir.x / safeZ,
             viewDir.y / safeZ,
             0
-        ) * (pom_depth * heightRatio)
-
-    -- Distance fade (optional but recommended)
+        ) * (pso * heightRatio)
+    -- POM Distance fade
     local maxPOMDistance = 1000
     local dist = (camPos - mapWorldPos):length()
     local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
@@ -338,6 +198,7 @@ end
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data
+    pso = computePomDepth()
 end
 
 -- icons is a list of {widget, fn() worldPos}
@@ -365,18 +226,63 @@ local function onUpdate(dt)
     end
 
     for _, icon in ipairs(icons) do
-        --local pos = cellPosToViewportPosition(icon.pos())
         local pos = realPosToViewportPos(icon.pos())
         if pos then
-            --[[if pos ~= icon.widget.layout.props.position then
-                print(pos)
-                end]]
             icon.widget.layout.props.visible = true
             icon.widget.layout.props.position = pos
             icon.widget:update()
         else
             icon.widget.layout.props.visible = false
             icon.widget:update()
+        end
+    end
+end
+
+local function summonMap(id)
+    local mapData
+    if id == "" or id == nil then
+        mapData = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
+    else
+        mapData = mutil.getMap(id)
+    end
+
+    mapData.cellID = pself.cell.id
+    mapData.player = pself
+    mapData.position = {
+        x = pself.position.x,
+        y = pself.position.y,
+        z = pself.position.z,
+    }
+    core.sendGlobalEvent(MOD_NAME .. "onShowMap", mapData)
+end
+
+local function splitString(str)
+    local out = {}
+    for item in str:gmatch("([^,%s]+)") do
+        table.insert(out, item)
+    end
+    return out
+end
+
+local function onConsoleCommand(mode, command, selectedObject)
+    local function getSuffixForCmd(prefix)
+        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
+            return string.sub(command, string.len(prefix) + 1)
+        else
+            return nil
+        end
+    end
+    local showMap = getSuffixForCmd("lua map")
+
+    if showMap ~= nil then
+        local id = splitString(showMap)
+        print("Show Map: " .. aux_util.deepToString(id, 3))
+
+        if #id == 0 then
+            id = nil
+            summonMap(nil)
+        else
+            summonMap(id[1])
         end
     end
 end

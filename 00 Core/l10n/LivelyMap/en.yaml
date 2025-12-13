@@ -3,5 +3,5 @@ description: "Overworld map replacer."
 
 map: "Map"
 
-pomDepthName: "Parallax Depth"
-pomDepthDescription: "Offset that matches the maximum parallax offset in your shader."
+psoDepthName: "Parallax Objects Scale"
+psoDepthDescription: "Equivalent to PARALLAX_SCALE_OBJECTS in your POM shader."
