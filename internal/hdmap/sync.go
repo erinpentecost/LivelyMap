@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
@@ -100,12 +101,12 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 
 	// Set up jobs to join the sub-images together.
 
-	mapInfos := []SubmapNode{}
+	mapInfos := map[string]SubmapNode{}
 	mapJobs := []*mapRenderJob{}
 	heightsMux := sync.Mutex{}
 	allHeights := map[string]float32{}
 	for _, extents := range Partition(parsedLands.MapExtents) {
-		mapInfos = append(mapInfos, extents)
+		mapInfos[strconv.Itoa(int(extents.ID))] = extents
 		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      core00TexturePath,
 			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
@@ -132,7 +133,10 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 				// We have to get heights from the finished heightmap
 				// since we do postprocessing on real heights.
 				manifest := NewHeightManifest()
-				heights, err := manifest.GetHeights(ctx, extents.Extents, img)
+				// ignore heights along the edges.
+				// these are guaranteed to be present in other partitions,
+				// of if on an edge, they are just padding.
+				heights, err := manifest.GetHeights(ctx, extents.Extents.Extend(-2, -2), img)
 				if err != nil {
 					return fmt.Errorf("getheights: %w", err)
 				}
@@ -247,9 +251,9 @@ func renderSky(textureFolder string, colorRenderer CellRenderer, specularRendere
 	return nil
 }
 
-func printMapInfo(path string, maps []SubmapNode, allHeights map[string]float32) error {
+func printMapInfo(path string, maps map[string]SubmapNode, allHeights map[string]float32) error {
 	container := struct {
-		Maps    []SubmapNode
+		Maps    map[string]SubmapNode
 		Heights map[string]float32
 	}{
 		Maps:    maps,

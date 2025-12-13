@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 local MOD_NAME = require("scripts.LivelyMap.ns")
 local aux_util = require('openmw_aux.util')
+local util = require('openmw.util')
+local pself = require("openmw.self")
 
 -- This script is attached to the 3d floating map objects.
 -- It should be responsible for adding annotations and cleaning
@@ -46,9 +48,34 @@ local function onInactive()
     print("inactivated " .. aux_util.deepToString(mapData, 3))
 end
 
--- onTeleported is called when the map is placed or moved.
+local function getBounds()
+    local verts = pself:getBoundingBox().vertices
+
+    local minX, maxX = verts[1].x, verts[1].x
+    local minY, maxY = verts[1].y, verts[1].y
+    local minZ, maxZ = verts[1].z, verts[1].z
+
+    for i = 2, #verts do
+        local v = verts[i]
+        minX = math.min(minX, v.x)
+        maxX = math.max(maxX, v.x)
+        minY = math.min(minY, v.y)
+        maxY = math.max(maxY, v.y)
+        minZ = math.min(minZ, v.z)
+        maxZ = math.max(maxZ, v.z)
+    end
+
+    return {
+        bottomLeft  = util.vector3(minX, minY, minZ),
+        bottomRight = util.vector3(maxX, minY, minZ),
+        topLeft     = util.vector3(minX, maxY, minZ),
+        topRight    = util.vector3(maxX, maxY, minZ),
+    }
+end
+
+-- onMapMoved is called when the map is placed or moved.
 -- this should move/create all the annotations it owns
-local function onTeleported(data)
+local function onMapMoved(data)
     if data == nil then
         error("onTeleported data is nil")
     end
@@ -56,14 +83,17 @@ local function onTeleported(data)
         error("onTeleported data.position is nil")
     end
     mapData = data
+
+    mapData.bounds = getBounds()
+
     print("onTeleported")
 
-    mapData.player:sendEvent(MOD_NAME .. "onMapMoved", data)
+    mapData.player:sendEvent(MOD_NAME .. "onMapMoved", mapData)
 end
 
 return {
     eventHandlers = {
-        [MOD_NAME .. "onTeleported"] = onTeleported,
+        [MOD_NAME .. "onMapMoved"] = onMapMoved,
     },
     engineHandlers = {
         onActive = onActive,

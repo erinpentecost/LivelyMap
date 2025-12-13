@@ -42,17 +42,9 @@ local function loadMapData()
 
     -- augment maps with object
     -- also turn it into a map instead of array
-    local maps = {}
-    local mapsData = json.decode(handle:read("*all"))
-    for _, v in ipairs(mapsData.Maps) do
-        print("Parsing map: " .. v.ID)
-        maps[tostring(v.ID)] = v
-    end
-    -- now load in height data
-    heightData:reset(mapsData.Heights)
-    print("HEIGHT TEST: " .. tostring(heightData:get("-109,-4")))
-
-    mapData:reset(maps)
+    local fileData = json.decode(handle:read("*all"))
+    mapData:reset(fileData.Maps)
+    heightData:reset(fileData.Heights)
 end
 
 loadMapData()

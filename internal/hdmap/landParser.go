@@ -169,6 +169,23 @@ func (l *LandParser) ParsePlugins() error {
 		}
 	}
 
+	// Put in some padding.
+	l.MapExtents = l.MapExtents.Extend(2, 2)
+	// Make sure the map isn't too thin.
+	l.MapExtents = ensureAspectRatio(l.MapExtents)
+	// If the map is nearly square, make it square.
+	w := l.MapExtents.Width()
+	h := l.MapExtents.Height()
+	if w+5 >= h && w-5 <= h {
+		if w > h {
+			// extend vertically
+			l.MapExtents = l.MapExtents.Extend(w-h, 0)
+		} else if h > w {
+			// extend horizontally
+			l.MapExtents = l.MapExtents.Extend(0, h-w)
+		}
+	}
+
 	// fill in empties
 	nearBottom := float32(l.Heights.Quantile(0.1))
 	fallbackHeights := make([][]float32, 65)
@@ -178,10 +195,13 @@ func (l *LandParser) ParsePlugins() error {
 			fallbackHeights[i][b] = nearBottom
 		}
 	}
-	fmt.Println("Faking records...")
+
+	fmt.Println("Faking cells...")
+	fakeCount := 0
 	for x := l.MapExtents.Left; x <= l.MapExtents.Right; x++ {
 		for y := l.MapExtents.Bottom; y <= l.MapExtents.Top; y++ {
 			if !present[coordKey(x, y)] {
+				fakeCount++
 				l.Lands = append(l.Lands, &ParsedLandRecord{
 					x:       x,
 					y:       y,
@@ -192,6 +212,7 @@ func (l *LandParser) ParsePlugins() error {
 			}
 		}
 	}
+	fmt.Printf("Faked %d cells.\n", fakeCount)
 
 	return nil
 }
@@ -216,6 +237,25 @@ func parseLtex(s *esm.Record) (index uint16, path string, err error) {
 		}
 	}
 	return
+}
+
+func ensureAspectRatio(m MapCoords) MapCoords {
+	w := m.Width()
+	h := m.Height()
+
+	const shortSide = 4
+	const longSide = 10
+
+	if w*shortSide > h*longSide {
+		// Too wide, extend vertically
+		newHeight := max(h, (w*shortSide+2)/longSide) // integer division, round up
+		return m.Extend(newHeight, 0)
+	} else if h*shortSide > w*longSide {
+		// Too tall, extend horizontally
+		newWidth := max(w, (h*shortSide+2)/longSide)
+		return m.Extend(0, newWidth)
+	}
+	return m
 }
 
 // loadPlugins reads in plugins and returns a filtered set of active records.
