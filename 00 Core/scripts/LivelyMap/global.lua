@@ -146,9 +146,10 @@ local function onShowMap(data)
     activeMap.object:teleport(world.getCellById(data.cellID),
         util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
 
-    -- notify everything that cares
+    -- notify the map that it moved.
+    -- the map is responsible for telling the player.
     activeMap.object:sendEvent(MOD_NAME .. "onMapMoved", data)
-    data.player:sendEvent(MOD_NAME .. "onMapMoved", data)
+    --data.player:sendEvent(MOD_NAME .. "onMapMoved", data)
 end
 
 

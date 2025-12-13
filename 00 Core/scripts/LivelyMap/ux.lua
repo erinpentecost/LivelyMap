@@ -192,27 +192,45 @@ end
 
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
-    print("player pos: world(x" .. tostring(pself.position.x) .. ", y" .. tostring(pself.position.y) .. ")" ..
-        ". cell (x" .. tostring(pself.cell.gridX) .. ", y" .. tostring(pself.cell.gridY) .. ")")
+    --[[print("player pos: world(x" .. tostring(pself.position.x) .. ", y" .. tostring(pself.position.y) .. ")" ..
+        ". cell (x" .. tostring(pself.cell.gridX) .. ", y" .. tostring(pself.cell.gridY) .. ")")]]
     -- data is a superset of the map info in maps.json
     currentMapData = data
 end
 
+-- icons is a list of {widget, fn() cellPos}
+local icons = {
+    {
+        widget = compass,
+        pos = function()
+            return mutil.worldPosToCellPos(pself.position)
+        end
+    },
+}
+
+
+
 local function onUpdate(dt)
-    compass.layout.props.visible = false
+    -- todo: optimize
     if currentMapData == nil then
+        for _, icon in ipairs(icons) do
+            icon.widget.layout.props.visible = false
+            icon.widget:update()
+        end
         return
     end
-    local compassPos = cellPosToViewportPosition(mutil.worldPosToCellPos(pself.position))
-    if compassPos == nil then
-        return
+
+    for _, icon in ipairs(icons) do
+        local pos = cellPosToViewportPosition(icon.pos())
+        if pos then
+            icon.widget.layout.props.visible = true
+            icon.widget.layout.props.position = pos
+            icon.widget:update()
+        else
+            icon.widget.layout.props.visible = false
+            icon.widget:update()
+        end
     end
-    --[[if compass.layout.props.position ~= compassPos then
-        print("compass pos x" .. tostring(compassPos.x) .. ", y" .. tostring(compassPos.y) .. "")
-        end]]
-    compass.layout.props.visible = true
-    compass.layout.props.position = compassPos
-    compass:update()
 end
 
 return {
