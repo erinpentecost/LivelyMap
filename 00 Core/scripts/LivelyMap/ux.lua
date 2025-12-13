@@ -129,8 +129,8 @@ local function relativeCellPos(cellPos)
     if cellPos.y < currentMapData.Extents.Bottom or cellPos.y > currentMapData.Extents.Top then
         error("offsetMapPos: x position is outside extents")
     end
-    local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right, 0.0, 1.0)
-    local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top, 0.0, 1.0)
+    local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right + 1, 0.0, 1.0)
+    local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top + 1, 0.0, 1.0)
     return util.vector3(x, y, cellPos.z)
 end
 
@@ -158,19 +158,12 @@ local function relativeCellPosToMapPos(relCellPos)
 
     local maxHeight = heightData:get("MaxHeight")
 
-    -- this isn't right, because the strength of the POM (parallax occlusion mapping)
-    -- effect is diminished at large camera distances from this point.
-    -- but this would actually do the inverse: dropping the icon lower
-    -- as our angle becomes more oblique.
-    --local z         = currentMapData.bounds.bottomRight.z +
-    --    util.remap(relCellPos.z * mutil.CELL_SIZE, 0, maxHeight, 0, pom_depth) - pom_depth
-
 
     return util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
 end
 
 
-local function worldPosToViewportPos(worldPos, screenYOffset)
+local function worldPosToViewportPos(worldPos)
     -- this function works perfectly
     local viewportPos = camera.worldToViewportVector(worldPos)
     local screenSize = ui.screenSize()
@@ -183,11 +176,31 @@ local function worldPosToViewportPos(worldPos, screenYOffset)
 
     if isObjectBehindCamera(worldPos) then return end
 
-    return util.vector2(viewportPos.x, viewportPos.y + screenYOffset)
+    return util.vector2(viewportPos.x, viewportPos.y)
 end
 
+local function computePomDepth()
+    if not currentMapData then
+        error("no current map")
+    end
+    local bl                     = currentMapData.bounds.bottomLeft
+    local br                     = currentMapData.bounds.bottomRight
+    local tl                     = currentMapData.bounds.topLeft
+
+    local worldWidth             = (br - bl):length()
+    local worldHeight            = (tl - bl):length()
+
+    local worldUnitsPerUV        = (worldWidth + worldHeight) * 0.5
+
+    --#define PARALLAX_SCALE_OBJECTS 0.04
+    local PARALLAX_SCALE_OBJECTS = 0.04 -- MUST match shader
+
+    return PARALLAX_SCALE_OBJECTS * worldUnitsPerUV
+end
+
+
 local function realPosToViewportPos(pos)
-    if currentMapData == nil then
+    if not currentMapData then
         error("no current map")
     end
 
@@ -196,32 +209,35 @@ local function realPosToViewportPos(pos)
 
     local mapWorldPos = relativeCellPosToMapPos(rel)
 
-    -- y offset is not accurate at all
-
     local maxHeight = heightData:get("MaxHeight")
-    local heightRatio =
-        1.0 - util.clamp((rel.z * mutil.CELL_SIZE) / maxHeight, 0, 1)
+    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
+    local heightRatio = 1.0 - (height / maxHeight)
 
     local camPos = camera.getPosition()
     local viewDir = (camPos - mapWorldPos):normalize()
 
-    local normal = util.vector3(0, 0, 1)
-    local angleFactor = util.clamp(viewDir:dot(normal), 0, 1)
+    local safeZ = math.max(math.abs(viewDir.z), 0.1)
 
-    local screenYOffset = pom_depth * heightRatio * angleFactor
+    --local calcPomDepth = computePomDepth()
 
+    -- Match shader: (eyeDir.xy / eyeDir.z) * scale
+    local parallaxWorldOffset =
+        util.vector3(
+            viewDir.x / safeZ,
+            viewDir.y / safeZ,
+            0
+        ) * (pom_depth * heightRatio)
+
+    -- Distance fade (optional but recommended)
     local maxPOMDistance = 1000
     local dist = (camPos - mapWorldPos):length()
     local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
-    local screenYOffsetWithFade = screenYOffset * fade
 
-    print("heightRatio: " ..
-        heightRatio ..
-        ", screenYOffset: " ..
-        screenYOffset .. ", angleFactor: " .. angleFactor .. ", screenYOffsetWithFade: " .. screenYOffsetWithFade)
+    parallaxWorldOffset = parallaxWorldOffset * fade
 
-    return worldPosToViewportPos(mapWorldPos, screenYOffsetWithFade)
+    return worldPosToViewportPos(mapWorldPos + parallaxWorldOffset)
 end
+
 
 
 local function onMapMoved(data)

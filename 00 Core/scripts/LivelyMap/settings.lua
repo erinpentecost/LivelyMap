@@ -36,7 +36,7 @@ local function init()
                 key = "pomDepth",
                 name = "pomDepthName",
                 description = "pomDepthDescription",
-                default = 1,
+                default = 30,
                 renderer = "number",
                 argument = {
                     integer = true,
