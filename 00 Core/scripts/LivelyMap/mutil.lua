@@ -23,12 +23,14 @@ local util = require('openmw.util')
 local function getMap(data)
     if type(data) == "string" then
         -- find the full map data
-        data = mapData:asTable()[data]
+        return mapData:asTable()[data]
     elseif type(data) == "number" then
         -- find the full map data
-        data = mapData:asTable()[tostring(data)]
+        return mapData:asTable()[tostring(data)]
+    elseif type(data) == "table" then
+        return mapData:asTable()[tostring(data.ID)]
     end
-    return data
+    error("getMap: unknown type")
 end
 
 local function getClosestMap(x, y)
@@ -60,7 +62,7 @@ local function getScale(map)
     return (extents.Top - extents.Bottom) / 16
 end
 
-local function lerpVec(a, b, t)
+local function lerpVec3(a, b, t)
     return util.vector3(
         a.x + (b.x - a.x) * t,
         a.y + (b.y - a.y) * t,
@@ -68,9 +70,31 @@ local function lerpVec(a, b, t)
     )
 end
 
+local function lerpVec2(a, b, t)
+    return util.vector2(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t
+    )
+end
+
+local CELL_SIZE = 64 * 128 -- 8192
+
+local function worldPosToCellPos(worldPos)
+    if worldPos == nil then
+        error("worldPos is nil")
+    end
+    -- to get actual cell, do the floor after this
+    local cx = worldPos.x / CELL_SIZE
+    local cy = worldPos.y / CELL_SIZE
+
+    return util.vector2(cx, cy)
+end
+
 return {
     getMap = getMap,
     getScale = getScale,
     getClosestMap = getClosestMap,
-    lerpVec = lerpVec,
+    lerpVec3 = lerpVec3,
+    lerpVec2 = lerpVec2,
+    worldPosToCellPos = worldPosToCellPos,
 }

@@ -24,10 +24,13 @@ local compass = ui.create {
     type = ui.TYPE.Image,
     layer = "HUD",
     props = {
-        relativePosition = util.vector2(0.5, 0.5),
+        position = util.vector2(100, 100),
         anchor = util.vector2(0, 0),
+        size = util.vector2(32, 32),
         resource = ui.texture {
-            path = "compass.dds"
+            path = "textures/compass.dds"
         }
     }
 }
+
+return compass

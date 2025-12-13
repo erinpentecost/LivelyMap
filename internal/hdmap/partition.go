@@ -2,31 +2,6 @@ package hdmap
 
 import "errors"
 
-func Partition2(m MapCoords) []SubmapNode {
-	// Step 1: ensure normal aspect ratio
-	m = ensureAspectRatio(m)
-	return Partition(m)
-}
-
-func ensureAspectRatio(m MapCoords) MapCoords {
-	w := m.Width()
-	h := m.Height()
-
-	const shortSide = 4
-	const longSide = 10
-
-	if w*shortSide > h*longSide {
-		// Too wide, extend vertically
-		newHeight := max(h, (w*shortSide+2)/longSide) // integer division, round up
-		return m.Extend(newHeight, 0)
-	} else if h*shortSide > w*longSide {
-		// Too tall, extend horizontally
-		newWidth := max(w, (h*shortSide+2)/longSide)
-		return m.Extend(0, newWidth)
-	}
-	return m
-}
-
 // powerOfTwoInRange returns a power of two p such that a <= p <= b.
 // If no such power of two exists, it returns an error.
 func powerOfTwoInRange(a, b int32) (int32, error) {
@@ -122,10 +97,8 @@ func Partition(m MapCoords) []SubmapNode {
 	partitions := []MapCoords{}
 	for _, square := range findSquares(m) {
 		// If the square is small enough, don't subdivide it.
-		width := 1 + square.Right - square.Left
-		height := 1 + square.Top - square.Bottom
 		// Vvardenfell is 43x42.
-		if width*height <= 43*42 {
+		if square.Width()*square.Height() <= 46*46 {
 			partitions = append(partitions, square)
 			continue
 		}
@@ -159,10 +132,9 @@ func Partition(m MapCoords) []SubmapNode {
 func findSquares(extents ...MapCoords) []MapCoords {
 	out := []MapCoords{}
 	for _, mapExtents := range extents {
-		width := 1 + mapExtents.Right - mapExtents.Left
-		height := 1 + mapExtents.Top - mapExtents.Bottom
+		width := mapExtents.Width()
+		height := mapExtents.Height()
 
-		// the map is not a square!
 		if width < height {
 			// Map is taller than it is wide. Chop into a top square and a bottom square.
 			// The side length of the squares is the full width of the map.

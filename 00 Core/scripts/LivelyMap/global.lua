@@ -140,7 +140,7 @@ local function onShowMap(data)
     end
 
     -- attach the rendered object to the data
-    data.mapObject = activeMap
+    data.object = activeMap.object
 
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
