@@ -20,12 +20,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -- Interact with it via the interface it exposes.
 
 local MOD_NAME = require("scripts.LivelyMap.ns")
-local types = require('openmw.types')
-local json = require('scripts.LivelyMap.json.json')
-local core = require('openmw.core')
-local pself = require("openmw.self")
-local vfs = require('openmw.vfs')
+local types    = require('openmw.types')
+local json     = require('scripts.LivelyMap.json.json')
+local core     = require('openmw.core')
+local pself    = require("openmw.self")
+local vfs      = require('openmw.vfs')
 local aux_util = require('openmw_aux.util')
+local settings = require("scripts.LivelyMap.settings")
+
+settings.init()
 
 local magicPrefix = "!!" .. MOD_NAME .. "!!STARTOFENTRY!!"
 local magicSuffix = "!!" .. MOD_NAME .. "!!ENDOFENTRY!!"

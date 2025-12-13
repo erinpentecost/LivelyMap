@@ -149,7 +149,6 @@ local function onShowMap(data)
     -- notify the map that it moved.
     -- the map is responsible for telling the player.
     activeMap.object:sendEvent(MOD_NAME .. "onMapMoved", data)
-    --data.player:sendEvent(MOD_NAME .. "onMapMoved", data)
 end
 
 
