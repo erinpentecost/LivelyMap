@@ -32,35 +32,11 @@ local heightData     = storage.globalSection(MOD_NAME .. "_heightData")
 
 local currentMapData = nil
 
--- psoDepth is PARALLAX_SCALE_OBJECTS = 0.04
+-- psoDepth determines how much to offset icons on the map.
 local psoDepth       = settings.psoDepth
--- pso is the calculated depth for the current map.
-local pso            = 0
-local function computePomDepth()
-    if not currentMapData then
-        error("no current map")
-    end
-
-    local bl              = currentMapData.bounds.bottomLeft
-    local br              = currentMapData.bounds.bottomRight
-    local tl              = currentMapData.bounds.topLeft
-
-    -- World-space map axes
-    local rightVec        = br - bl
-    local upVec           = tl - bl
-
-    -- Average length for scaling
-    local worldUnitsPerUV = (rightVec:length() + upVec:length()) * 0.5
-
-    --local PARALLAX_SCALE_OBJECTS = 0.04 -- MUST match shader
-    return psoDepth * worldUnitsPerUV
-end
 settings.subscribe(async:callback(function(_, setting)
     if setting == "psoDepth" then
         psoDepth = settings.psoDepth
-        if currentMapData then
-            pso = computePomDepth()
-        end
     end
 end))
 
@@ -154,9 +130,6 @@ local function worldPosToViewportPos(worldPos)
 end
 
 
-
-
-
 local function realPosToViewportPos(pos)
     -- this works ok, but fails when the camera gets too close.
     if not currentMapData then
@@ -176,13 +149,14 @@ local function realPosToViewportPos(pos)
     local heightRatio = 1.0 - (height / maxHeight)
     local camPos = camera.getPosition()
     local viewDir = (camPos - mapWorldPos):normalize()
-    local safeZ = math.max(math.abs(viewDir.z), 0.1)
+    --local safeZ = math.max(math.abs(viewDir.z), 0.1)
+    local safeZ = 1
     local parallaxWorldOffset =
         util.vector3(
             viewDir.x / safeZ,
             viewDir.y / safeZ,
             0
-        ) * (pso * heightRatio)
+        ) * (psoDepth * heightRatio)
     -- POM Distance fade
     local maxPOMDistance = 1000
     local dist = (camPos - mapWorldPos):length()
@@ -198,7 +172,6 @@ end
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data
-    pso = computePomDepth()
 end
 
 -- icons is a list of {widget, fn() worldPos}

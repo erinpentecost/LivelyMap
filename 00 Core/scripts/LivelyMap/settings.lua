@@ -36,12 +36,12 @@ local function init()
                 key = "psoDepth",
                 name = "psoDepthName",
                 description = "psoDepthDescription",
-                default = 0.4,
+                default = 30,
                 renderer = "number",
                 argument = {
-                    integer = false,
+                    integer = true,
                     min = 0,
-                    max = 1,
+                    max = 300,
                 }
             }
         }

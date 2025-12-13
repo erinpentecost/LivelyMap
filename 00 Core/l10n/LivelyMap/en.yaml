@@ -3,5 +3,5 @@ description: "Overworld map replacer."
 
 map: "Map"
 
-psoDepthName: "Parallax Objects Scale"
-psoDepthDescription: "Equivalent to PARALLAX_SCALE_OBJECTS in your POM shader."
+psoDepthName: "Parallax Depth"
+psoDepthDescription: "How deep to offset icons on the world map. Relates to you parallax shader. If the icons on the map seem 'floaty', or not glued to the ground, try adjusting this value."
