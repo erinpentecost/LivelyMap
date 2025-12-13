@@ -74,27 +74,30 @@ local function getBounds()
     }
 end
 
-local CELL_SIZE = 128 * 64     -- 8192
+local CELL_SIZE = 128 * 64 -- 8192
 local function worldToMapMeshTransform(bounds, extents)
-    local CELL_SIZE   = 128 * 64 -- 8192
-
-    -- Compute width/height in world space
+    -- Compute width/height in world space.
+    -- these are the dimensions of the map object.
     local worldWidth  = bounds.bottomRight.x - bounds.bottomLeft.x
     local worldHeight = bounds.topLeft.y - bounds.bottomLeft.y
     local scaleZ      = 1
+    if worldHeight < 0 or worldWidth < 0 then
+        error("negative dimensions: height:" .. tostring(worldHeight) .. ", width:" .. tostring(worldWidth))
+    end
 
     -- Compute width/height in cells
-    local cellWidth   = extents.Right - extents.Left
-    local cellHeight  = extents.Top - extents.Bottom
+    -- extents are inclusive.
+    local cellWidth  = extents.Right - extents.Left + 1
+    local cellHeight = extents.Top - extents.Bottom + 1
 
     -- Compute scale
-    local scaleX      = worldWidth / (cellWidth * CELL_SIZE)
-    local scaleY      = worldHeight / (cellHeight * CELL_SIZE)
+    local scaleX     = worldWidth / (cellWidth * CELL_SIZE)
+    local scaleY     = worldHeight / (cellHeight * CELL_SIZE)
 
     -- Compute translation to align bottom-left of extents to bottom-left of bounds
-    local moveX       = bounds.bottomLeft.x - extents.Left * CELL_SIZE * scaleX
-    local moveY       = bounds.bottomLeft.y - extents.Bottom * CELL_SIZE * scaleY
-    local moveZ       = bounds.bottomLeft.z
+    local moveX      = bounds.bottomLeft.x - extents.Left * CELL_SIZE * scaleX
+    local moveY      = bounds.bottomLeft.y - extents.Bottom * CELL_SIZE * scaleY
+    local moveZ      = bounds.bottomLeft.z
 
     -- Return real util.transform
     return util.transform.identity
