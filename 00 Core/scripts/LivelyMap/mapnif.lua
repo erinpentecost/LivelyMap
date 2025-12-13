@@ -49,6 +49,7 @@ local function onInactive()
 end
 
 local function getBounds()
+    -- this is called on the map object
     local verts = pself:getBoundingBox().vertices
 
     local minX, maxX = verts[1].x, verts[1].x
@@ -73,6 +74,91 @@ local function getBounds()
     }
 end
 
+local CELL_SIZE = 128 * 64 -- 8192
+
+local function worldToMapMeshTransform(bounds)
+    if not mapData then
+        error("currentMapData is nil")
+    end
+    if not mapData.Extents then
+        error("currentMapData.Extents is nil")
+    end
+
+    local e = mapData.Extents
+    local b = bounds
+    local trans = util.transform
+
+    -- Step 1: scale worldPos -> cell coords
+    local scaleToCell = 1 / CELL_SIZE
+
+    -- Step 2: scale cell coords -> relative coords in [0,1] using extents
+    local scaleX = 1 / (e.Right - e.Left)
+    local scaleY = 1 / (e.Top - e.Bottom)
+    local offsetX = -e.Left * scaleX
+    local offsetY = -e.Bottom * scaleY
+
+    -- Step 3: map relative coords [0,1] -> mesh coordinates
+    local meshScaleX = b.bottomRight.x - b.bottomLeft.x
+    local meshScaleY = b.topLeft.y - b.bottomLeft.y
+    local meshOffsetX = b.bottomLeft.x
+    local meshOffsetY = b.bottomLeft.y
+    local meshOffsetZ = b.bottomLeft.z
+
+    -- Combined scale and offset
+    local totalScaleX = meshScaleX * scaleX * scaleToCell
+    local totalScaleY = meshScaleY * scaleY * scaleToCell
+
+    local totalOffsetX = meshOffsetX + meshScaleX * offsetX
+    local totalOffsetY = meshOffsetY + meshScaleY * offsetY
+
+    -- Build the transform
+    local t = trans.identity
+        * trans.scale(totalScaleX, totalScaleY, 1)
+        * trans.move(util.vector3(totalOffsetX, totalOffsetY, meshOffsetZ))
+
+    return t
+end
+
+local function worldToRelativeMapTransform2(bounds)
+    if mapData == nil or mapData.Extents == nil then
+        error("missing map extents")
+    end
+
+    local e          = mapData.Extents
+
+    local mapWidth   = e.Right - e.Left
+    local mapHeight  = e.Top - e.Bottom
+
+    local meshWidth  = bounds.bottomRight.x - bounds.bottomLeft.x
+    local meshHeight = bounds.topLeft.y - bounds.bottomLeft.y
+
+    return
+    -- relative map → mesh quad
+        util.transform.move(bounds.bottomLeft)
+        *
+        util.transform.scale(meshWidth, meshHeight, 1)
+        *
+        -- cell → relative map
+        util.transform.scale(
+            1 / mapWidth,
+            1 / mapHeight,
+            1
+        )
+        *
+        util.transform.move(
+            -e.Left,
+            -e.Bottom,
+            0
+        )
+        *
+        -- world → cell
+        util.transform.scale(
+            1 / CELL_SIZE,
+            1 / CELL_SIZE,
+            1
+        )
+end
+
 -- onMapMoved is called when the map is placed or moved.
 -- this should move/create all the annotations it owns
 local function onMapMoved(data)
@@ -85,6 +171,7 @@ local function onMapMoved(data)
     mapData = data
 
     mapData.bounds = getBounds()
+    mapData.worldToMapMeshTransform = worldToMapMeshTransform(mapData.bounds)
 
     print("onTeleported")
 

@@ -171,15 +171,39 @@ local function worldPosToViewportPos(worldPos)
     ]]
 end
 
-local function cellPosToViewportPosition(cellPos)
-    -- TODO: I need to scale the UI component according to camera distance.
-    -- TODO: also shift it "down" according to the cell height.
+-- TODO: I need to scale the UI component according to camera distance.
+-- TODO: also shift it "down" according to the cell height.
+local function cellPosToViewportPosition(worldPos)
+    local cellPos = mutil.worldPosToCellPos(pself.position)
     local rel = relativeCellPos(cellPos)
 
     local world = relativeCellPosToMapPos(rel)
 
     local screen = worldPosToViewportPos(world)
     return screen
+end
+
+local function realPosToViewportPos(pos)
+    if currentMapData == nil then
+        error("no current map")
+        return
+    end
+    local xformed = currentMapData.worldToMapMeshTransform * pos
+    print("mapspace:" ..
+        aux_util.deepToString(xformed, 3) ..
+        ", worldspace:" ..
+        aux_util.deepToString(pself.pos, 3) ..
+        ", bounds:" ..
+        aux_util.deepToString(currentMapData.bounds, 3) ..
+        ", transform:" .. aux_util.deepToString(currentMapData.worldToMapMeshTransform, 3))
+
+    local expected = cellPosToViewportPosition(pself.position)
+    print("expected mapspace: " ..
+        aux_util.deepToString(expected, 3))
+
+
+    return worldPosToViewportPos(util.vector3(xformed.x, xformed.y, 0))
+    --return expected
 end
 
 -- placeIcon moves the given uxComponent so it appears on the target cell.
@@ -203,7 +227,8 @@ local icons = {
     {
         widget = compass,
         pos = function()
-            return mutil.worldPosToCellPos(pself.position)
+            --return mutil.worldPosToCellPos(pself.position)
+            return pself.position
         end
     },
 }
@@ -211,6 +236,9 @@ local icons = {
 
 
 local function onUpdate(dt)
+    if dt <= 0 then
+        return
+    end
     -- todo: optimize
     if currentMapData == nil then
         for _, icon in ipairs(icons) do
@@ -221,8 +249,12 @@ local function onUpdate(dt)
     end
 
     for _, icon in ipairs(icons) do
-        local pos = cellPosToViewportPosition(icon.pos())
+        --local pos = cellPosToViewportPosition(icon.pos())
+        local pos = realPosToViewportPos(icon.pos())
         if pos then
+            if pos ~= icon.widget.layout.props.position then
+                print(pos)
+            end
             icon.widget.layout.props.visible = true
             icon.widget.layout.props.position = pos
             icon.widget:update()
