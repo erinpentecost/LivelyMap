@@ -75,38 +75,32 @@ local function getBounds()
 end
 
 local CELL_SIZE = 128 * 64 -- 8192
+
+-- Returns a util.transform that maps raw world-space positions to map mesh positions
 local function worldToMapMeshTransform(bounds, extents)
-    -- Compute width/height in world space.
-    -- these are the dimensions of the map object.
+    -- Width and height of map bounds in world units
     local worldWidth  = bounds.bottomRight.x - bounds.bottomLeft.x
     local worldHeight = bounds.topLeft.y - bounds.bottomLeft.y
     local scaleZ      = 1
-    if worldHeight < 0 or worldWidth < 0 then
-        error("negative dimensions: height:" .. tostring(worldHeight) .. ", width:" .. tostring(worldWidth))
-    end
 
-    -- Compute width/height in cells
-    -- extents are inclusive.
-    local cellWidth  = extents.Right - extents.Left + 1
-    local cellHeight = extents.Top - extents.Bottom + 1
+    -- Width and height in cells (inclusive)
+    local cellWidth   = extents.Right - extents.Left + 1
+    local cellHeight  = extents.Top - extents.Bottom + 1
 
-    -- Compute scale
-    local scaleX     = worldWidth / (cellWidth * CELL_SIZE)
-    local scaleY     = worldHeight / (cellHeight * CELL_SIZE)
+    -- Scale factors: world → map mesh
+    local scaleX      = worldWidth / (cellWidth * CELL_SIZE)
+    local scaleY      = worldHeight / (cellHeight * CELL_SIZE)
 
-    -- Compute translation to align bottom-left of extents to bottom-left of bounds
-    local moveX      = bounds.bottomLeft.x - extents.Left * CELL_SIZE * scaleX
-    local moveY      = bounds.bottomLeft.y - extents.Bottom * CELL_SIZE * scaleY
-    local moveZ      = bounds.bottomLeft.z
+    -- Translation: align extents bottom-left with bounds bottom-left
+    local moveX       = bounds.bottomLeft.x - extents.Left * CELL_SIZE * scaleX
+    local moveY       = bounds.bottomLeft.y - extents.Bottom * CELL_SIZE * scaleY
+    local moveZ       = bounds.bottomLeft.z
 
-    -- Return real util.transform
+    -- Compose single transform
     return util.transform.identity
         * util.transform.scale(scaleX, scaleY, scaleZ)
         * util.transform.move(util.vector3(moveX, moveY, moveZ))
 end
-
-
-
 
 
 local function worldToRelativeMapTransform2(bounds)

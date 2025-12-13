@@ -220,6 +220,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	// Save map image info so the Lua mod knows what to do with them:
 	return printMapInfo(
 		filepath.Join(core00DataPath, "maps.json"),
+		parsedLands,
 		mapInfos,
 		allHeights,
 	)
@@ -251,13 +252,15 @@ func renderSky(textureFolder string, colorRenderer CellRenderer, specularRendere
 	return nil
 }
 
-func printMapInfo(path string, maps map[string]SubmapNode, allHeights map[string]float32) error {
+func printMapInfo(path string, parsedLands *LandParser, maps map[string]SubmapNode, allHeights map[string]float32) error {
 	container := struct {
-		Maps    map[string]SubmapNode
-		Heights map[string]float32
+		Maps      map[string]SubmapNode
+		MaxHeight float64
+		Heights   map[string]float32
 	}{
-		Maps:    maps,
-		Heights: allHeights,
+		Maps:      maps,
+		MaxHeight: parsedLands.MaxHeight,
+		Heights:   allHeights,
 	}
 	raw, err := json.Marshal(container)
 	if err != nil {

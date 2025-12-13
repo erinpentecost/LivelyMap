@@ -15,16 +15,18 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME = require("scripts.LivelyMap.ns")
-local mutil    = require("scripts.LivelyMap.mutil")
-local core     = require("openmw.core")
-local util     = require("openmw.util")
-local pself    = require("openmw.self")
-local aux_util = require('openmw_aux.util')
-local camera   = require("openmw.camera")
-local ui       = require("openmw.ui")
-local compass  = require("scripts.LivelyMap.compass")
+local MOD_NAME   = require("scripts.LivelyMap.ns")
+local mutil      = require("scripts.LivelyMap.mutil")
+local core       = require("openmw.core")
+local util       = require("openmw.util")
+local pself      = require("openmw.self")
+local aux_util   = require('openmw_aux.util')
+local camera     = require("openmw.camera")
+local ui         = require("openmw.ui")
+local compass    = require("scripts.LivelyMap.compass")
 
+local storage    = require('openmw.storage')
+local heightData = storage.globalSection(MOD_NAME .. "_heightData")
 
 local function summonMap(id)
     local mapData
@@ -119,7 +121,7 @@ local function relativeCellPos(cellPos)
     end
     local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right, 0.0, 1.0)
     local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top, 0.0, 1.0)
-    return util.vector2(x, y)
+    return util.vector3(x, y, cellPos.z)
 end
 
 -- relativeMapPosToWorldPos turns a relative map position to a 3D world position.
@@ -143,8 +145,42 @@ local function relativeCellPosToMapPos(relCellPos)
     -- interpolate along Y between bottom and top
     local worldPos  = mutil.lerpVec3(bottomPos, topPos, relCellPos.y)
 
-    return worldPos
+    -- TODO: also do Z.
+    -- this is the real-world offset as if the map was truly 3d.
+    -- all I need to do here is convert from cellpos to mesh cell width pos
+    -- and then add bounds.bottomLeft.z to it.
+    -- the problem with this is that it is not scaled by maxheight.
+    -- I should actually be normalizing between 0 and maxheight
+    --[[local mapWidth  = currentMapData.Extents.Right - currentMapData.Extents.Left + 1
+    local meshWidth = currentMapData.bounds.bottomRight.x - currentMapData.bounds.bottomLeft.x
+    local z         = currentMapData.bounds.bottomRight.z + relCellPos.z * meshWidth / mapWidth
+    --]]
+    local maxHeight = heightData:get("MaxHeight")
+
+    local POM_DEPTH = 2
+    local z = currentMapData.bounds.bottomRight.z +
+        util.remap(relCellPos.z * mutil.CELL_SIZE / maxHeight, 0, maxHeight, 0, POM_DEPTH) - POM_DEPTH
+    -- TODO: restore this once I fix the 2d offset problem
+    z = currentMapData.bounds.bottomRight.z
+
+    return util.vector3(worldPos.x, worldPos.y, z)
 end
+
+local function relativeCellPosToMapPosTransform(bounds)
+    -- bounds: {bottomLeft, bottomRight, topLeft, topRight}, axis-aligned
+    local scaleX = bounds.bottomRight.x - bounds.bottomLeft.x
+    local scaleY = bounds.topLeft.y - bounds.bottomLeft.y
+    local scaleZ = 1 -- assume Z is constant along bounds
+    local moveX  = bounds.bottomLeft.x
+    local moveY  = bounds.bottomLeft.y
+    local moveZ  = bounds.bottomLeft.z
+
+    -- Return a util.transform that maps relCellPos (x,y in 0..1) → worldPos
+    return util.transform.identity
+        * util.transform.scale(scaleX, scaleY, scaleZ)
+        * util.transform.move(util.vector3(moveX, moveY, moveZ))
+end
+
 
 
 local function worldPosToViewportPos(worldPos)
@@ -165,9 +201,10 @@ local function worldPosToViewportPos(worldPos)
 end
 
 local function oldWay(worldPos)
-    local cellPos = mutil.worldPosToCellPos(pself.position)
+    local cellPos = mutil.worldPosToCellPos(worldPos)
     local rel = relativeCellPos(cellPos)
 
+    --return relativeCellPosToMapPosTransform(currentMapData.bounds) * rel
     return relativeCellPosToMapPos(rel)
 end
 
@@ -177,22 +214,8 @@ local function realPosToViewportPos(pos)
         return
     end
     -- expected is my current way of getting the correct position.
-    local expected = oldWay(pself.position)
-    -- this is the output that chatgpt is making
-    local xformed = currentMapData.worldToMapMeshTransform * pos
-    print("expected mapspace: " ..
-        aux_util.deepToString(expected, 3) ..
-        ", mapspace:" ..
-        aux_util.deepToString(xformed, 3) ..
-        ", worldspace:" ..
-        aux_util.deepToString(pself.position, 3) ..
-        ", bounds:" ..
-        aux_util.deepToString(currentMapData.bounds, 3) ..
-        ", Extents:" ..
-        aux_util.deepToString(currentMapData.Extents, 3) ..
-        ", transform:" .. aux_util.deepToString(currentMapData.worldToMapMeshTransform, 3))
-
-    --return worldPosToViewportPos(util.vector3(xformed.x, xformed.y, 0))
+    local expected = oldWay(pos)
+    print(expected)
     return worldPosToViewportPos(expected)
 end
 
@@ -204,27 +227,12 @@ local function placeIcon(uxComponent, cellPos)
     end
 end
 
--- TODO: I need to scale the UI component according to camera distance.
--- TODO: also shift it "down" according to the cell height.
-local function cellPosToViewportPosition(worldPos)
-    local cellPos = mutil.worldPosToCellPos(pself.position)
-    local rel = relativeCellPos(cellPos)
-
-    local world = relativeCellPosToMapPos(rel)
-
-    local screen = worldPosToViewportPos(world)
-    return screen
-end
-
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
-    --[[print("player pos: world(x" .. tostring(pself.position.x) .. ", y" .. tostring(pself.position.y) .. ")" ..
-        ". cell (x" .. tostring(pself.cell.gridX) .. ", y" .. tostring(pself.cell.gridY) .. ")")]]
-    -- data is a superset of the map info in maps.json
     currentMapData = data
 end
 
--- icons is a list of {widget, fn() cellPos}
+-- icons is a list of {widget, fn() worldPos}
 local icons = {
     {
         widget = compass,
@@ -234,8 +242,6 @@ local icons = {
         end
     },
 }
-
-
 
 local function onUpdate(dt)
     if dt <= 0 then
