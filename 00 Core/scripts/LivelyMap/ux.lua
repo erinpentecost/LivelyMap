@@ -75,6 +75,27 @@ local function onConsoleCommand(mode, command, selectedObject)
     end
 end
 
+local function isObjectBehindCamera(worldPos)
+    -- this function works perfectly
+    local cameraPos = camera.getPosition()
+    local cameraForward = util.transform.identity
+        * util.transform.rotateZ(camera.getYaw())
+        * util.vector3(0, 1, 0)
+
+    -- Direction vector from camera to object
+    local toObject = worldPos - cameraPos
+
+    -- Normalize both vectors
+    cameraForward = cameraForward:normalize()
+    toObject = toObject:normalize()
+
+    -- Calculate the dot product
+    local dotProduct = cameraForward:dot(toObject)
+
+    -- If the dot product is negative, the object is behind the camera
+    return dotProduct < 0
+end
+
 local currentMapData = nil
 
 -- relativeCellPos return mapPos, but shifted by the current map Extents
@@ -125,30 +146,9 @@ local function relativeCellPosToMapPos(relCellPos)
     return worldPos
 end
 
-local function isObjectBehindCamera(worldPos)
-    -- https://gitlab.com/modding-openmw/s3ctors-s3cret-st4sh/-/blob/master/h3lp_yours3lf/scripts/s3/camHelper.lua
-    local cameraPos = camera.getPosition()
-    local cameraForward = util.transform.identity
-        * util.transform.rotateZ(camera.getYaw())
-        * util.vector3(0, 1, 0)
-
-    -- Direction vector from camera to object
-    local toObject = worldPos - cameraPos
-
-    -- Normalize both vectors
-    cameraForward = cameraForward:normalize()
-    toObject = toObject:normalize()
-
-    -- Calculate the dot product
-    local dotProduct = cameraForward:dot(toObject)
-
-    -- If the dot product is negative, the object is behind the camera
-    return dotProduct < 0
-end
-
 
 local function worldPosToViewportPos(worldPos)
-    -- https://gitlab.com/modding-openmw/s3ctors-s3cret-st4sh/-/blob/master/h3lp_yours3lf/scripts/s3/camHelper.lua
+    -- this function works perfectly
     local viewportPos = camera.worldToViewportVector(worldPos)
     local screenSize = ui.screenSize()
 
@@ -162,13 +162,46 @@ local function worldPosToViewportPos(worldPos)
 
 
     return util.vector2(viewportPos.x, viewportPos.y)
-    --[[
-    local normalizedX = util.remap(viewportPos.x, 0, screenSize.x, 0.0, 1.0)
-    local normalizedY = util.remap(viewportPos.y, 0, screenSize.y, 0.0, 1.0)
+end
 
-    --return util.vector3(normalizedX, normalizedY, viewportPos.z)
-    return util.vector2(normalizedX, normalizedY)
-    ]]
+local function oldWay(worldPos)
+    local cellPos = mutil.worldPosToCellPos(pself.position)
+    local rel = relativeCellPos(cellPos)
+
+    return relativeCellPosToMapPos(rel)
+end
+
+local function realPosToViewportPos(pos)
+    if currentMapData == nil then
+        error("no current map")
+        return
+    end
+    -- expected is my current way of getting the correct position.
+    local expected = oldWay(pself.position)
+    -- this is the output that chatgpt is making
+    local xformed = currentMapData.worldToMapMeshTransform * pos
+    print("expected mapspace: " ..
+        aux_util.deepToString(expected, 3) ..
+        ", mapspace:" ..
+        aux_util.deepToString(xformed, 3) ..
+        ", worldspace:" ..
+        aux_util.deepToString(pself.position, 3) ..
+        ", bounds:" ..
+        aux_util.deepToString(currentMapData.bounds, 3) ..
+        ", Extents:" ..
+        aux_util.deepToString(currentMapData.Extents, 3) ..
+        ", transform:" .. aux_util.deepToString(currentMapData.worldToMapMeshTransform, 3))
+
+    --return worldPosToViewportPos(util.vector3(xformed.x, xformed.y, 0))
+    return worldPosToViewportPos(expected)
+end
+
+-- placeIcon moves the given uxComponent so it appears on the target cell.
+local function placeIcon(uxComponent, cellPos)
+    if currentMapData == nil then
+        error("no current map")
+        return
+    end
 end
 
 -- TODO: I need to scale the UI component according to camera distance.
@@ -181,37 +214,6 @@ local function cellPosToViewportPosition(worldPos)
 
     local screen = worldPosToViewportPos(world)
     return screen
-end
-
-local function realPosToViewportPos(pos)
-    if currentMapData == nil then
-        error("no current map")
-        return
-    end
-    local xformed = currentMapData.worldToMapMeshTransform * pos
-    print("mapspace:" ..
-        aux_util.deepToString(xformed, 3) ..
-        ", worldspace:" ..
-        aux_util.deepToString(pself.pos, 3) ..
-        ", bounds:" ..
-        aux_util.deepToString(currentMapData.bounds, 3) ..
-        ", transform:" .. aux_util.deepToString(currentMapData.worldToMapMeshTransform, 3))
-
-    local expected = cellPosToViewportPosition(pself.position)
-    print("expected mapspace: " ..
-        aux_util.deepToString(expected, 3))
-
-
-    return worldPosToViewportPos(util.vector3(xformed.x, xformed.y, 0))
-    --return expected
-end
-
--- placeIcon moves the given uxComponent so it appears on the target cell.
-local function placeIcon(uxComponent, cellPos)
-    if currentMapData == nil then
-        error("no current map")
-        return
-    end
 end
 
 local function onMapMoved(data)

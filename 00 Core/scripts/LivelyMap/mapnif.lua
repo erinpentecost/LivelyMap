@@ -74,50 +74,37 @@ local function getBounds()
     }
 end
 
-local CELL_SIZE = 128 * 64 -- 8192
+local CELL_SIZE = 128 * 64     -- 8192
+local function worldToMapMeshTransform(bounds, extents)
+    local CELL_SIZE   = 128 * 64 -- 8192
 
-local function worldToMapMeshTransform(bounds)
-    if not mapData then
-        error("currentMapData is nil")
-    end
-    if not mapData.Extents then
-        error("currentMapData.Extents is nil")
-    end
+    -- Compute width/height in world space
+    local worldWidth  = bounds.bottomRight.x - bounds.bottomLeft.x
+    local worldHeight = bounds.topLeft.y - bounds.bottomLeft.y
+    local scaleZ      = 1
 
-    local e = mapData.Extents
-    local b = bounds
-    local trans = util.transform
+    -- Compute width/height in cells
+    local cellWidth   = extents.Right - extents.Left
+    local cellHeight  = extents.Top - extents.Bottom
 
-    -- Step 1: scale worldPos -> cell coords
-    local scaleToCell = 1 / CELL_SIZE
+    -- Compute scale
+    local scaleX      = worldWidth / (cellWidth * CELL_SIZE)
+    local scaleY      = worldHeight / (cellHeight * CELL_SIZE)
 
-    -- Step 2: scale cell coords -> relative coords in [0,1] using extents
-    local scaleX = 1 / (e.Right - e.Left)
-    local scaleY = 1 / (e.Top - e.Bottom)
-    local offsetX = -e.Left * scaleX
-    local offsetY = -e.Bottom * scaleY
+    -- Compute translation to align bottom-left of extents to bottom-left of bounds
+    local moveX       = bounds.bottomLeft.x - extents.Left * CELL_SIZE * scaleX
+    local moveY       = bounds.bottomLeft.y - extents.Bottom * CELL_SIZE * scaleY
+    local moveZ       = bounds.bottomLeft.z
 
-    -- Step 3: map relative coords [0,1] -> mesh coordinates
-    local meshScaleX = b.bottomRight.x - b.bottomLeft.x
-    local meshScaleY = b.topLeft.y - b.bottomLeft.y
-    local meshOffsetX = b.bottomLeft.x
-    local meshOffsetY = b.bottomLeft.y
-    local meshOffsetZ = b.bottomLeft.z
-
-    -- Combined scale and offset
-    local totalScaleX = meshScaleX * scaleX * scaleToCell
-    local totalScaleY = meshScaleY * scaleY * scaleToCell
-
-    local totalOffsetX = meshOffsetX + meshScaleX * offsetX
-    local totalOffsetY = meshOffsetY + meshScaleY * offsetY
-
-    -- Build the transform
-    local t = trans.identity
-        * trans.scale(totalScaleX, totalScaleY, 1)
-        * trans.move(util.vector3(totalOffsetX, totalOffsetY, meshOffsetZ))
-
-    return t
+    -- Return real util.transform
+    return util.transform.identity
+        * util.transform.scale(scaleX, scaleY, scaleZ)
+        * util.transform.move(util.vector3(moveX, moveY, moveZ))
 end
+
+
+
+
 
 local function worldToRelativeMapTransform2(bounds)
     if mapData == nil or mapData.Extents == nil then
@@ -171,7 +158,7 @@ local function onMapMoved(data)
     mapData = data
 
     mapData.bounds = getBounds()
-    mapData.worldToMapMeshTransform = worldToMapMeshTransform(mapData.bounds)
+    mapData.worldToMapMeshTransform = worldToMapMeshTransform(mapData.bounds, mapData.Extents)
 
     print("onTeleported")
 
