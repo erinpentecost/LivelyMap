@@ -20,12 +20,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -- Interact with it via the interface it exposes.
 
 local MOD_NAME = require("scripts.LivelyMap.ns")
-local types = require('openmw.types')
-local json = require('scripts.LivelyMap.json.json')
-local core = require('openmw.core')
-local pself = require("openmw.self")
-local vfs = require('openmw.vfs')
+local types    = require('openmw.types')
+local json     = require('scripts.LivelyMap.json.json')
+local mutil    = require('scripts.LivelyMap.mutil')
+local core     = require('openmw.core')
+local pself    = require("openmw.self")
+local util     = require("openmw.util")
+local vfs      = require('openmw.vfs')
 local aux_util = require('openmw_aux.util')
+local settings = require("scripts.LivelyMap.settings")
+
+settings.init()
 
 local magicPrefix = "!!" .. MOD_NAME .. "!!STARTOFENTRY!!"
 local magicSuffix = "!!" .. MOD_NAME .. "!!ENDOFENTRY!!"
@@ -102,14 +107,6 @@ local function onSave()
     return { json = wrapInMagic(json.encode(fromSave)) }
 end
 
-local function newEntry()
-    return {
-        t = math.ceil(core.getGameTime()),
-        x = pself.cell.isExterior and pself.cell.gridX or nil,
-        y = pself.cell.isExterior and pself.cell.gridY or nil,
-        c = (not pself.cell.isExterior) and pself.cell.id or nil
-    }
-end
 
 local function parseFile(path)
     local handle, err = vfs.open(path)
@@ -164,21 +161,39 @@ local function onLoad(data)
     end
 end
 
+local function newEntry()
+    return {
+        t = math.ceil(core.getGameTime()),
+        x = pself.cell.isExterior and pself.position.x or nil,
+        y = pself.cell.isExterior and pself.position.y or nil,
+        z = pself.cell.isExterior and pself.position.z or nil,
+        c = (not pself.cell.isExterior) and pself.cell.id or nil
+    }
+end
+local entry = nil
 local function addEntry()
-    local entry = newEntry()
-
+    entry = newEntry()
     -- make a new list and add the entry to it
-    if allData[playerName] == nil or #allData[playerName].paths == 0 then
-        mergedData = {
+    if allData[playerName] == nil then
+        allData[playerName] = {
             id = playerName,
             paths = { entry }
         }
         print("Initialized new local storage with entry: " .. aux_util.deepToString(entry, 3))
         return
     end
-    -- otherwise, don't do anything if the cell is the same.
+    if not allData[playerName].paths or #allData[playerName].paths == 0 then
+        allData[playerName].paths = { entry }
+        return
+    end
+    -- otherwise, don't do anything if the interior cell is the same.
     local tail = allData[playerName].paths[#allData[playerName].paths]
-    if tail.c == entry.c and tail.x == entry.x and tail.y == entry.y then
+    if entry.c ~= nil and tail.c == entry.c then
+        return
+    end
+    -- also don't do anything if the distance is too close
+    -- 7456540 is a third of cell length, squared
+    if (util.vector2(entry.x, entry.y) - util.vector2(tail.x, tail.y)):length2() < 7456540 then
         return
     end
     -- ok, now add to the end of the list.
@@ -187,16 +202,10 @@ local function addEntry()
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
 end
 
-local cachedCellId
 local function onUpdate(dt)
     if dt == 0 then
         -- don't do anything if paused.
         return
-    end
-    if pself.cell.id == cachedCellId then
-        return
-    else
-        cachedCellId = pself.cell.id
     end
     addEntry()
 end

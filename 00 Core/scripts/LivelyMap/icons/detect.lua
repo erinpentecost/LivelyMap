@@ -15,22 +15,10 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
+local interfaces = require('openmw.interfaces')
+local ui         = require('openmw.ui')
+local util       = require('openmw.util')
+local pself      = require("openmw.self")
 
-local ui = require('openmw.ui')
-local util = require('openmw.util')
 
-local compass = ui.create {
-    name = "compass",
-    type = ui.TYPE.Image,
-    layer = "HUD",
-    props = {
-        position = util.vector2(100, 100),
-        anchor = util.vector2(0, 0),
-        size = util.vector2(32, 32),
-        resource = ui.texture {
-            path = "textures/compass.dds"
-        }
-    }
-}
-
-return compass
+-- TODO: detect spells go here

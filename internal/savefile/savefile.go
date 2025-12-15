@@ -27,10 +27,12 @@ type SaveData struct {
 type PathEntry struct {
 	// TimeStamp the player entered the cell.
 	TimeStamp uint64 `json:"t,omitempty"`
-	// Xposition is an exterior cell X position.
-	Xposition int64 `json:"x,omitempty"`
-	// Yposition is an exterior cell Y position.
-	Yposition int64 `json:"y,omitempty"`
+	// Xposition is an exterior world X position.
+	Xposition float64 `json:"x,omitempty"`
+	// Yposition is an exterior world Y position.
+	Yposition float64 `json:"y,omitempty"`
+	// Zposition is an exterior world Z position.
+	Zposition float64 `json:"z,omitempty"`
 	// CellID is an interior cell ID.
 	CellID string `json:"c,omitempty"`
 }

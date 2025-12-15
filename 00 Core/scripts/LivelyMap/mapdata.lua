@@ -44,7 +44,10 @@ local function loadMapData()
     -- also turn it into a map instead of array
     local fileData = json.decode(handle:read("*all"))
     mapData:reset(fileData.Maps)
-    heightData:reset(fileData.Heights)
+    heightData:set("MaxHeight", fileData.MaxHeight)
+    if fileData.MaxHeight == nil then
+        error("missing maxheight")
+    end
 end
 
 loadMapData()

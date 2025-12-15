@@ -62,6 +62,7 @@ type LandParser struct {
 	MapExtents   MapCoords
 	Lands        []*ParsedLandRecord
 	LandTextures map[uint16]image.Image
+	MaxHeight    float64
 }
 
 type ParsedLandRecord struct {
@@ -163,7 +164,9 @@ func (l *LandParser) ParsePlugins() error {
 			// calc Z extents
 			for x := range parsed.heights {
 				for y := range parsed.heights[x] {
-					l.Heights.Add(float64(parsed.heights[x][y]), 1)
+					pointHeight := float64(parsed.heights[x][y])
+					l.Heights.Add(pointHeight, 1)
+					l.MaxHeight = max(l.MaxHeight, pointHeight)
 				}
 			}
 		}

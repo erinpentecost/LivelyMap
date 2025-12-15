@@ -84,13 +84,12 @@ local function worldPosToCellPos(worldPos)
         error("worldPos is nil")
     end
     -- to get actual cell, do the floor after this
-    local cx = worldPos.x / CELL_SIZE
-    local cy = worldPos.y / CELL_SIZE
-
-    return util.vector2(cx, cy)
+    return util.vector3(worldPos.x / CELL_SIZE, worldPos.y / CELL_SIZE, worldPos.z / CELL_SIZE)
 end
 
+
 return {
+    CELL_SIZE = CELL_SIZE,
     getMap = getMap,
     getScale = getScale,
     getClosestMap = getClosestMap,

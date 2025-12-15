@@ -5,13 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
-	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
-	"sync"
 
 	"github.com/erinpentecost/LivelyMap/internal/dds"
 	"github.com/erinpentecost/LivelyMap/internal/hdmap/postprocessors"
@@ -36,6 +34,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures")
 	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures")
 	potatoTexturePath := filepath.Join(rootPath, "01 Potato Map", "textures")
+	normalsTexturePath := filepath.Join(rootPath, "02 Normals", "textures")
+	extremeNormalsTexturePath := filepath.Join(rootPath, "02 Extreme Normals", "textures")
 
 	for _, texturePath := range []string{core00TexturePath, detailTexturePath, core00DataPath} {
 		if tdir, err := os.Stat(texturePath); err != nil {
@@ -103,7 +103,6 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 
 	mapInfos := map[string]SubmapNode{}
 	mapJobs := []*mapRenderJob{}
-	heightsMux := sync.Mutex{}
 	allHeights := map[string]float32{}
 	for _, extents := range Partition(parsedLands.MapExtents) {
 		mapInfos[strconv.Itoa(int(extents.ID))] = extents
@@ -116,7 +115,20 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Codec:          dds.Lossless,
 		})
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: core00TexturePath,
+			Directory: normalsTexturePath,
+			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     normalCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				&postprocessors.MinimumEdgeTransparencyProcessor{
+					Minimum: 255,
+				},
+			},
+			Codec: dds.DXT5,
+		})
+		mapJobs = append(mapJobs, &mapRenderJob{
+			Directory: extremeNormalsTexturePath,
 			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     normalCells,
@@ -128,22 +140,6 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 				&postprocessors.MinimumEdgeTransparencyProcessor{
 					Minimum: 255,
 				},
-			},
-			PostFunction: func(img *image.RGBA) error {
-				// We have to get heights from the finished heightmap
-				// since we do postprocessing on real heights.
-				manifest := NewHeightManifest()
-				// ignore heights along the edges.
-				// these are guaranteed to be present in other partitions,
-				// of if on an edge, they are just padding.
-				heights, err := manifest.GetHeights(ctx, extents.Extents.Extend(-2, -2), img)
-				if err != nil {
-					return fmt.Errorf("getheights: %w", err)
-				}
-				heightsMux.Lock()
-				defer heightsMux.Unlock()
-				maps.Copy(allHeights, heights)
-				return nil
 			},
 			Codec: dds.DXT5,
 		})
@@ -163,22 +159,6 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Cells:          classicColorCells,
 			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
 			Codec:          dds.DXT1,
-		})
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: potatoTexturePath,
-			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     normalCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
-				&postprocessors.LocalToneMapAlpha{
-					WindowRadiusDenom: 10,
-				},
-				&postprocessors.MinimumEdgeTransparencyProcessor{
-					Minimum: 255,
-				},
-			},
-			Codec: dds.DXT5,
 		})
 		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory:      potatoTexturePath,
@@ -220,6 +200,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	// Save map image info so the Lua mod knows what to do with them:
 	return printMapInfo(
 		filepath.Join(core00DataPath, "maps.json"),
+		parsedLands,
 		mapInfos,
 		allHeights,
 	)
@@ -251,13 +232,15 @@ func renderSky(textureFolder string, colorRenderer CellRenderer, specularRendere
 	return nil
 }
 
-func printMapInfo(path string, maps map[string]SubmapNode, allHeights map[string]float32) error {
+func printMapInfo(path string, parsedLands *LandParser, maps map[string]SubmapNode, allHeights map[string]float32) error {
 	container := struct {
-		Maps    map[string]SubmapNode
-		Heights map[string]float32
+		Maps      map[string]SubmapNode
+		MaxHeight float64
+		Heights   map[string]float32
 	}{
-		Maps:    maps,
-		Heights: allHeights,
+		Maps:      maps,
+		MaxHeight: parsedLands.MaxHeight,
+		Heights:   allHeights,
 	}
 	raw, err := json.Marshal(container)
 	if err != nil {
