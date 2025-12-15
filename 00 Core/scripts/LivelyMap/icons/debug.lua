@@ -23,7 +23,7 @@ local mutil      = require("scripts.LivelyMap.mutil")
 local nearby     = require('openmw.nearby')
 local settings   = require("scripts.LivelyMap.settings")
 local async      = require("openmw.async")
-local iutil      = require("scripts.LivelyMap.iutil")
+local iutil      = require("scripts.LivelyMap.icons.iutil")
 
 local debugPips  = {}
 
@@ -36,17 +36,7 @@ local function makeDebugPips()
                     y * mutil.CELL_SIZE / 2,
                     100 * mutil.CELL_SIZE
                 )
-                local worldPos = function()
-                    local origin = pself.position + offset
-                    local castResult = nearby.castRay(origin,
-                        util.vector3(origin.x, origin.y, -100 * mutil.CELL_SIZE), {
-                            collisionType = nearby.COLLISION_TYPE.HeightMap + nearby.COLLISION_TYPE.Water
-                        })
-                    if not castResult.hit then
-                        return nil
-                    end
-                    return castResult.hitPos
-                end
+
                 local pip = ui.create {
                     name = "debug_" .. tostring(x) .. "_" .. tostring(y),
                     type = ui.TYPE.Image,
@@ -61,6 +51,17 @@ local function makeDebugPips()
                         }
                     }
                 }
+                local worldPos = function()
+                    local origin = pself.position + offset
+                    local castResult = nearby.castRay(origin,
+                        util.vector3(origin.x, origin.y, -100 * mutil.CELL_SIZE), {
+                            collisionType = nearby.COLLISION_TYPE.HeightMap + nearby.COLLISION_TYPE.Water
+                        })
+                    if not castResult.hit then
+                        return nil
+                    end
+                    return castResult.hitPos
+                end
                 local callbacks = {
                     onDraw = function(pos)
                         pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(pos.mapWorldPos)
