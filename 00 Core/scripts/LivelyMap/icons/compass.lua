@@ -48,13 +48,13 @@ local compassIcon = {
         return pself.position
     end,
     onDraw = function(posData)
-        print("draw compass: " .. aux_util.deepToString(posData, 3))
+        --print("draw compass: " .. aux_util.deepToString(posData, 3))
         compass.layout.props.visible = true
         compass.layout.props.position = posData.viewportPos
         compass:update()
     end,
     onHide = function()
-        print("hide compass")
+        --print("hide compass")
         compass.layout.props.visible = false
         compass:update()
     end,
