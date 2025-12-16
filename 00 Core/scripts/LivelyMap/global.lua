@@ -131,6 +131,7 @@ local function onShowMap(data)
     for k, v in pairs(persist.activeMaps[playerID]) do
         if k ~= data.ID then
             print("Deleting map " .. tostring(v.ID))
+            activeMap.object:sendEvent(MOD_NAME .. "onMapHidden", v)
             v.object:remove()
             table.insert(toDelete, k)
         end

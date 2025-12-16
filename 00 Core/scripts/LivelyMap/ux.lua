@@ -26,9 +26,6 @@ local ui              = require("openmw.ui")
 local settings        = require("scripts.LivelyMap.settings")
 local async           = require("openmw.async")
 
-local compass         = require("scripts.LivelyMap.icons.compass")
-local debugIcons      = require("scripts.LivelyMap.icons.debug")
-
 local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 
@@ -180,23 +177,24 @@ local function realPosToViewportPos(pos)
 end
 
 
-
-
-
 -- icons is a list of {widget, fn() worldPos}
 local icons = {}
+
+local function hideIcon(icon)
+    if icon.onScreen then
+        icon.onScreen = false
+        icon.onHide()
+    end
+end
 
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
         for i = #icons, 1, -1 do
-            local widget = icons[i].widget
-            local pos = icons[i].pos
-            if widget == nil or pos == nil then
+            if icons[i].remove then
                 table.remove(icons, i)
-            elseif widget.layout.props.visible then
-                widget.layout.props.visible = false
-                widget:update()
+            else
+                hideIcon(icons[i])
             end
         end
         return
@@ -204,44 +202,55 @@ local function renderIcons()
 
     -- Render all the icons.
     for i = #icons, 1, -1 do
-        --print("icon: " .. aux_util.deepToString(icons[i], 3))
-        local widget = icons[i].widget
-        local posFn = icons[i].pos
-        if widget == nil or posFn == nil then
+        -- Remove if marked for removal.
+        if icons[i].remove then
             table.remove(icons, i)
             goto continue
         end
-        local iPos = posFn
-        if type(posFn) == "function" then
-            iPos = posFn()
+
+        -- Get world position.
+        local iPos = nil
+        if type(icons[i].pos) == "function" then
+            iPos = icons[i].pos()
+        else
+            iPos = icons[i].pos
         end
+
         if iPos then
             local pos = realPosToViewportPos(iPos)
             if pos.viewportPos then
-                widget.layout.props.visible = true
-                widget.layout.props.position = pos.viewportPos
-                if icons[i].callbacks and icons[i].callbacks.onDraw then
-                    icons[i].callbacks.onDraw(pos)
-                end
-                widget:update()
-            elseif widget.layout.props.visible then
-                widget.layout.props.visible = false
-                widget:update()
+                icons[i].onScreen = true
+                icons[i].onDraw(pos)
+            else
+                hideIcon(icons[i])
             end
-        elseif widget.layout.props.visible then
-            -- now off-screen
-            widget.layout.props.visible = false
-            widget:update()
+        else
+            hideIcon(icons[i])
         end
 
         ::continue::
     end
 end
 
+local onMapMovedHandlers = {}
+local onMapHiddenHandlers = {}
+
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data
+
+    for _, fn in ipairs(onMapMovedHandlers) do
+        fn(currentMapData)
+    end
+
     renderIcons()
+end
+
+local function onMapHidden(data)
+    print("onMapHidden" .. aux_util.deepToString(data, 3))
+    for _, fn in ipairs(onMapHiddenHandlers) do
+        fn(data)
+    end
 end
 
 local lastCameraPos = nil
@@ -315,34 +324,54 @@ local function onConsoleCommand(mode, command, selectedObject)
     end
 end
 
-local function registerIcon(widget, pos, callbacks)
-    if not widget then
-        error("registerIcon data.widget is nil")
+
+local function registerIcon(icon)
+    if not icon then
+        error("registerIcon icon is nil")
     end
-    if not pos then
-        error("registerIcon data.pos is nil")
+    if not icon.pos then
+        error("registerIcon icon.pos is nil: " .. aux_util.deepToString(icon, 3))
     end
-    local ref = {
-        widget = widget,
-        pos = pos,
-        callbacks = callbacks,
-    }
-    setmetatable(ref, { __mode = "v" })
-    table.insert(icons, ref)
+    if not icon.onDraw then
+        error("registerIcon icon.onDraw is nil: " .. aux_util.deepToString(icon, 3))
+    end
+    if not icon.onHide then
+        error("registerIcon icon.onHide is nil: " .. aux_util.deepToString(icon, 3))
+    end
+    table.insert(icons, {
+        -- onScreen exists so we don't call onHide every frame.
+        onScreen = false,
+        -- remove is used to signal deletion
+        remove = false,
+        pos = icon.pos,
+        onDraw = icon.onDraw,
+        onHide = icon.onHide,
+    })
 end
 
 
-registerIcon(unpack(compass))
-
+local function addHandler(fn, list)
+    if type(fn) ~= "function" then
+        error("addHandler fn must be a function, not a " .. type(fn))
+    end
+    table.insert(list, fn)
+end
 
 return {
     interfaceName = MOD_NAME .. "Draw",
     interface = {
         version = 1,
         registerIcon = registerIcon,
+        onMapMoved = function(fn)
+            return addHandler(fn, onMapMovedHandlers)
+        end,
+        onMapHidden = function(fn)
+            return addHandler(fn, onMapHiddenHandlers)
+        end
     },
     eventHandlers = {
         [MOD_NAME .. "onMapMoved"] = onMapMoved,
+        [MOD_NAME .. "onMapHidden"] = onMapHidden,
     },
     engineHandlers = {
         onUpdate = onUpdate,

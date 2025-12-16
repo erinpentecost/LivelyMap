@@ -23,16 +23,37 @@ local types               = require("openmw.types")
 local core                = require("openmw.core")
 local nearby              = require("openmw.nearby")
 local iutil               = require("scripts.LivelyMap.icons.iutil")
+local pool                = require("scripts.LivelyMap.pool.pool")
 
 local detectAnimalId      = core.magic.EFFECT_TYPE.DetectEnchantment
 local detectEnchantmentId = core.magic.EFFECT_TYPE.DetectEnchantment
 local detectKeyId         = core.magic.EFFECT_TYPE.DetectKey
 
+local mapUp               = false
 local detectIcons         = {}
 
-local function makeIcon(tex, name, entity)
-    local pip = ui.create {
-        name = "detect_" .. name,
+
+interfaces.LivelyMapDraw.onMapMoved(function(_)
+    print("map up")
+    mapUp = true
+end)
+
+interfaces.LivelyMapDraw.onMapHidden(function(_)
+    print("map down")
+    mapUp = false
+end)
+
+local function getRecord(entity)
+    return entity.type.records[entity.recordId]
+end
+
+local animalPath = "textures/detect_animal_icon.dds"
+local keyPath = "textures/detect_key_icon.dds"
+local enchantmentPath = "textures/detect_enchantment_icon.dds"
+
+local function newDetectIcon()
+    return ui.create {
+        name = "detect",
         type = ui.TYPE.Image,
         layer = "HUD",
         props = {
@@ -41,9 +62,20 @@ local function makeIcon(tex, name, entity)
             anchor = util.vector2(0.5, 0.5),
             size = util.vector2(32, 32),
             resource = ui.texture {
-                path = tex
+                path = animalPath,
             }
         }
+    }
+end
+
+local iconPool = pool.create(newDetectIcon)
+
+local function makeIcon(path, entity)
+    local name = getRecord(entity).name
+    print("makeIcon: " .. name)
+    local pip = iconPool:obtain()
+    pip.layout.props.resource = ui.texture {
+        path = path,
     }
     local worldPos = function()
         return entity.pos
@@ -62,14 +94,10 @@ local function makeIcon(tex, name, entity)
     interfaces.LivelyMapDraw.registerIcon(unpack(icon))
 end
 
-local function getRecord(entity)
-    return entity.type.records[entity.recordId]
-end
-
 local function drawAnimals(magnitude2)
     for _, actor in ipairs(nearby.actors) do
         if types.Creature.objectIsInstance(actor) and (actor.position - pself.position):length2() <= magnitude2 then
-            makeIcon("textures/detect_animal_icon.dds", actor.record.name, actor)
+            makeIcon(animalPath, actor)
         end
     end
 end
@@ -77,16 +105,16 @@ end
 local function drawItems(enchantmentMagnitude2, keyMagnitude2)
     for _, item in ipairs(nearby.items) do
         if getRecord(item).isKey and (item.position - pself.position):length2() <= keyMagnitude2 then
-            makeIcon("textures/detect_key_icon.dds", getRecord(item).name, item)
+            makeIcon(keyPath, item)
         elseif getRecord(item).enchant and (item.position - pself.position):length2() <= enchantmentMagnitude2 then
-            makeIcon("textures/detect_enchantment_icon.dds", getRecord(item).name, item)
+            makeIcon(enchantmentPath, item)
         end
     end
     for _, container in ipairs(nearby.containers) do
         if (container.position - pself.position):length2() <= keyMagnitude2 then
             for _, item in types.Container(container) do
                 if getRecord(item).isKey then
-                    makeIcon("textures/detect_key_icon.dds", getRecord(item).name, item)
+                    makeIcon(keyPath, item)
                     break
                 end
             end
@@ -94,7 +122,7 @@ local function drawItems(enchantmentMagnitude2, keyMagnitude2)
         if (container.position - pself.position):length2() <= enchantmentMagnitude2 then
             for _, item in types.Container(container) do
                 if getRecord(item) then
-                    makeIcon("textures/detect_enchantment_icon.dds", getRecord(item).name, item)
+                    makeIcon(enchantmentPath, item)
                     break
                 end
             end
@@ -103,6 +131,9 @@ local function drawItems(enchantmentMagnitude2, keyMagnitude2)
 end
 
 local function onUpdate(dt)
+    if not mapUp then
+        return
+    end
     -- get effects we care about
     local animalMagnitude = 0
     local enchantmentMagnitude = 0
@@ -126,13 +157,22 @@ local function onUpdate(dt)
             end
         end
     end
-    -- TODO: use an icon pool or something
     -- delete old icons
+    if detectIcons ~= {} then
+        return
+    end
     for _, icon in ipairs(detectIcons) do
-        icon[1]:destroy()
+        iconPool:free(icon[1])
+        icon[1].layout.props.visible = false
+        icon[2] = nil
     end
     detectIcons = {}
+    --[[print("animalMagnitude:" .. tostring(animalMagnitude) ..
+        ", keyMagnitude:" .. tostring(keyMagnitude) ..
+        ", enchantmentMagnitude:" .. tostring(enchantmentMagnitude)
+        )]]
     -- make new icons
+    animalMagnitude = 300 * 300 -- TODO: remove debug
     if animalMagnitude > 0 then
         drawAnimals(animalMagnitude * animalMagnitude)
     end

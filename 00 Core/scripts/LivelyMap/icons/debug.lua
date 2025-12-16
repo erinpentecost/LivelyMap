@@ -25,7 +25,18 @@ local settings   = require("scripts.LivelyMap.settings")
 local async      = require("openmw.async")
 local iutil      = require("scripts.LivelyMap.icons.iutil")
 
-local debugPips  = {}
+
+local debugEnabled = false
+settings.subscribe(async:callback(function(_, key)
+    if key == "psoUnlock" then
+        debugEnabled = settings.psoUnlock
+    end
+end))
+debugEnabled = settings.psoUnlock
+
+
+
+local debugIcons = {}
 
 local function makeDebugPips()
     for x = -2, 2, 1 do
@@ -52,6 +63,9 @@ local function makeDebugPips()
                     }
                 }
                 local worldPos = function()
+                    if not debugEnabled then
+                        return nil
+                    end
                     local origin = pself.position + offset
                     local castResult = nearby.castRay(origin,
                         util.vector3(origin.x, origin.y, -100 * mutil.CELL_SIZE), {
@@ -62,45 +76,30 @@ local function makeDebugPips()
                     end
                     return castResult.hitPos
                 end
-                local callbacks = {
-                    onDraw = function(pos)
-                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(pos.mapWorldPos)
-                    end
-                }
-                table.insert(debugPips, {
-                    pip,
-                    worldPos,
-                    callbacks
+                table.insert(debugIcons, {
+                    pip = pip,
+                    pos = worldPos,
+                    onDraw = function(posData)
+                        if not debugEnabled then
+                            pip.layout.props.visible = false
+                            return
+                        end
+                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData.mapWorldPos)
+                        pip.layout.props.visible = true
+                        pip.layout.props.position = posData.viewportPos
+                        pip:update()
+                    end,
+                    onHide = function()
+                        pip.layout.props.visible = false
+                        pip:update()
+                    end,
                 })
             end
         end
     end
 end
 
-local function updatePips(enabled)
-    if enabled and interfaces.LivelyMapDraw then
-        print("Debug pips enabled.")
-        makeDebugPips()
-        for _, icon in ipairs(debugPips) do
-            interfaces.LivelyMapDraw.registerIcon(unpack(icon))
-        end
-    else
-        print("Debug pips disabled.")
-        for _, icon in ipairs(debugPips) do
-            icon[1]:destroy()
-            icon[2] = nil
-        end
-        debugPips = {}
-    end
+makeDebugPips()
+for _, icon in ipairs(debugIcons) do
+    interfaces.LivelyMapDraw.registerIcon(icon)
 end
-
-settings.subscribe(async:callback(function(_, key)
-    if key == "psoUnlock" then
-        updatePips(settings.psoUnlock)
-    end
-end))
-
-updatePips(settings.psoUnlock)
-
--- have to return something so it's not garbage collected
-return {}

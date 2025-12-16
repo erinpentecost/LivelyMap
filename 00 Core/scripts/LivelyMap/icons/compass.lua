@@ -19,6 +19,7 @@ local interfaces = require('openmw.interfaces')
 local ui         = require('openmw.ui')
 local util       = require('openmw.util')
 local pself      = require("openmw.self")
+local aux_util   = require('openmw_aux.util')
 
 local compass    = ui.create {
     name = "compass",
@@ -41,8 +42,22 @@ local compass    = ui.create {
     }
 }
 
-local function pos()
-    return pself.position
-end
 
-return { compass, pos }
+local compassIcon = {
+    pos = function()
+        return pself.position
+    end,
+    onDraw = function(posData)
+        print("draw compass: " .. aux_util.deepToString(posData, 3))
+        compass.layout.props.visible = true
+        compass.layout.props.position = posData.viewportPos
+        compass:update()
+    end,
+    onHide = function()
+        print("hide compass")
+        compass.layout.props.visible = false
+        compass:update()
+    end,
+}
+
+interfaces.LivelyMapDraw.registerIcon(compassIcon)
