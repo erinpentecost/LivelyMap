@@ -183,7 +183,7 @@ local icons = {}
 local function hideIcon(icon)
     if icon.onScreen then
         icon.onScreen = false
-        icon.onHide()
+        icon.ref.onHide()
     end
 end
 
@@ -210,17 +210,17 @@ local function renderIcons()
 
         -- Get world position.
         local iPos = nil
-        if type(icons[i].pos) == "function" then
-            iPos = icons[i].pos()
+        if type(icons[i].ref.pos) == "function" then
+            iPos = icons[i].ref.pos()
         else
-            iPos = icons[i].pos
+            iPos = icons[i].ref.pos
         end
 
         if iPos then
             local pos = realPosToViewportPos(iPos)
             if pos.viewportPos then
                 icons[i].onScreen = true
-                icons[i].onDraw(pos)
+                icons[i].ref.onDraw(pos)
             else
                 hideIcon(icons[i])
             end
@@ -343,9 +343,7 @@ local function registerIcon(icon)
         onScreen = false,
         -- remove is used to signal deletion
         remove = false,
-        pos = icon.pos,
-        onDraw = icon.onDraw,
-        onHide = icon.onHide,
+        ref = icon,
     })
 end
 
