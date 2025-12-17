@@ -7,3 +7,6 @@ psoDepthName: "Parallax Depth"
 psoDepthDescription: "How deep to offset icons on the world map. Relates to you parallax shader. If the icons on the map seem 'floaty', or not glued to the ground, try adjusting this value."
 psoPushdownOnlyName: "Parallax Pushdown Only"
 psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
+
+extendDetectRangeName: "Extend Detect Spells"
+extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."

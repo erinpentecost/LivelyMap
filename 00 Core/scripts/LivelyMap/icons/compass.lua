@@ -47,14 +47,17 @@ local compassIcon = {
     pos = function()
         return pself.position
     end,
+    facing = function()
+        return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
+    end,
     onDraw = function(posData)
-        --print("draw compass: " .. aux_util.deepToString(posData, 3))
         compass.layout.props.visible = true
         compass.layout.props.position = posData.viewportPos
+        -- TODO: rotate compass according to facing
+        --print("compass facing: " .. tostring(posData.viewportFacing))
         compass:update()
     end,
     onHide = function()
-        --print("hide compass")
         compass.layout.props.visible = false
         compass:update()
     end,
