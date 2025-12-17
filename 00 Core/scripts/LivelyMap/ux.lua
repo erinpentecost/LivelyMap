@@ -25,7 +25,7 @@ local camera          = require("openmw.camera")
 local ui              = require("openmw.ui")
 local settings        = require("scripts.LivelyMap.settings")
 local async           = require("openmw.async")
-
+local interfaces      = require('openmw.interfaces')
 local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 
@@ -216,6 +216,59 @@ local function hideIcon(icon)
     end
 end
 
+local hoverBox = ui.create {
+    name = 'hoverBox',
+    layer = 'Windows',
+    type = ui.TYPE.Container,
+    template = interfaces.MWUI.templates.boxSolid,
+    props = {
+        --relativePosition = util.vector2(0.5, 0.5),
+        --size = util.vector2(30, 30),
+        --anchor = util.vector2(0.5, 0.5),
+        relativePosition = util.vector2(0.5, 0.9),
+        anchor = util.vector2(0.5, 1),
+        visible = false
+    },
+    content = ui.content { {
+        name = "vflex",
+        type = ui.TYPE.Flex,
+        props = {
+            arrange = ui.ALIGNMENT.Center,
+            horizontal = false,
+        },
+        content = ui.content {},
+    } }
+}
+local function setHoverBoxContent(content)
+    -- delete old items in hovercontent
+    for _, old in ipairs(hoverBox.layout.content["vflex"].content) do
+        if old.destroy then
+            old:destroy()
+        end
+    end
+    local temp = ui.content {}
+
+    if content and #content > 0 then
+        hoverBox.layout.props.visible = true
+
+        for _, c in ipairs(content) do
+            temp:add(c)
+        end
+    else
+        hoverBox.layout.props.visible = false
+    end
+
+    hoverBox.layout.content["vflex"].content = temp
+
+    hoverBox:update()
+end
+
+local function closeToCenter(viewportPos)
+    local screenSize = ui.screenSize()
+    local radius2 = (screenSize / 100):length2()
+    return (viewportPos - (screenSize / 2)):length2() < radius2
+end
+
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
@@ -228,6 +281,9 @@ local function renderIcons()
         end
         return
     end
+
+    -- Track which icons we are hovering over.
+    local hovering = {}
 
     -- Render all the icons.
     for i = #icons, 1, -1 do
@@ -258,6 +314,12 @@ local function renderIcons()
             local pos = realPosToViewportPos(iPos, iFacing)
             if pos.viewportPos then
                 icons[i].onScreen = true
+                -- if the icon is hover-aware, get its info and
+                -- embed the hover status in the pos table.
+                if icons[i].ref.onHover and closeToCenter(pos.viewportPos) then
+                    pos.hovering = true
+                    table.insert(hovering, icons[i].ref.onHover(pos, icons[i].ref))
+                end
                 icons[i].ref.onDraw(pos, icons[i].ref)
             else
                 hideIcon(icons[i])
@@ -268,6 +330,11 @@ local function renderIcons()
 
         ::continue::
     end
+
+    for _, hovInfo in ipairs(hovering) do
+        print("hover: " .. aux_util.deepToString(hovInfo, 3))
+    end
+    setHoverBoxContent(hovering)
 end
 
 local onMapMovedHandlers = {}

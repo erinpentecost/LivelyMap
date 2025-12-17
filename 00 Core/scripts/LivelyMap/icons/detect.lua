@@ -58,6 +58,8 @@ local animalPath = "textures/detect_animal_icon.dds"
 local keyPath = "textures/detect_key_icon.dds"
 local enchantmentPath = "textures/detect_enchantment_icon.dds"
 
+local color = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
+
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path)
     local pip = ui.create {
@@ -96,6 +98,19 @@ local function newDetectIcon(path)
             pip.layout.props.visible = false
             pip:update()
         end,
+        onHover = function(posData, s)
+            return {
+                template = interfaces.MWUI.templates.textHeader,
+                type = ui.TYPE.Text,
+                alignment = ui.ALIGNMENT.End,
+                props = {
+                    textAlignV = ui.ALIGNMENT.Center,
+                    relativePosition = util.vector2(0, 0.5),
+                    text = getRecord(s.entity).name,
+                    textColor = color,
+                },
+            }
+        end
     }
     interfaces.LivelyMapDraw.registerIcon(icon)
     return icon
@@ -254,6 +269,10 @@ local function onUpdate(dt)
             end
         end
     end
+    -- DEBUG!
+    animalMagnitude = 100
+    enchantmentMagnitude = 100
+    keyMagnitude = 100
     -- delete old icons
     freeIcons()
     if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then
