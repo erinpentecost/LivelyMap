@@ -15,15 +15,18 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces          = require('openmw.interfaces')
-local ui                  = require('openmw.ui')
-local util                = require('openmw.util')
-local pself               = require("openmw.self")
-local types               = require("openmw.types")
-local core                = require("openmw.core")
-local nearby              = require("openmw.nearby")
-local iutil               = require("scripts.LivelyMap.icons.iutil")
-local pool                = require("scripts.LivelyMap.pool.pool")
+local interfaces = require('openmw.interfaces')
+local ui         = require('openmw.ui')
+local util       = require('openmw.util')
+local pself      = require("openmw.self")
+local types      = require("openmw.types")
+local core       = require("openmw.core")
+local nearby     = require("openmw.nearby")
+local iutil      = require("scripts.LivelyMap.icons.iutil")
+local pool       = require("scripts.LivelyMap.pool.pool")
+local settings   = require("scripts.LivelyMap.settings")
+local mutil      = require("scripts.LivelyMap.mutil")
+
 
 local detectAnimalId      = core.magic.EFFECT_TYPE.DetectAnimal
 local detectEnchantmentId = core.magic.EFFECT_TYPE.DetectEnchantment
@@ -122,7 +125,14 @@ local function makeIcon(iconPool, entity, pos)
 end
 
 local function magnitudeToSqDist(mag)
-    return mag * mag * 21.33333333 * 21.33333333
+    if settings.extendDetectRange then
+        -- 8192 at 100 mag
+        local v = mag * mutil.CELL_SIZE / 100
+        return v * v
+    else
+        -- 213 at 100 mag
+        return mag * mag * 21.33333333 * 21.33333333
+    end
 end
 
 local function draw(animalMagnitude, enchantmentMagnitude, keyMagnitude)
@@ -246,10 +256,6 @@ local function onUpdate(dt)
     end
     -- delete old icons
     freeIcons()
-    -- DEBUG!
-    animalMagnitude = 1000
-    enchantmentMagnitude = 1000
-    keyMagnitude = 1000
     if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then
         return
     end

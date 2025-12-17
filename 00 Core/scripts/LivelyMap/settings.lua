@@ -57,6 +57,13 @@ local function init()
                 description = "psoUnlockDescription",
                 default = false,
                 renderer = "checkbox",
+            },
+            {
+                key = "extendDetectRange",
+                name = "extendDetectRangeName",
+                description = "extendDetectRangeDescription",
+                default = true,
+                renderer = "checkbox",
             }
         }
     }
