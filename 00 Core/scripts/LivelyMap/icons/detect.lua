@@ -92,7 +92,7 @@ local function newDetectIcon(path)
         end,
         onHide = function(s)
             -- s is this icon.
-            print("hiding " .. getRecord(s.entity).name)
+            --print("hiding " .. getRecord(s.entity).name)
             pip.layout.props.visible = false
             pip:update()
         end,
@@ -112,7 +112,7 @@ local iconPoolKey = pool.create(function()
 end)
 
 local function makeIcon(iconPool, entity, pos)
-    print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))
+    --print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))
     local icon = iconPool:obtain()
     icon.pip.layout.props.visible = true
     icon.pos = function()

@@ -132,7 +132,7 @@ local function worldPosToViewportPos(worldPos)
 end
 
 
-local function realPosToViewportPos(pos)
+local function realPosToViewportPos(pos, facingWorldDir)
     -- this works ok, but fails when the camera gets too close.
     if not currentMapData then
         error("no current map")
@@ -170,9 +170,38 @@ local function realPosToViewportPos(pos)
 
     parallaxWorldOffset = parallaxWorldOffset * fade
 
+    -- Extra calcs if we need facing
+    local viewportFacing = nil
+    if facingWorldDir then
+        local mapNormal =
+            util.vector3(viewDir.x, viewDir.y, 1):normalize()
+
+        local worldNorth = util.vector3(0, 1, 0)
+        local mapForward =
+            worldNorth - mapNormal * worldNorth:dot(mapNormal)
+
+        if mapForward:length() > 0.001 then
+            mapForward = mapForward:normalize()
+            local mapRight = mapForward:cross(mapNormal):normalize()
+
+            local facingOnMap =
+                facingWorldDir - mapNormal * facingWorldDir:dot(mapNormal)
+
+            if facingOnMap:length() > 0.001 then
+                facingOnMap = facingOnMap:normalize()
+
+                local x = facingOnMap:dot(mapRight)
+                local y = facingOnMap:dot(mapForward)
+
+                viewportFacing = util.vector2(x, y)
+            end
+        end
+    end
+
     return {
         viewportPos = worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
         mapWorldPos = mapWorldPos,
+        viewportFacing = viewportFacing,
     }
 end
 
@@ -215,9 +244,18 @@ local function renderIcons()
         else
             iPos = icons[i].ref.pos
         end
+        -- Get optional world facing vector.
+        local iFacing = nil
+        if icons[i].ref.facing then
+            if type(icons[i].ref.facing) == "function" then
+                iFacing = icons[i].ref.facing()
+            else
+                iFacing = icons[i].ref.facing
+            end
+        end
 
         if iPos then
-            local pos = realPosToViewportPos(iPos)
+            local pos = realPosToViewportPos(iPos, iFacing)
             if pos.viewportPos then
                 icons[i].onScreen = true
                 icons[i].ref.onDraw(pos, icons[i].ref)
