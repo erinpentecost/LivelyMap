@@ -25,7 +25,7 @@ local nearby              = require("openmw.nearby")
 local iutil               = require("scripts.LivelyMap.icons.iutil")
 local pool                = require("scripts.LivelyMap.pool.pool")
 
-local detectAnimalId      = core.magic.EFFECT_TYPE.DetectEnchantment
+local detectAnimalId      = core.magic.EFFECT_TYPE.DetectAnimal
 local detectEnchantmentId = core.magic.EFFECT_TYPE.DetectEnchantment
 local detectKeyId         = core.magic.EFFECT_TYPE.DetectKey
 
@@ -46,12 +46,17 @@ local function getRecord(entity)
     return entity.type.records[entity.recordId]
 end
 
+local function isEnchanted(record)
+    return record.enchant ~= nil and record.enchant ~= ""
+end
+
+
 local animalPath = "textures/detect_animal_icon.dds"
 local keyPath = "textures/detect_key_icon.dds"
 local enchantmentPath = "textures/detect_enchantment_icon.dds"
 
 -- creates an unattached icon and registers it.
-local function newDetectIcon()
+local function newDetectIcon(path)
     local pip = ui.create {
         name = "detect",
         type = ui.TYPE.Image,
@@ -62,20 +67,29 @@ local function newDetectIcon()
             anchor = util.vector2(0.5, 0.5),
             size = util.vector2(32, 32),
             resource = ui.texture {
-                path = animalPath,
+                path = path,
             }
         }
     }
     local icon = {
         pip = pip,
+        entity = nil,
+        freed = true,
         pos = function() return nil end,
-        onDraw = function(posData)
-            pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData.mapWorldPos)
-            pip.layout.props.visible = true
-            pip.layout.props.position = posData.viewportPos
+        onDraw = function(posData, s)
+            -- s is this icon.
+            if s.freed then
+                pip.layout.props.visible = false
+            else
+                pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData.mapWorldPos)
+                pip.layout.props.visible = true
+                pip.layout.props.position = posData.viewportPos
+            end
             pip:update()
         end,
-        onHide = function()
+        onHide = function(s)
+            -- s is this icon.
+            print("hiding " .. getRecord(s.entity).name)
             pip.layout.props.visible = false
             pip:update()
         end,
@@ -84,51 +98,90 @@ local function newDetectIcon()
     return icon
 end
 
-local iconPool = pool.create(newDetectIcon)
+local iconPoolAnimal = pool.create(function()
+    return newDetectIcon(animalPath)
+end)
+local iconPoolEnchantment = pool.create(function()
+    return newDetectIcon(enchantmentPath)
+end)
+local iconPoolKey = pool.create(function()
+    return newDetectIcon(keyPath)
+end)
 
-local function makeIcon(path, entity, pos)
-    local name = getRecord(entity).name
+local function makeIcon(iconPool, entity, pos)
+    print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))
     local icon = iconPool:obtain()
     icon.pip.layout.props.visible = true
-    icon.pip.layout.props.resource = ui.texture {
-        path = path,
-    }
     icon.pos = function()
         return pos
     end
-    icon.pip:update()
+    icon.freed = false
+    icon.entity = entity
+    icon.pool = iconPool
     table.insert(detectIcons, icon)
 end
 
-local function drawAnimals(magnitude2)
-    for _, actor in ipairs(nearby.actors) do
-        if types.Creature.objectIsInstance(actor) and (actor.position - pself.position):length2() <= magnitude2 then
-            makeIcon(animalPath, actor, actor.position)
-        end
-    end
+local function magnitudeToSqDist(mag)
+    return mag * mag * 21.33333333 * 21.33333333
 end
 
-local function drawItems(enchantmentMagnitude2, keyMagnitude2)
+local function draw(animalMagnitude, enchantmentMagnitude, keyMagnitude)
+    local animalMagnitude2 = magnitudeToSqDist(animalMagnitude)
+    local enchantmentMagnitude2 = magnitudeToSqDist(enchantmentMagnitude)
+    local keyMagnitude2 = magnitudeToSqDist(keyMagnitude)
+
+    -- Check for loose items first:
     for _, item in ipairs(nearby.items) do
         if getRecord(item).isKey and (item.position - pself.position):length2() <= keyMagnitude2 then
-            makeIcon(keyPath, item, item.position)
-        elseif getRecord(item).enchant and (item.position - pself.position):length2() <= enchantmentMagnitude2 then
-            makeIcon(enchantmentPath, item, item.position)
+            makeIcon(iconPoolKey, item, item.position)
+        elseif isEnchanted(getRecord(item)) and (item.position - pself.position):length2() <= enchantmentMagnitude2 then
+            makeIcon(iconPoolEnchantment, item, item.position)
         end
     end
+
+    -- Check actors...
+    for _, actor in ipairs(nearby.actors) do
+        if actor.id == pself.id then
+            goto continue
+        end
+        -- Draw creatures.
+        if types.Creature.objectIsInstance(actor) and (actor.position - pself.position):length2() <= animalMagnitude2 then
+            makeIcon(iconPoolAnimal, actor, actor.position)
+        end
+        -- Check for items any actor carries
+        if (actor.position - pself.position):length2() <= keyMagnitude2 then
+            for _, item in ipairs(types.Actor.inventory(actor):getAll(types.Miscellaneous)) do
+                if getRecord(item).isKey then
+                    makeIcon(iconPoolKey, item, actor.position)
+                    break
+                end
+            end
+        end
+        if (actor.position - pself.position):length2() <= enchantmentMagnitude2 then
+            for _, item in ipairs(types.Actor.inventory(actor):getAll()) do
+                if isEnchanted(getRecord(item)) then
+                    makeIcon(iconPoolEnchantment, item, actor.position)
+                    break
+                end
+            end
+        end
+        ::continue::
+    end
+
+    -- Check for items in containers
     for _, container in ipairs(nearby.containers) do
         if (container.position - pself.position):length2() <= keyMagnitude2 then
             for _, item in ipairs(types.Container.inventory(container):getAll(types.Miscellaneous)) do
                 if getRecord(item).isKey then
-                    makeIcon(keyPath, item, container.position)
+                    makeIcon(iconPoolKey, item, container.position)
                     break
                 end
             end
         end
         if (container.position - pself.position):length2() <= enchantmentMagnitude2 then
             for _, item in ipairs(types.Container.inventory(container):getAll()) do
-                if getRecord(item) then
-                    makeIcon(enchantmentPath, item, container.position)
+                if isEnchanted(getRecord(item)) then
+                    makeIcon(iconPoolEnchantment, item, container.position)
                     break
                 end
             end
@@ -139,19 +192,35 @@ end
 local function freeIcons()
     for _, icon in ipairs(detectIcons) do
         icon.pos = function()
+            -- returning nil here should result
+            -- in onHide() being called.
             return nil
         end
         icon.pip.layout.props.visible = false
-        icon.pip:update()
-        iconPool:free(icon)
+        icon.freed = true
+        icon.entity = nil
+        icon.pool:free(icon)
     end
     detectIcons = {}
 end
 
+local delay = -5
 local function onUpdate(dt)
+    -- Don't run if the map is not up.
     if not mapUp then
+        -- Make sure we always run on the first frame
+        -- of the map going up.
+        delay = -5
         return
     end
+
+    -- Only run about every second.
+    delay = delay - dt
+    if delay > 0 then
+        return
+    end
+    delay = 1
+
     -- get effects we care about
     local animalMagnitude = 0
     local enchantmentMagnitude = 0
@@ -167,23 +236,25 @@ local function onUpdate(dt)
                     if enchantmentMagnitude < effect.magnitudeThisFrame then
                         enchantmentMagnitude = effect.magnitudeThisFrame
                     end
-                end
-            elseif effect.id == detectKeyId then
-                if keyMagnitude < effect.magnitudeThisFrame then
-                    keyMagnitude = effect.magnitudeThisFrame
+                elseif effect.id == detectKeyId then
+                    if keyMagnitude < effect.magnitudeThisFrame then
+                        keyMagnitude = effect.magnitudeThisFrame
+                    end
                 end
             end
         end
     end
     -- delete old icons
     freeIcons()
+    -- DEBUG!
+    animalMagnitude = 1000
+    enchantmentMagnitude = 1000
+    keyMagnitude = 1000
+    if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then
+        return
+    end
     -- make new icons
-    if animalMagnitude > 0 then
-        drawAnimals(animalMagnitude * animalMagnitude)
-    end
-    if enchantmentMagnitude > 0 or keyMagnitude > 0 then
-        drawItems(enchantmentMagnitude * enchantmentMagnitude, keyMagnitude * keyMagnitude)
-    end
+    draw(animalMagnitude, enchantmentMagnitude, keyMagnitude)
 end
 
 return {

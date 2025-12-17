@@ -183,7 +183,7 @@ local icons = {}
 local function hideIcon(icon)
     if icon.onScreen then
         icon.onScreen = false
-        icon.ref.onHide()
+        icon.ref.onHide(icon.ref)
     end
 end
 
@@ -220,7 +220,7 @@ local function renderIcons()
             local pos = realPosToViewportPos(iPos)
             if pos.viewportPos then
                 icons[i].onScreen = true
-                icons[i].ref.onDraw(pos)
+                icons[i].ref.onDraw(pos, icons[i].ref)
             else
                 hideIcon(icons[i])
             end
