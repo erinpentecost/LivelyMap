@@ -21,6 +21,7 @@ local util         = require('openmw.util')
 local pself        = require("openmw.self")
 local aux_util     = require('openmw_aux.util')
 local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
+local iutil        = require("scripts.LivelyMap.icons.iutil")
 
 -- "/home/ern/workspace/LivelyMap/cmd/h3/make_atlas.sh" -i  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow.png" -o "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow_atlas.dds" -r 20 -c 18
 local compassAtlas = imageAtlas.constructAtlas({
@@ -60,11 +61,13 @@ local compassIcon = {
             return
         end
 
+        compassAtlas:getElement().layout.props.size = util.vector2(50, 50) * iutil.distanceScale(posData.mapWorldPos)
+
         local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)
 
         -- Convert to degrees, where 0° = East, 90° = North.
         local deg = adjustedYaw(angle)
-        print(deg .. " - " .. tostring(posData.viewportFacing))
+        --print(deg .. " - " .. tostring(posData.viewportFacing))
 
         compassAtlas:setTile(deg)
         compassAtlas:getElement():update()

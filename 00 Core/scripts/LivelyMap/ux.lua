@@ -173,21 +173,13 @@ local function realPosToViewportPos(pos, facingWorldDir)
     -- Extra calcs if we need facing
     local viewportFacing = nil
     if facingWorldDir then
-        print("facingWorldDir: " .. tostring(facingWorldDir))
+        --print("facingWorldDir: " .. tostring(facingWorldDir))
         facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
-        local cellFacing = mutil.worldPosToCellPos(pos + facingWorldDir)
-        local relFacing = relativeCellPos(cellFacing)
+        local relFacing = relativeCellPos(mutil.worldPosToCellPos(pos + facingWorldDir))
 
         local mapWorldFacingPos = relativeCellPosToMapPos(relFacing)
-        print("rel: " ..
-            tostring(rel) ..
-            " relFacing: " .. tostring(relFacing))
         local s0 = worldPosToViewportPos(mapWorldPos)
         local s1 = worldPosToViewportPos(mapWorldFacingPos)
-        print("s0: " ..
-            tostring(s0) ..
-            " s1: " .. tostring(s1))
-
         if s0 and s1 then
             viewportFacing = (s1 - s0):normalize()
         end
