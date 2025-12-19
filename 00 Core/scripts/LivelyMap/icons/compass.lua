@@ -35,27 +35,6 @@ compassAtlas:spawn({
     anchor = util.vector2(0.5, 0.5),
 })
 
---[[local compass = ui.create {
-    name = "compass",
-    type = ui.TYPE.Image,
-    layer = "HUD",
-    icon = {
-        worldPos = function()
-            return pself.position
-        end,
-        defaultSize = util.vector2(32, 32),
-    },
-    props = {
-        visible = false,
-        position = util.vector2(100, 100),
-        anchor = util.vector2(0.5, 0.5),
-        size = util.vector2(32, 32),
-        resource = ui.texture {
-            path = "textures/compass.dds"
-        }
-    }
-    }]]
-
 local function adjustedYaw(deg)
     local yaw = math.deg(deg)
 
@@ -74,10 +53,14 @@ local compassIcon = {
     onDraw = function(posData)
         compassAtlas:getElement().layout.props.visible = true
         compassAtlas:getElement().layout.props.position = posData.viewportPos
-        -- TODO: rotate compass according to facing
-        --print("compass facing: " .. tostring(posData.viewportFacing))
 
-        local angle = math.atan2(posData.viewportFacing.x, posData.viewportFacing.y)
+        if not posData.viewportFacing then
+            compassAtlas:getElement().layout.props.visible = false
+            compassAtlas:getElement():update()
+            return
+        end
+
+        local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)
 
         -- Convert to degrees, where 0° = East, 90° = North.
         local deg = adjustedYaw(angle)
