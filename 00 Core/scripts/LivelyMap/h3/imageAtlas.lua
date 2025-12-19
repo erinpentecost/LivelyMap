@@ -1,3 +1,5 @@
+-- Modified from the original
+
 local ui = require 'openmw.ui'
 local util = require 'openmw.util'
 
@@ -54,6 +56,17 @@ function ImageAtlas:cycleFrame(nextOrPrev)
     props.resource = self.textureArray[currentTile]
 
     element:update()
+end
+
+function ImageAtlas:setTile(idx)
+    assert(idx >= 1 and idx <= self.totalTiles,
+        ("Invalid tile index %d (valid: 1–%d)"):format(idx, self.totalTiles))
+
+    local element = self.element
+    assert(element)
+    local props = element.layout.props
+    self.currentTile = idx
+    props.resource = self.textureArray[idx]
 end
 
 ---@class AtlasSpawnerData
@@ -121,14 +134,12 @@ local function constructAtlas(atlasData)
             offset = copy:getCoordinates(i),
             size = copy.tileSize,
         }
+        print(tostring(i) .. ": " .. tostring(copy:getCoordinates(i)))
     end
 
     return copy
 end
 
 return {
-    interfaceName = 'S3AtlasConstructor',
-    interface = {
-        constructAtlas = constructAtlas,
-    },
+    constructAtlas = constructAtlas,
 }

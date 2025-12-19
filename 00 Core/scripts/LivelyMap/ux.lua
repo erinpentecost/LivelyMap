@@ -173,30 +173,28 @@ local function realPosToViewportPos(pos, facingWorldDir)
     -- Extra calcs if we need facing
     local viewportFacing = nil
     if facingWorldDir then
-        local mapNormal =
-            util.vector3(viewDir.x, viewDir.y, 1):normalize()
+        -- Flatten to map plane
+        local v = util.vector3(
+            facingWorldDir.x,
+            facingWorldDir.y,
+            0
+        )
 
-        local worldNorth = util.vector3(0, 1, 0)
-        local mapForward =
-            worldNorth - mapNormal * worldNorth:dot(mapNormal)
+        if v:length() > 0.001 then
+            v                = v:normalize()
 
-        if mapForward:length() > 0.001 then
-            mapForward = mapForward:normalize()
-            local mapRight = mapForward:cross(mapNormal):normalize()
+            -- Fixed map-space axes
+            local mapRight   = util.vector3(1, 0, 0)
+            local mapForward = util.vector3(0, 1, 0)
 
-            local facingOnMap =
-                facingWorldDir - mapNormal * facingWorldDir:dot(mapNormal)
+            local x          = v:dot(mapRight)
+            local y          = v:dot(mapForward)
 
-            if facingOnMap:length() > 0.001 then
-                facingOnMap = facingOnMap:normalize()
-
-                local x = facingOnMap:dot(mapRight)
-                local y = facingOnMap:dot(mapForward)
-
-                viewportFacing = util.vector2(x, y)
-            end
+            viewportFacing   = util.vector2(x, y)
         end
     end
+
+
 
     return {
         viewportPos = worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
@@ -331,9 +329,9 @@ local function renderIcons()
         ::continue::
     end
 
-    for _, hovInfo in ipairs(hovering) do
+    --[[for _, hovInfo in ipairs(hovering) do
         print("hover: " .. aux_util.deepToString(hovInfo, 3))
-    end
+        end]]
     setHoverBoxContent(hovering)
 end
 
