@@ -88,16 +88,8 @@ local function onShowMap(data)
     if not data then
         error("onShowMap has nil data parameter.")
     end
-    if not data.ID then
-        error("onShowMap data parameter has nil ID field.")
-        return
-    end
     if not data.cellID then
         error("onShowMap data parameter has nil cellID field.")
-        return
-    end
-    if not data.position then
-        error("onShowMap data parameter has nil position field.")
         return
     end
     if not data.player then
@@ -107,6 +99,22 @@ local function onShowMap(data)
     if type(data.player) == "string" then
         error("onShowMap data parameter has a string player field.")
         return
+    end
+
+    if (not data.ID) and (not data.position) then
+        -- One of these two are required.
+        -- position is world position.
+        -- ID is the map ID in maps.json.
+        error("onShowMap data parameter has nil ID and nil position field.")
+        return
+    end
+    -- Find ID or startWorldPosition based on the other one.
+    if data.startWorldPosition then
+        local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
+        data.ID = mutil.getClosestMap(math.floor(cellPos.x), math.floor(cellPos.y))
+    else
+        local mapdata = mutil.getMap(data)
+        data.startWorldPosition = util.vector3(mapdata.CenterX * mutil.CELL_SIZE, mapdata.CenterY * mutil.CELL_SIZE, 0)
     end
 
     local playerID = data.player.id
@@ -149,7 +157,8 @@ local function onShowMap(data)
 
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
-        util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
+        util.vector3(data.player.position.x, data.player.position.y, data.player.position.z + 5 * mutil.CELL_SIZE),
+        data.transform)
 
     -- notify the map that it moved.
     -- the map is responsible for telling the player.

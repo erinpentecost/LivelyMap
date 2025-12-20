@@ -95,9 +95,7 @@ local function onMapMoved(data)
     if data == nil then
         error("onTeleported data is nil")
     end
-    if data.position == nil then
-        error("onTeleported data.position is nil")
-    end
+
     mapData = data
 
     mapData.bounds = getBounds()

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 local MOD_NAME        = require("scripts.LivelyMap.ns")
 local mutil           = require("scripts.LivelyMap.mutil")
+local putil           = require("scripts.LivelyMap.putil")
 local core            = require("openmw.core")
 local util            = require("openmw.util")
 local pself           = require("openmw.self")
@@ -76,13 +77,18 @@ local function startCamera()
     controls.overrideUiControls(true)
     uiInterface.setHudVisibility(false)
     clearControls()
-    cameraState = {
-        pitch = camera.getPitch(),
-        yaw = camera.getYaw(),
-        roll = camera.getRoll(),
-        position = camera.getPosition(),
-        mode = camera.getMode()
-    }
+    if cameraState == nil then
+        -- Don't override the old state.
+        -- this might be called multiple times before
+        -- endCamera() is called.
+        cameraState = {
+            pitch = camera.getPitch(),
+            yaw = camera.getYaw(),
+            roll = camera.getRoll(),
+            position = camera.getPosition(),
+            mode = camera.getMode()
+        }
+    end
     camera.setMode(camera.MODE.Static, true)
 end
 
@@ -135,7 +141,15 @@ end
 local function onMapMoved(data)
     print("controls.onMapMoved")
     startCamera()
-    -- TODO: move camera into starting position
+    -- Move camera into starting position
+    local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
+    local rel = putil.relativeCellPos(data, cellPos)
+    local mapWorldPos = putil.relativeCellPosToMapPos(data, rel)
+
+    --local mapObj = data.object.position
+    camera.setStaticPosition(mapWorldPos + util.vector3(0, 0, 200))
+    camera.setPitch(1)
+    camera.setYaw(0)
 end
 
 local function onMapHidden(data)

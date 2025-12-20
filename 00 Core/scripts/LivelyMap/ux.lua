@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 local MOD_NAME        = require("scripts.LivelyMap.ns")
 local mutil           = require("scripts.LivelyMap.mutil")
+local putil           = require("scripts.LivelyMap.putil")
 local core            = require("openmw.core")
 local util            = require("openmw.util")
 local pself           = require("openmw.self")
@@ -65,54 +66,7 @@ local function isObjectBehindCamera(worldPos)
     return dotProduct < 0
 end
 
--- relativeCellPos return mapPos, but shifted by the current map Extents
--- so the bottom left becomes 0,0 and top right becomes 1,1.
-local function relativeCellPos(cellPos)
-    if currentMapData == nil then
-        error("missing mapObject")
-        return
-    end
-    if cellPos == nil then
-        error("mapPos is nil")
-    end
-    if currentMapData.Extents == nil then
-        error("mapPos.Extents is nil")
-    end
-    if cellPos.x < currentMapData.Extents.Left or cellPos.x > currentMapData.Extents.Right then
-        error("offsetMapPos: x position is outside extents")
-    end
-    if cellPos.y < currentMapData.Extents.Bottom or cellPos.y > currentMapData.Extents.Top then
-        error("offsetMapPos: x position is outside extents")
-    end
-    local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right + 1, 0.0, 1.0)
-    local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top + 1, 0.0, 1.0)
-    return util.vector3(x, y, cellPos.z)
-end
 
--- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
--- which is the position on the map mesh.
-local function relativeCellPosToMapPos(relCellPos)
-    if currentMapData == nil then
-        error("no current map")
-    end
-    if currentMapData.object == nil then
-        error("missing object")
-    end
-    if relCellPos == nil then
-        error("relCellPos is nil")
-    end
-    if currentMapData.bounds == nil then
-        error("currentMapData.bounds is nil")
-    end
-    -- interpolate along X at bottom and top edges
-    local bottomPos = mutil.lerpVec3(currentMapData.bounds.bottomLeft, currentMapData.bounds.bottomRight, relCellPos.x)
-    local topPos    = mutil.lerpVec3(currentMapData.bounds.topLeft, currentMapData.bounds.topRight, relCellPos.x)
-
-    -- interpolate along Y between bottom and top
-    local worldPos  = mutil.lerpVec3(bottomPos, topPos, relCellPos.y)
-
-    return util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
-end
 
 
 local function worldPosToViewportPos(worldPos)
@@ -139,9 +93,9 @@ local function realPosToViewportPos(pos, facingWorldDir)
     end
 
     local cellPos = mutil.worldPosToCellPos(pos)
-    local rel = relativeCellPos(cellPos)
+    local rel = putil.relativeCellPos(currentMapData, cellPos)
 
-    local mapWorldPos = relativeCellPosToMapPos(rel)
+    local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
 
     -- POM: Calculate vertical offset so the icon appears glued
     -- to the surface of the map, which has been distorted according
@@ -175,9 +129,9 @@ local function realPosToViewportPos(pos, facingWorldDir)
     if facingWorldDir then
         --print("facingWorldDir: " .. tostring(facingWorldDir))
         facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
-        local relFacing = relativeCellPos(mutil.worldPosToCellPos(pos + facingWorldDir))
+        local relFacing = putil.relativeCellPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
 
-        local mapWorldFacingPos = relativeCellPosToMapPos(relFacing)
+        local mapWorldFacingPos = putil.relativeCellPosToMapPos(currentMapData, relFacing)
         local s0 = worldPosToViewportPos(mapWorldPos)
         local s1 = worldPosToViewportPos(mapWorldFacingPos)
         if s0 and s1 then
@@ -378,7 +332,7 @@ local function summonMap(id)
 
     mapData.cellID = pself.cell.id
     mapData.player = pself
-    mapData.position = {
+    mapData.startWorldPosition = {
         x = pself.position.x,
         y = pself.position.y,
         z = pself.position.z,
