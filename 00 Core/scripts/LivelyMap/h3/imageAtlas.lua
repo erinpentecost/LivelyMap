@@ -134,7 +134,6 @@ local function constructAtlas(atlasData)
             offset = copy:getCoordinates(i),
             size = copy.tileSize,
         }
-        print(tostring(i) .. ": " .. tostring(copy:getCoordinates(i)))
     end
 
     return copy

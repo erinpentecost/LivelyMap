@@ -2,6 +2,7 @@ GLOBAL: scripts/LivelyMap/mapdata.lua
 GLOBAL: scripts/LivelyMap/global.lua
 PLAYER: scripts/LivelyMap/player.lua
 PLAYER: scripts/LivelyMap/ux.lua
+PLAYER: scripts/LivelyMap/controls.lua
 CUSTOM: scripts/LivelyMap/mapnif.lua
 
 PLAYER: scripts/LivelyMap/icons/compass.lua

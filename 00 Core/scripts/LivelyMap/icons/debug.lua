@@ -84,7 +84,7 @@ local function makeDebugPips()
                             pip.layout.props.visible = false
                             return
                         end
-                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData.mapWorldPos)
+                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData)
                         pip.layout.props.visible = true
                         pip.layout.props.position = posData.viewportPos
                         pip:update()

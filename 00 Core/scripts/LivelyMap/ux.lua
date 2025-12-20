@@ -254,6 +254,9 @@ end
 local function closeToCenter(viewportPos)
     local screenSize = ui.screenSize()
     local radius2 = (screenSize / 100):length2()
+    if radius2 < 32 * 32 then
+        radius2 = 32 * 32
+    end
     return (viewportPos - (screenSize / 2)):length2() < radius2
 end
 
@@ -319,9 +322,6 @@ local function renderIcons()
         ::continue::
     end
 
-    --[[for _, hovInfo in ipairs(hovering) do
-        print("hover: " .. aux_util.deepToString(hovInfo, 3))
-        end]]
     setHoverBoxContent(hovering)
 end
 

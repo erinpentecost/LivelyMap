@@ -23,6 +23,8 @@ local aux_util     = require('openmw_aux.util')
 local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
 local iutil        = require("scripts.LivelyMap.icons.iutil")
 
+local color        = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
+
 -- "/home/ern/workspace/LivelyMap/cmd/h3/make_atlas.sh" -i  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow.png" -o "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow_atlas.dds" -r 20 -c 18
 local compassAtlas = imageAtlas.constructAtlas({
     totalTiles = 360,
@@ -34,7 +36,10 @@ local compassAtlas = imageAtlas.constructAtlas({
 compassAtlas:spawn({
     layer = "HUD",
     anchor = util.vector2(0.5, 0.5),
+    color = color,
 })
+
+local baseSize = util.vector2(50, 50)
 
 local function adjustedYaw(deg)
     local yaw = math.deg(deg)
@@ -61,7 +66,7 @@ local compassIcon = {
             return
         end
 
-        compassAtlas:getElement().layout.props.size = util.vector2(50, 50) * iutil.distanceScale(posData.mapWorldPos)
+        compassAtlas:getElement().layout.props.size = baseSize * iutil.distanceScale(posData)
 
         local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)
 
