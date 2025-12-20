@@ -68,6 +68,8 @@ local function clearControls()
     pself.controls.run = false
 end
 
+local currentMapData = nil
+
 -- Store old camera state so we can reset to that same state
 -- once we exit the map.
 local cameraState = nil
@@ -120,7 +122,13 @@ local function trackPosition(worldPos, time)
     trackInfo.startPos = camera.getPosition()
     trackInfo.endPos = worldPos
     trackInfo.startTime = core.getRealTime()
+    time = time or 0
     trackInfo.endTime = trackInfo.startTime + time
+
+
+    local cellPos = mutil.worldPosToCellPos(worldPos)
+    local rel = putil.relativeCellPos(currentMapData, cellPos)
+    local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
 end
 
 local function onFrame(dt)
@@ -140,21 +148,25 @@ end
 
 local function onMapMoved(data)
     print("controls.onMapMoved")
-    startCamera()
-    -- Move camera into starting position
-    local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
-    local rel = putil.relativeCellPos(data, cellPos)
-    local mapWorldPos = putil.relativeCellPosToMapPos(data, rel)
-
-    --local mapObj = data.object.position
-    camera.setStaticPosition(mapWorldPos + util.vector3(0, 0, 200))
-    camera.setPitch(1)
-    camera.setYaw(0)
+    currentMapData = data
+    -- If this is not a swap, then this is a brand new map session.
+    if not data.swapped then
+        startCamera()
+        camera.setStaticPosition(data.object:getBoundingBox().center + util.vector3(0, 0, 200))
+        camera.setPitch(1)
+        camera.setYaw(0)
+        -- finish moving to the first spot
+        trackPosition(data.startWorldPosition)
+    end
 end
 
 local function onMapHidden(data)
     print("controls.onMapHidden")
-    endCamera()
+    currentMapData = nil
+    -- If it's not a swap, it means we are done looking at the map.
+    if not data.swapped then
+        endCamera()
+    end
 end
 
 return {

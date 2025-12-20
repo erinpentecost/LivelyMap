@@ -84,6 +84,20 @@ local function start(data)
     end
 end
 
+local function shallowMerge(data, ...)
+    local copy = {}
+    for k, v in pairs(data) do
+        copy[k] = v
+    end
+    local arg = { ... }
+    for _, extraData in ipairs(arg) do
+        for k, v in pairs(extraData) do
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
 local function onShowMap(data)
     if not data then
         error("onShowMap has nil data parameter.")
@@ -139,11 +153,17 @@ local function onShowMap(data)
     end
 
     -- we should only show one map per player, so clean up everything else
+    local swapped = false
     local toDelete = {}
     for k, v in pairs(persist.activeMaps[playerID]) do
         if k ~= data.ID then
+            swapped = true
             print("Deleting map " .. tostring(v.ID))
-            v.player:sendEvent(MOD_NAME .. "onMapHidden", v)
+            -- swapped means the map is being replaced with a different one.
+            v.player:sendEvent(MOD_NAME .. "onMapHidden",
+                shallowMerge(v, {
+                    swapped = swapped
+                }))
             v.object:remove()
             table.insert(toDelete, k)
         end
@@ -162,7 +182,8 @@ local function onShowMap(data)
 
     -- notify the map that it moved.
     -- the map is responsible for telling the player.
-    activeMap.object:sendEvent(MOD_NAME .. "onMapMoved", data)
+    activeMap.object:sendEvent(MOD_NAME .. "onMapMoved",
+        shallowMerge(data, { swapped = swapped }))
 end
 
 local function onHideMap(data)
@@ -182,7 +203,8 @@ local function onHideMap(data)
     local toDelete = {}
     for k, v in pairs(persist.activeMaps[playerID]) do
         print("Deleting map " .. tostring(v.ID) .. ": " .. aux_util.deepToString(v, 3))
-        v.player:sendEvent(MOD_NAME .. "onMapHidden", v)
+        v.player:sendEvent(MOD_NAME .. "onMapHidden",
+            shallowMerge(v, { swapped = false }))
         v.object:remove()
         table.insert(toDelete, k)
     end
