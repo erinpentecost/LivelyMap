@@ -34,7 +34,7 @@ local compassAtlas = imageAtlas.constructAtlas({
     create = true,
 })
 compassAtlas:spawn({
-    layer = "HUD",
+    layer = iutil.layer,
     anchor = util.vector2(0.5, 0.5),
     color = color,
 })

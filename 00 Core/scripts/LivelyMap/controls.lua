@@ -127,7 +127,8 @@ local function moveCamera(data)
         camera.setYaw(data.yaw)
     end
     if data.position or data.relativePosition then
-        camera.setStaticPosition(data.position or (camera.getPosition() + data.relativePosition))
+        local pos = data.position or (camera.getPosition() + data.relativePosition)
+        camera.setStaticPosition(pos)
     end
 end
 
@@ -203,6 +204,10 @@ local vecLeft = vecRight * -1
 local moveSpeed = 100
 
 local function onFrame(dt)
+    -- Fake a duration if we're paused.
+    if dt <= 0 then
+        dt = 1 / 60
+    end
     -- Only track inputs while the map is up.
     if not cameraState then
         return
@@ -258,18 +263,18 @@ local function onMapMoved(data)
     if not data.swapped then
         -- Orient the camera so starting position is in the center.
         startCamera()
-        camera.setPitch(defaultPitch)
         camera.setYaw(0)
         local mapCenter = data.object:getBoundingBox().center
         local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
         local rel = putil.relativeCellPos(currentMapData, cellPos)
         local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
         local heightOffset = util.vector3(0, 0, defaultHeight)
-        local camOffset = cameraOffset(mapCenter + heightOffset, 1, util.vector3(0, 1, 0))
-        --[[print("camOffset: " .. tostring(camOffset))
-        print("mapWorldPos: " .. tostring(mapWorldPos))
-        print("mapCenter: " .. tostring(mapCenter))]]
-        camera.setStaticPosition(mapWorldPos + camOffset + heightOffset)
+        local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
+
+        moveCamera({
+            pitch = defaultPitch,
+            position = mapWorldPos + camOffset + heightOffset,
+        })
     end
 end
 

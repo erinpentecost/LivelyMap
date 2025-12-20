@@ -36,4 +36,5 @@ end
 
 return {
     distanceScale = distanceScale,
+    layer = "Modal",
 }

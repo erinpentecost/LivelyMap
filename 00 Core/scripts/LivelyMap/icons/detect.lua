@@ -65,7 +65,7 @@ local function newDetectIcon(path)
     local pip = ui.create {
         name = "detect",
         type = ui.TYPE.Image,
-        layer = "HUD",
+        layer = iutil.layer,
         props = {
             visible = false,
             position = util.vector2(100, 100),

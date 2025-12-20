@@ -51,7 +51,7 @@ local function makeDebugPips()
                 local pip = ui.create {
                     name = "debug_" .. tostring(x) .. "_" .. tostring(y),
                     type = ui.TYPE.Image,
-                    layer = "HUD",
+                    layer = iutil.layer,
                     props = {
                         visible = false,
                         position = util.vector2(100, 100),

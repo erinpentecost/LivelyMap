@@ -160,7 +160,6 @@ end
 
 local hoverBox = ui.create {
     name = 'hoverBox',
-    layer = 'Windows',
     type = ui.TYPE.Container,
     template = interfaces.MWUI.templates.boxSolid,
     props = {
@@ -181,6 +180,18 @@ local hoverBox = ui.create {
         content = ui.content {},
     } }
 }
+
+local mainWindow = ui.create {
+    name = "worldmaproot",
+    layer = 'Windows',
+    type = ui.TYPE.Widget,
+    props = {
+        size = ui.screenSize(),
+        visible = false,
+    },
+    content = ui.content { hoverBox },
+}
+
 local function setHoverBoxContent(content)
     -- delete old items in hovercontent
     for _, old in ipairs(hoverBox.layout.content["vflex"].content) do
@@ -290,6 +301,14 @@ local function onMapMoved(data)
         fn(currentMapData)
     end
 
+    if not data.swapped then
+        -- need to steal some interface and also turn off pausing during it.
+        -- this is because I want
+        interfaces.UI.setMode('Interface', { windows = {} })
+        --interfaces.UI.setPauseOnMode('Travel', false)
+        mainWindow.layout.props.visible = true
+        mainWindow:update()
+    end
     renderIcons()
 end
 
@@ -298,6 +317,12 @@ local function onMapHidden(data)
     for _, fn in ipairs(onMapHiddenHandlers) do
         fn(data)
     end
+
+    if not data.swapped then
+        interfaces.UI.setMode()
+        mainWindow.layout.props.visible = false
+        mainWindow:update()
+    end
 end
 
 local lastCameraPos = nil
@@ -305,9 +330,6 @@ local function onUpdate(dt)
     if settingsChanged then
         renderIcons()
         settingsChanged = false
-        return
-    end
-    if dt <= 0 then
         return
     end
     if lastCameraPos == nil then
