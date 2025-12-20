@@ -111,24 +111,46 @@ end
 
 -- Pan the camera to a specific point of interest.
 local trackInfo = {
+    tracking = false,
     startTime = 0,
     endTime = 0,
     startPos = nil,
     endPos = nil,
 }
-local function trackPosition(worldPos, time)
-    -- TODO: don't use camera position for startPos.
-    -- instead, get the current pos on the map at center of screen.
+
+local function advanceTracker()
+    if not trackInfo.tracking then
+        return
+    end
+    local currentTime = core.getRealTime()
+    local intermediatePosition = nil
+    if currentTime >= trackInfo.endTime then
+        trackInfo.tracking = false
+        -- snap to end pos
+        intermediatePosition = trackInfo.endPos
+    else
+        -- lerp!
+        local i = util.remap(currentTime, trackInfo.startTime, trackInfo.endTime, 0, 1)
+        intermediatePosition = mutil.lerpVec3(i, trackInfo.startPos, trackInfo.endPos)
+    end
+
+    -- TODO: handle moving off the map.
+    -- TODO: maybe do fancy camera movements in the future
+    camera.setStaticPosition(intermediatePosition)
+end
+
+local function trackPosition(newCameraPos, duration)
+    trackInfo.tracking = true
     trackInfo.startPos = camera.getPosition()
-    trackInfo.endPos = worldPos
+    trackInfo.endPos = newCameraPos
     trackInfo.startTime = core.getRealTime()
-    time = time or 0
-    trackInfo.endTime = trackInfo.startTime + time
+    duration = duration or 0
+    trackInfo.endTime = trackInfo.startTime + duration
 
-
-    local cellPos = mutil.worldPosToCellPos(worldPos)
-    local rel = putil.relativeCellPos(currentMapData, cellPos)
-    local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
+    -- Immediate advance if no duration given.
+    if duration <= 0 then
+        advanceTracker()
+    end
 end
 
 local function onFrame(dt)
@@ -144,6 +166,20 @@ local function onFrame(dt)
     -- If we have input, cancel trackPosition,
     -- then move the camera manually.
     -- Else, advance the camera toward tracked position.
+    advanceTracker()
+end
+
+-- cameraOffset returns a vector offset for the camera position
+-- so that the center of the viewPort lands on targetPosition.
+local function cameraOffset(targetPosition, camPitch, camViewVector)
+    local pos = targetPosition or camera.getPosition()
+    local pitch = camPitch or camera.getPitch()
+    local height = pos.z - currentMapData.object.position.z
+    local viewDir = camViewVector or camera.viewportToWorldVector(util.vector2(0.5, 0.5))
+    viewDir = util.vector3(viewDir.x, viewDir.y, 0):normalize()
+    print(viewDir)
+    -- 1.5708 - pitch is the angle between straight down and camera center.
+    return viewDir * (-1 * height * math.tan(1.5708 - pitch))
 end
 
 local function onMapMoved(data)
@@ -152,11 +188,23 @@ local function onMapMoved(data)
     -- If this is not a swap, then this is a brand new map session.
     if not data.swapped then
         startCamera()
-        camera.setStaticPosition(data.object:getBoundingBox().center + util.vector3(0, 0, 200))
+        --camera.setStaticPosition(data.object:getBoundingBox().center + util.vector3(0, 0, 200))
         camera.setPitch(1)
         camera.setYaw(0)
+
+
+        local mapCenter = data.object:getBoundingBox().center
+        local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
+        local rel = putil.relativeCellPos(currentMapData, cellPos)
+        local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
+        local camOffset = cameraOffset(mapCenter + util.vector3(0, 0, 200), 1, util.vector3(0, 1, 0))
+        print("camOffset: " .. tostring(camOffset))
+        print("mapWorldPos: " .. tostring(mapWorldPos))
+        print("mapCenter: " .. tostring(mapCenter))
+        camera.setStaticPosition(mapWorldPos + camOffset + util.vector3(0, 0, 200))
+
         -- finish moving to the first spot
-        trackPosition(data.startWorldPosition)
+        --trackPosition(mapWorldPos + util.vector3(0, 0, 200))
     end
 end
 
