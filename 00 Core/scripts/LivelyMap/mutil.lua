@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -87,6 +87,12 @@ local function worldPosToCellPos(worldPos)
     return util.vector3(worldPos.x / CELL_SIZE, worldPos.y / CELL_SIZE, worldPos.z / CELL_SIZE)
 end
 
+local function inBox(position, box)
+    local normalized = box.transform:inverse():apply(position)
+    return math.abs(normalized.x) <= 1
+        and math.abs(normalized.y) <= 1
+        and math.abs(normalized.z) <= 1
+end
 
 return {
     CELL_SIZE = CELL_SIZE,
@@ -96,4 +102,5 @@ return {
     lerpVec3 = lerpVec3,
     lerpVec2 = lerpVec2,
     worldPosToCellPos = worldPosToCellPos,
+    inBox = inBox,
 }

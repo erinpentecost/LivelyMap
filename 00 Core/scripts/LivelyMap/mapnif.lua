@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -16,13 +16,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 local MOD_NAME = require("scripts.LivelyMap.ns")
+local mutil = require("scripts.LivelyMap.mutil")
 local aux_util = require('openmw_aux.util')
 local util = require('openmw.util')
 local pself = require("openmw.self")
 
 -- This script is attached to the 3d floating map objects.
--- It should be responsible for adding annotations and cleaning
--- them up.
 
 -- mapData holds read-only map metadata for this extent.
 -- It also contains "player", which is the player that
@@ -36,16 +35,6 @@ local function onStart(initData)
 end
 local function onSave()
     return mapData
-end
-
-local function onActive()
-    print("activated " .. aux_util.deepToString(mapData, 3))
-end
-
-local function onInactive()
-    -- this is called after the map is destroyed,
-    -- so it's probably too late to clean up annotations at this point.
-    print("inactivated " .. aux_util.deepToString(mapData, 3))
 end
 
 local function getBounds()
@@ -74,8 +63,6 @@ local function getBounds()
     }
 end
 
-local CELL_SIZE = 128 * 64 -- 8192
-
 -- Returns a util.transform that maps raw world-space positions to map mesh positions
 local function worldToMapMeshTransform(bounds, extents)
     -- Width and height of map bounds in world units
@@ -88,12 +75,12 @@ local function worldToMapMeshTransform(bounds, extents)
     local cellHeight  = extents.Top - extents.Bottom + 1
 
     -- Scale factors: world → map mesh
-    local scaleX      = worldWidth / (cellWidth * CELL_SIZE)
-    local scaleY      = worldHeight / (cellHeight * CELL_SIZE)
+    local scaleX      = worldWidth / (cellWidth * mutil.CELL_SIZE)
+    local scaleY      = worldHeight / (cellHeight * mutil.CELL_SIZE)
 
     -- Translation: align extents bottom-left with bounds bottom-left
-    local moveX       = bounds.bottomLeft.x - extents.Left * CELL_SIZE * scaleX
-    local moveY       = bounds.bottomLeft.y - extents.Bottom * CELL_SIZE * scaleY
+    local moveX       = bounds.bottomLeft.x - extents.Left * mutil.CELL_SIZE * scaleX
+    local moveY       = bounds.bottomLeft.y - extents.Bottom * mutil.CELL_SIZE * scaleY
     local moveZ       = bounds.bottomLeft.z
 
     -- Compose single transform
@@ -102,56 +89,13 @@ local function worldToMapMeshTransform(bounds, extents)
         * util.transform.move(util.vector3(moveX, moveY, moveZ))
 end
 
-
-local function worldToRelativeMapTransform2(bounds)
-    if mapData == nil or mapData.Extents == nil then
-        error("missing map extents")
-    end
-
-    local e          = mapData.Extents
-
-    local mapWidth   = e.Right - e.Left
-    local mapHeight  = e.Top - e.Bottom
-
-    local meshWidth  = bounds.bottomRight.x - bounds.bottomLeft.x
-    local meshHeight = bounds.topLeft.y - bounds.bottomLeft.y
-
-    return
-    -- relative map → mesh quad
-        util.transform.move(bounds.bottomLeft)
-        *
-        util.transform.scale(meshWidth, meshHeight, 1)
-        *
-        -- cell → relative map
-        util.transform.scale(
-            1 / mapWidth,
-            1 / mapHeight,
-            1
-        )
-        *
-        util.transform.move(
-            -e.Left,
-            -e.Bottom,
-            0
-        )
-        *
-        -- world → cell
-        util.transform.scale(
-            1 / CELL_SIZE,
-            1 / CELL_SIZE,
-            1
-        )
-end
-
 -- onMapMoved is called when the map is placed or moved.
 -- this should move/create all the annotations it owns
 local function onMapMoved(data)
     if data == nil then
         error("onTeleported data is nil")
     end
-    if data.position == nil then
-        error("onTeleported data.position is nil")
-    end
+
     mapData = data
 
     mapData.bounds = getBounds()
@@ -167,10 +111,13 @@ return {
         [MOD_NAME .. "onMapMoved"] = onMapMoved,
     },
     engineHandlers = {
-        onActive = onActive,
-        onInactive = onInactive,
         onInit = onStart,
         onSave = onSave,
-        onLoad = onStart,
+        onLoad = function(initData)
+            onStart(initData)
+            if initData ~= nil then
+                initData.player:sendEvent(MOD_NAME .. "onMapMoved", initData)
+            end
+        end,
     }
 }

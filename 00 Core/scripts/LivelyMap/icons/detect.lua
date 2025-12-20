@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -59,13 +59,13 @@ local keyPath = "textures/detect_key_icon.dds"
 local enchantmentPath = "textures/detect_enchantment_icon.dds"
 
 local color = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
-
+local baseSize = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path)
     local pip = ui.create {
         name = "detect",
         type = ui.TYPE.Image,
-        layer = "HUD",
+        layer = iutil.layer,
         props = {
             visible = false,
             position = util.vector2(100, 100),
@@ -86,7 +86,7 @@ local function newDetectIcon(path)
             if s.freed then
                 pip.layout.props.visible = false
             else
-                pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData.mapWorldPos)
+                pip.layout.props.size = baseSize * iutil.distanceScale(posData)
                 pip.layout.props.visible = true
                 pip.layout.props.position = posData.viewportPos
             end

@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -24,12 +24,17 @@ local async    = require("openmw.async")
 local camera   = require("openmw.camera")
 
 
-local function distanceScale(mapWorldPos)
-    local dist = (camera.getPosition() - mapWorldPos):length()
+local function distanceScale(posData)
+    local dist = (camera.getPosition() - posData.mapWorldPos):length()
     dist = util.clamp(dist, 100, 500)
-    return util.remap(dist, 100, 500, 1, 0.5)
+    local max = 1
+    if posData.hovering then
+        max = 1.25
+    end
+    return util.remap(dist, 100, 500, max, 0.5)
 end
 
 return {
     distanceScale = distanceScale,
+    layer = "Modal",
 }

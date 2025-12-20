@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -15,33 +15,39 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces = require('openmw.interfaces')
-local ui         = require('openmw.ui')
-local util       = require('openmw.util')
-local pself      = require("openmw.self")
-local aux_util   = require('openmw_aux.util')
+local interfaces   = require('openmw.interfaces')
+local ui           = require('openmw.ui')
+local util         = require('openmw.util')
+local pself        = require("openmw.self")
+local aux_util     = require('openmw_aux.util')
+local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
+local iutil        = require("scripts.LivelyMap.icons.iutil")
 
-local compass    = ui.create {
-    name = "compass",
-    type = ui.TYPE.Image,
-    layer = "HUD",
-    icon = {
-        worldPos = function()
-            return pself.position
-        end,
-        defaultSize = util.vector2(32, 32),
-    },
-    props = {
-        visible = false,
-        position = util.vector2(100, 100),
-        anchor = util.vector2(0.5, 0.5),
-        size = util.vector2(32, 32),
-        resource = ui.texture {
-            path = "textures/compass.dds"
-        }
-    }
-}
+local color        = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
 
+-- "/home/ern/workspace/LivelyMap/cmd/h3/make_atlas.sh" -i  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow.png" -o "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow_atlas.dds" -r 20 -c 18
+local compassAtlas = imageAtlas.constructAtlas({
+    totalTiles = 360,
+    tilesPerRow = 18,
+    atlasPath = "textures/LivelyMap/arrow_atlas.dds",
+    tileSize = util.vector2(100, 100),
+    create = true,
+})
+compassAtlas:spawn({
+    layer = iutil.layer,
+    anchor = util.vector2(0.5, 0.5),
+    color = color,
+})
+
+local baseSize = util.vector2(50, 50)
+
+local function adjustedYaw(deg)
+    local yaw = math.deg(deg)
+
+    if yaw < 0 then yaw = util.remap(yaw, -180, 0, 181, 360) end
+
+    return util.clamp(util.round(yaw), 1, 360)
+end
 
 local compassIcon = {
     pos = function()
@@ -51,15 +57,29 @@ local compassIcon = {
         return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
     end,
     onDraw = function(posData)
-        compass.layout.props.visible = true
-        compass.layout.props.position = posData.viewportPos
-        -- TODO: rotate compass according to facing
-        --print("compass facing: " .. tostring(posData.viewportFacing))
-        compass:update()
+        compassAtlas:getElement().layout.props.visible = true
+        compassAtlas:getElement().layout.props.position = posData.viewportPos
+
+        if not posData.viewportFacing then
+            compassAtlas:getElement().layout.props.visible = false
+            compassAtlas:getElement():update()
+            return
+        end
+
+        compassAtlas:getElement().layout.props.size = baseSize * iutil.distanceScale(posData)
+
+        local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)
+
+        -- Convert to degrees, where 0° = East, 90° = North.
+        local deg = adjustedYaw(angle)
+        --print(deg .. " - " .. tostring(posData.viewportFacing))
+
+        compassAtlas:setTile(deg)
+        compassAtlas:getElement():update()
     end,
     onHide = function()
-        compass.layout.props.visible = false
-        compass:update()
+        compassAtlas:getElement().layout.props.visible = false
+        compassAtlas:getElement():update()
     end,
 }
 

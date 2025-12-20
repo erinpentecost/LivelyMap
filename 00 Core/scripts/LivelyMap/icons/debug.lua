@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -51,7 +51,7 @@ local function makeDebugPips()
                 local pip = ui.create {
                     name = "debug_" .. tostring(x) .. "_" .. tostring(y),
                     type = ui.TYPE.Image,
-                    layer = "HUD",
+                    layer = iutil.layer,
                     props = {
                         visible = false,
                         position = util.vector2(100, 100),
@@ -84,7 +84,7 @@ local function makeDebugPips()
                             pip.layout.props.visible = false
                             return
                         end
-                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData.mapWorldPos)
+                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData)
                         pip.layout.props.visible = true
                         pip.layout.props.position = posData.viewportPos
                         pip:update()

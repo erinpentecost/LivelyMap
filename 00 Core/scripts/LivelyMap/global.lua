@@ -1,6 +1,6 @@
 --[[
 LivelyMap for OpenMW.
-Copyright (C) 2025
+Copyright (C) Erin Pentecost 2025
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -60,7 +60,7 @@ local function newMapObject(data, player)
 
     local record = getMapRecord(map.ID)
     if not record then
-        error("No record for map " .. name)
+        error("No record for map " .. map.ID)
         return nil
     end
     -- embed the owning player, too.
@@ -84,25 +84,51 @@ local function start(data)
     end
 end
 
+local function shallowMerge(data, ...)
+    local copy = {}
+    for k, v in pairs(data) do
+        copy[k] = v
+    end
+    local arg = { ... }
+    for _, extraData in ipairs(arg) do
+        for k, v in pairs(extraData) do
+            copy[k] = v
+        end
+    end
+    return copy
+end
+
 local function onShowMap(data)
     if not data then
         error("onShowMap has nil data parameter.")
-    end
-    if not data.ID then
-        error("onShowMap data parameter has nil ID field.")
-        return
     end
     if not data.cellID then
         error("onShowMap data parameter has nil cellID field.")
         return
     end
-    if not data.position then
-        error("onShowMap data parameter has nil position field.")
-        return
-    end
     if not data.player then
         error("onShowMap data parameter has nil player field.")
         return
+    end
+    if type(data.player) == "string" then
+        error("onShowMap data parameter has a string player field.")
+        return
+    end
+
+    if (not data.ID) and (not data.position) then
+        -- One of these two are required.
+        -- position is world position.
+        -- ID is the map ID in maps.json.
+        error("onShowMap data parameter has nil ID and nil position field.")
+        return
+    end
+    -- Find ID or startWorldPosition based on the other one.
+    if data.startWorldPosition then
+        local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
+        data.ID = mutil.getClosestMap(math.floor(cellPos.x), math.floor(cellPos.y))
+    else
+        local mapdata = mutil.getMap(data)
+        data.startWorldPosition = util.vector3(mapdata.CenterX * mutil.CELL_SIZE, mapdata.CenterY * mutil.CELL_SIZE, 0)
     end
 
     local playerID = data.player.id
@@ -114,7 +140,7 @@ local function onShowMap(data)
     local activeMap = nil
     if persist.activeMaps[playerID][data.ID] == nil then
         -- enable the new map etc
-        activeMap = newMapObject(data.ID, playerID)
+        activeMap = newMapObject(data.ID, data.player)
         if activeMap == nil then
             error("Unknown map ID: " .. data.ID)
         end
@@ -127,11 +153,17 @@ local function onShowMap(data)
     end
 
     -- we should only show one map per player, so clean up everything else
+    local swapped = false
     local toDelete = {}
     for k, v in pairs(persist.activeMaps[playerID]) do
         if k ~= data.ID then
+            swapped = true
             print("Deleting map " .. tostring(v.ID))
-            activeMap.object:sendEvent(MOD_NAME .. "onMapHidden", v)
+            -- swapped means the map is being replaced with a different one.
+            v.player:sendEvent(MOD_NAME .. "onMapHidden",
+                shallowMerge(v, {
+                    swapped = swapped
+                }))
             v.object:remove()
             table.insert(toDelete, k)
         end
@@ -145,17 +177,47 @@ local function onShowMap(data)
 
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
-        util.vector3(data.position.x, data.position.y, data.position.z), data.transform)
+        util.vector3(data.player.position.x, data.player.position.y, data.player.position.z + 5 * mutil.CELL_SIZE),
+        data.transform)
 
     -- notify the map that it moved.
     -- the map is responsible for telling the player.
-    activeMap.object:sendEvent(MOD_NAME .. "onMapMoved", data)
+    activeMap.object:sendEvent(MOD_NAME .. "onMapMoved",
+        shallowMerge(data, { swapped = swapped }))
+end
+
+local function onHideMap(data)
+    if not data then
+        error("onShowMap has nil data parameter.")
+    end
+    if not data.player then
+        error("onShowMap data parameter has nil player field.")
+        return
+    end
+
+    local playerID = data.player.id
+    if persist.activeMaps[playerID] == nil then
+        persist.activeMaps[playerID] = {}
+    end
+
+    local toDelete = {}
+    for k, v in pairs(persist.activeMaps[playerID]) do
+        print("Deleting map " .. tostring(v.ID) .. ": " .. aux_util.deepToString(v, 3))
+        v.player:sendEvent(MOD_NAME .. "onMapHidden",
+            shallowMerge(v, { swapped = false }))
+        v.object:remove()
+        table.insert(toDelete, k)
+    end
+    for _, k in ipairs(toDelete) do
+        persist.activeMaps[playerID][k] = nil
+    end
 end
 
 
 return {
     eventHandlers = {
         [MOD_NAME .. "onShowMap"] = onShowMap,
+        [MOD_NAME .. "onHideMap"] = onHideMap,
     },
     engineHandlers = {
         onSave = onSave,
