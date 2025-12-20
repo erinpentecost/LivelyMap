@@ -109,13 +109,39 @@ local function endCamera()
     cameraState = nil
 end
 
--- Pan the camera to a specific point of interest.
+local function facing2D(camViewVector)
+    local viewDir = camViewVector or camera.viewportToWorldVector(util.vector2(0.5, 0.5))
+    return util.vector3(viewDir.x, viewDir.y, 0):normalize()
+end
+
+-- moveCamera safely moves the camera within acceptable bounds.
+local function moveCamera(data)
+    if data == nil then
+        return
+    end
+
+    if data.pitch then
+        camera.setPitch(data.pitch)
+    end
+    if data.yaw then
+        camera.setYaw(data.yaw)
+    end
+    if data.position or data.relativePosition then
+        camera.setStaticPosition(data.position or (camera.getPosition() + data.relativePosition))
+    end
+end
+
+-- Lerp the camera to a new position.
 local trackInfo = {
     tracking = false,
     startTime = 0,
     endTime = 0,
     startPos = nil,
     endPos = nil,
+    -- onEnd is invoked when tracking stops.
+    -- the parameter will be true if it completed normally
+    -- (it will be false if interrupted)
+    onEnd = nil
 }
 
 local function advanceTracker()
@@ -124,34 +150,57 @@ local function advanceTracker()
     end
     local currentTime = core.getRealTime()
     local intermediatePosition = nil
+    local i = 0
     if currentTime >= trackInfo.endTime then
-        trackInfo.tracking = false
-        -- snap to end pos
+        -- set to end
+        i = 1
         intermediatePosition = trackInfo.endPos
     else
         -- lerp!
-        local i = util.remap(currentTime, trackInfo.startTime, trackInfo.endTime, 0, 1)
+        i = util.remap(currentTime, trackInfo.startTime, trackInfo.endTime, 0, 1)
         intermediatePosition = mutil.lerpVec3(i, trackInfo.startPos, trackInfo.endPos)
     end
 
-    -- TODO: handle moving off the map.
+    if i >= 1 then
+        trackInfo.tracking = false
+        if trackInfo.onEnd then
+            trackInfo.onEnd(true)
+        end
+    end
+
     -- TODO: maybe do fancy camera movements in the future
-    camera.setStaticPosition(intermediatePosition)
+    moveCamera({ position = intermediatePosition })
 end
 
-local function trackPosition(newCameraPos, duration)
+local function trackPosition(newCameraPos, duration, onEnd)
+    if newCameraPos == nil then
+        error("trackPosition newCameraPos is required.")
+    end
+    if duration and type(duration) ~= "number" then
+        error("trackPosition duration should be a number, not a " .. type(duration))
+    end
+    if onEnd and type(onEnd) ~= "function" then
+        error("trackPosition onEnd should be a function, not a " .. type(onEnd))
+    end
     trackInfo.tracking = true
     trackInfo.startPos = camera.getPosition()
     trackInfo.endPos = newCameraPos
     trackInfo.startTime = core.getRealTime()
     duration = duration or 0
     trackInfo.endTime = trackInfo.startTime + duration
+    trackInfo.onEnd = onEnd
 
     -- Immediate advance if no duration given.
     if duration <= 0 then
         advanceTracker()
     end
 end
+
+local vecForward = util.vector3(0, 1, 0)
+local vecBackward = vecForward * -1
+local vecRight = util.vector3(1, 0, 0)
+local vecLeft = vecRight * -1
+local moveSpeed = 100
 
 local function onFrame(dt)
     -- Only track inputs while the map is up.
@@ -166,7 +215,26 @@ local function onFrame(dt)
     -- If we have input, cancel trackPosition,
     -- then move the camera manually.
     -- Else, advance the camera toward tracked position.
-    advanceTracker()
+    local hasInput = keys.forward.pressed or keys.backward.pressed or keys.left.pressed or keys.right.pressed
+    if hasInput then
+        local moveVec = (vecForward * keys.forward.analog +
+            vecBackward * keys.backward.analog +
+            vecRight * keys.right.analog +
+            vecLeft * keys.left.analog):normalize() * moveSpeed * dt
+
+        moveCamera({
+            relativePosition = moveVec
+        })
+        -- Interrupt tracking
+        if trackInfo.tracking then
+            if trackInfo.onEnd then
+                trackInfo.onEnd(false)
+            end
+        end
+        trackInfo.tracking = false
+    else
+        advanceTracker()
+    end
 end
 
 -- cameraOffset returns a vector offset for the camera position
@@ -175,36 +243,33 @@ local function cameraOffset(targetPosition, camPitch, camViewVector)
     local pos = targetPosition or camera.getPosition()
     local pitch = camPitch or camera.getPitch()
     local height = pos.z - currentMapData.object.position.z
-    local viewDir = camViewVector or camera.viewportToWorldVector(util.vector2(0.5, 0.5))
-    viewDir = util.vector3(viewDir.x, viewDir.y, 0):normalize()
+    local viewDir = facing2D(camViewVector)
     print(viewDir)
     -- 1.5708 - pitch is the angle between straight down and camera center.
     return viewDir * (-1 * height * math.tan(1.5708 - pitch))
 end
 
+local defaultHeight = 200
+local defaultPitch = 1
 local function onMapMoved(data)
     print("controls.onMapMoved")
     currentMapData = data
     -- If this is not a swap, then this is a brand new map session.
     if not data.swapped then
+        -- Orient the camera so starting position is in the center.
         startCamera()
-        --camera.setStaticPosition(data.object:getBoundingBox().center + util.vector3(0, 0, 200))
-        camera.setPitch(1)
+        camera.setPitch(defaultPitch)
         camera.setYaw(0)
-
-
         local mapCenter = data.object:getBoundingBox().center
         local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
         local rel = putil.relativeCellPos(currentMapData, cellPos)
         local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
-        local camOffset = cameraOffset(mapCenter + util.vector3(0, 0, 200), 1, util.vector3(0, 1, 0))
-        print("camOffset: " .. tostring(camOffset))
+        local heightOffset = util.vector3(0, 0, defaultHeight)
+        local camOffset = cameraOffset(mapCenter + heightOffset, 1, util.vector3(0, 1, 0))
+        --[[print("camOffset: " .. tostring(camOffset))
         print("mapWorldPos: " .. tostring(mapWorldPos))
-        print("mapCenter: " .. tostring(mapCenter))
-        camera.setStaticPosition(mapWorldPos + camOffset + util.vector3(0, 0, 200))
-
-        -- finish moving to the first spot
-        --trackPosition(mapWorldPos + util.vector3(0, 0, 200))
+        print("mapCenter: " .. tostring(mapCenter))]]
+        camera.setStaticPosition(mapWorldPos + camOffset + heightOffset)
     end
 end
 
