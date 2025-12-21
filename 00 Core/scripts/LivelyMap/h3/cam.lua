@@ -4,6 +4,8 @@ local ui     = require("openmw.ui")
 local util   = require("openmw.util")
 local camera = require("openmw.camera")
 
+---@param worldPos util.vector3
+---@return boolean
 local function isObjectBehindCamera(worldPos)
     -- This is from h3.
     local cameraPos = camera.getPosition()
@@ -27,9 +29,10 @@ end
 
 
 
-
+---@param worldPos util.vector3
+---@return util.vector2?
 local function worldPosToViewportPos(worldPos)
-    -- this function works perfectly
+    -- This is from h3.
     local viewportPos = camera.worldToViewportVector(worldPos)
     local screenSize = ui.screenSize()
 

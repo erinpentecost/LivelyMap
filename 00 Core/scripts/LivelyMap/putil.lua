@@ -48,7 +48,7 @@ local h3cam      = require("scripts.LivelyMap.h3.cam")
 local function cellPosToRelativeMeshPos(currentMapData, cellPos)
     if currentMapData == nil then
         error("missing mapObject")
-        return
+        return nil
     end
     if cellPos == nil then
         error("mapPos is nil")
@@ -68,9 +68,12 @@ local function cellPosToRelativeMeshPos(currentMapData, cellPos)
 end
 
 
--- TODO: might be trash
+-- TODO: this is NOT TESTED and might not work
 -- relativeMeshPosToCellPos converts a relative [0,1) map position
 -- back into an absolute cell position.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param relMeshPos RelativeMeshPos
+--- @return CellPos?
 local function relativeMeshPosToCellPos(currentMapData, relMeshPos)
     if currentMapData == nil then
         error("missing mapObject")
@@ -96,61 +99,64 @@ local function relativeMeshPosToCellPos(currentMapData, relMeshPos)
         currentMapData.Extents.Top + 1
     )
 
-    return util.vector3(x, y, relMeshPos.z)
+    -- We can't recover Z; lossy.
+    return util.vector3(x, y, 0)
 end
 
 
--- TODO: might be hot trash
+--- mapPosToRelativeCellPos converts a world-space position on the map mesh
+--- into a relative mesh position in the range [0,1]x[0,1].
+---
+--- This is the inverse of relativeMeshPosToAbsoluteMeshPos and assumes the
+--- map mesh is a planar parallelogram defined by:
+---   bottomLeft -> bottomRight (X axis)
+---   bottomLeft -> topLeft     (Y axis)
+---
+--- The implementation projects the point onto the map plane and solves
+--- for barycentric-style coordinates using dot products (no quadratics).
+---
+--- @param currentMapData MeshAnnotatedMapData
+--- @param worldPos WorldSpacePos
+--- @return RelativeMeshPos? util.vector2 or nil if degenerate
 local function mapPosToRelativeCellPos(currentMapData, worldPos)
+    if not currentMapData then
+        error("missing map data")
+    end
+    if not currentMapData.bounds then
+        error("missing map bounds")
+    end
+    if not worldPos then
+        error("worldPos is nil")
+    end
+
     local bl = currentMapData.bounds.bottomLeft
     local br = currentMapData.bounds.bottomRight
     local tl = currentMapData.bounds.topLeft
-    local tr = currentMapData.bounds.topRight
 
-    -- Work in 2D
-    local px, py = worldPos.x, worldPos.y
+    -- Basis vectors of the map
+    local u = br - bl -- X axis
+    local v = tl - bl -- Y axis
+    local w = worldPos - bl
 
-    local ax = bl.x
-    local ay = bl.y
+    -- Precompute dot products
+    local uu = u:dot(u)
+    local uv = u:dot(v)
+    local vv = v:dot(v)
+    local wu = w:dot(u)
+    local wv = w:dot(v)
 
-    local bx = br.x - bl.x
-    local by = br.y - bl.y
-
-    local cx = tl.x - bl.x
-    local cy = tl.y - bl.y
-
-    local dx = tr.x - tl.x - br.x + bl.x
-    local dy = tr.y - tl.y - br.y + bl.y
-
-    -- Solve for y using quadratic
-    local A = dx * cy - dy * cx
-    local B = dx * ay - dy * ax + bx * cy - by * cx + dy * px - dx * py
-    local C = bx * ay - by * ax + by * px - bx * py
-
-    local y
-    if math.abs(A) < 1e-8 then
-        -- Degenerate to linear
-        y = -C / B
-    else
-        local disc = B * B - 4 * A * C
-        if disc < 0 then
-            error("point not on map quad")
-        end
-        local sqrtDisc = math.sqrt(disc)
-
-        local y1 = (-B + sqrtDisc) / (2 * A)
-        local y2 = (-B - sqrtDisc) / (2 * A)
-
-        -- choose solution in [0,1]
-        y = (y1 >= 0 and y1 <= 1) and y1 or y2
+    local denom = uu * vv - uv * uv
+    if math.abs(denom) < 1e-8 then
+        return nil -- Degenerate map
     end
 
-    -- Solve for x
-    local denom = bx + dx * y
-    local x = (px - ax - cx * y) / denom
+    -- Solve for barycentric-style coordinates
+    local x = (wu * vv - wv * uv) / denom
+    local y = (wv * uu - wu * uv) / denom
 
-    return util.vector3(x, y, 0)
+    return util.vector2(x, y)
 end
+
 
 
 
@@ -196,13 +202,17 @@ end
 ---@field psoPushdownOnly boolean
 ---@field psoDepth number
 
+---@class ViewportData
+---@field viewportPos util.vector2?
+---@field  mapWorldPos util.vector3?
+---@field  viewportFacing util.vector3?
 
 --- realPosToViewportPos turns a world space coordinate into the corresponding coordinate for the map mesh on the viewport.
 --- @param currentMapData MeshAnnotatedMapData
 --- @param psoSettings PsoSettings
 --- @param pos WorldSpacePos
 --- @param facingWorldDir util.vector2 | util.vector3 | nil
---- @return util.vector2?
+--- @return ViewportData?
 local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorldDir)
     -- this works ok, but fails when the camera gets too close.
     if not currentMapData then
@@ -270,10 +280,62 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
 end
 
 
+--- TODO: this is UNTESTED and may not work
+--- viewportPosToRealPos inverts realPosToViewportPos (without parallax)
+--- @param currentMapData MeshAnnotatedMapData
+--- @param viewportPos util.vector2
+--- @return WorldSpacePos?
+local function viewportPosToRealPos(currentMapData, viewportPos)
+    if not currentMapData or not currentMapData.bounds then
+        error("missing map data")
+    end
+
+    -- 1. Build a ray from the camera through the viewport
+    local rayOrigin = camera.getPosition()
+    local rayDir = camera.viewportToWorldVector(viewportPos:normalize())
+
+    -- 2. Intersect ray with map plane
+    -- Assume map is planar using bottomLeft, bottomRight, topLeft
+    local bl = currentMapData.bounds.bottomLeft
+    local br = currentMapData.bounds.bottomRight
+    local tl = currentMapData.bounds.topLeft
+
+    local planeNormal = (br - bl):cross(tl - bl):normalize()
+    local denom = planeNormal:dot(rayDir)
+    if math.abs(denom) < 1e-6 then
+        return nil -- Ray parallel to map
+    end
+
+    local t = planeNormal:dot(bl - rayOrigin) / denom
+    if t < 0 then
+        return nil -- Intersection behind camera
+    end
+
+    local hitPos = rayOrigin + rayDir * t
+
+    -- 3. Map-world → relative mesh
+    local rel = mapPosToRelativeCellPos(currentMapData, hitPos)
+    if not rel then
+        return nil
+    end
+
+    -- 4. Relative mesh → cell
+    local cellPos = relativeMeshPosToCellPos(currentMapData, rel)
+    if not cellPos then
+        return nil
+    end
+
+    -- 5. Cell → world
+    return mutil.cellPosToWorldPos(cellPos)
+end
+
+
+
 return {
     cellPosToRelativeMeshPos = cellPosToRelativeMeshPos,
     relativeMeshPosToAbsoluteMeshPos = relativeMeshPosToAbsoluteMeshPos,
     relativeMeshPosToCellPos = relativeMeshPosToCellPos,
     mapPosToRelativeCellPos = mapPosToRelativeCellPos,
     realPosToViewportPos = realPosToViewportPos,
+    viewportPosToRealPos = viewportPosToRealPos,
 }

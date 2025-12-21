@@ -124,6 +124,16 @@ local function worldPosToCellPos(worldPos)
     return util.vector3(worldPos.x / CELL_SIZE, worldPos.y / CELL_SIZE, worldPos.z / CELL_SIZE)
 end
 
+---@param cellPos CellPos
+---@return WorldSpacePos
+local function cellPosToWorldPos(cellPos)
+    if cellPos == nil then
+        error("cellPos is nil")
+    end
+
+    return util.vector3(cellPos.x * CELL_SIZE, cellPos.y * CELL_SIZE, cellPos.z * CELL_SIZE)
+end
+
 local function inBox(position, box)
     local normalized = box.transform:inverse():apply(position)
     return math.abs(normalized.x) <= 1
@@ -156,6 +166,7 @@ return {
     lerpVec3 = lerpVec3,
     lerpVec2 = lerpVec2,
     worldPosToCellPos = worldPosToCellPos,
+    cellPosToWorldPos = cellPosToWorldPos,
     inBox = inBox,
     shallowMerge = shallowMerge,
 }

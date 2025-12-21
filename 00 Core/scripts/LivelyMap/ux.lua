@@ -185,6 +185,16 @@ local function renderIcons()
     end
 
     setHoverBoxContent(hovering)
+
+
+    -- debugging
+    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, util.vector2(0.5, 0.5))
+    if cameraFocusPos then
+        local recalced = putil.realPosToViewportPos(currentMapData, settingCache, cameraFocusPos)
+        if recalced then
+            print("cameraFocusPos: " .. tostring(cameraFocusPos) .. ", reversed: " .. aux_util.deepToString(recalced, 3))
+        end
+    end
 end
 
 local onMapMovedHandlers = {}
