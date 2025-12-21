@@ -192,7 +192,10 @@ local function renderIcons()
     if cameraFocusPos then
         local recalced = putil.realPosToViewportPos(currentMapData, settingCache, cameraFocusPos)
         if recalced then
-            print("cameraFocusPos: " .. tostring(cameraFocusPos) .. ", reversed: " .. aux_util.deepToString(recalced, 3))
+            print("viewportPosToRealPos(mapData, util.vector2(0.5,0.5)): " ..
+            tostring(cameraFocusPos) ..
+            "\n realPosToViewportPos(mapData, " ..
+            tostring(settingCache) .. ", " .. tostring(cameraFocusPos) .. "): " .. aux_util.deepToString(recalced, 3))
         end
     end
 end
