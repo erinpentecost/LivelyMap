@@ -28,10 +28,20 @@ local settings   = require("scripts.LivelyMap.settings")
 local async      = require("openmw.async")
 local interfaces = require('openmw.interfaces')
 
+---This is a world-space position, but x and y are divided by CELL_LENGTH.
+---@alias CellPos util.vector3
 
+---X and Y are between 0 and 1, and are the relative locations on the mesh.
+---@alias RelativeMeshPos util.vector2
 
--- cellPosToRelativeMeshPos return mapPos, but shifted by the current map Extents
--- so the bottom left becomes 0,0 and top right becomes 1,1.
+---World space coordinate.
+---@alias WorldSpacePos util.vector3
+
+--- cellPosToRelativeMeshPos return mapPos, but shifted by the current map Extents
+--- so the bottom left becomes 0,0 and top right becomes 1,1.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param cellPos CellPos
+--- @return RelativeMeshPos?
 local function cellPosToRelativeMeshPos(currentMapData, cellPos)
     if currentMapData == nil then
         error("missing mapObject")
@@ -51,7 +61,7 @@ local function cellPosToRelativeMeshPos(currentMapData, cellPos)
     end
     local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right + 1, 0.0, 1.0)
     local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top + 1, 0.0, 1.0)
-    return util.vector3(x, y, cellPos.z)
+    return util.vector2(x, y)
 end
 
 
@@ -141,8 +151,11 @@ end
 
 
 
--- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
--- which is the position on the map mesh.
+--- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
+--- which is the position on the map mesh.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param relCellPos RelativeMeshPos
+--- @return WorldSpacePos?
 local function relativeMeshPosToAbsoluteMeshPos(currentMapData, relCellPos)
     if currentMapData == nil then
         error("no current map")

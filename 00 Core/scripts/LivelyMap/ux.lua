@@ -54,6 +54,9 @@ local function realPosToViewportPos(pos, facingWorldDir)
 
     local cellPos = mutil.worldPosToCellPos(pos)
     local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
+    if not rel then
+        return
+    end
 
     local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
 
@@ -61,7 +64,7 @@ local function realPosToViewportPos(pos, facingWorldDir)
     -- to the surface of the map, which has been distorted according
     -- to the parallax shader.
     local maxHeight = heightData:get("MaxHeight")
-    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
+    local height = util.clamp(cellPos.z * mutil.CELL_SIZE, 0, maxHeight)
     local heightMax = 0.5
     if settingCache.psoPushdownOnly then
         heightMax = 1.0
@@ -91,11 +94,13 @@ local function realPosToViewportPos(pos, facingWorldDir)
         facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
         local relFacing = putil.cellPosToRelativeMeshPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
 
-        local mapWorldFacingPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
-        local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
-        local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
-        if s0 and s1 then
-            viewportFacing = (s1 - s0):normalize()
+        if relFacing then
+            local mapWorldFacingPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
+            local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
+            local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
+            if s0 and s1 then
+                viewportFacing = (s1 - s0):normalize()
+            end
         end
     end
 
