@@ -139,6 +139,8 @@ local trackInfo = {
     endTime = 0,
     startPos = nil,
     endPos = nil,
+    startPitch = nil,
+    endPitch = nil,
     -- onEnd is invoked when tracking stops.
     -- the parameter will be true if it completed normally
     -- (it will be false if interrupted)
@@ -150,16 +152,22 @@ local function advanceTracker()
         return
     end
     local currentTime = core.getRealTime()
-    local intermediatePosition = nil
+    local intermediate = nil
     local i = 0
     if currentTime >= trackInfo.endTime then
         -- set to end
         i = 1
-        intermediatePosition = trackInfo.endPos
+        intermediate = {
+            position = trackInfo.endPos,
+            pitch = trackInfo.endPitch,
+        }
     else
         -- lerp!
         i = util.remap(currentTime, trackInfo.startTime, trackInfo.endTime, 0, 1)
-        intermediatePosition = mutil.lerpVec3(i, trackInfo.startPos, trackInfo.endPos)
+        intermediate = {
+            position = mutil.lerpVec3(trackInfo.startPos, trackInfo.endPos, i),
+            pitch = mutil.lerpAngle(trackInfo.startPitch, trackInfo.endPitch, i)
+        }
     end
 
     if i >= 1 then
@@ -170,10 +178,10 @@ local function advanceTracker()
     end
 
     -- TODO: maybe do fancy camera movements in the future
-    moveCamera({ position = intermediatePosition })
+    moveCamera(intermediate)
 end
 
-local function trackPosition(newCameraPos, duration, onEnd)
+local function trackPosition(newCameraPos, newCameraPitch, duration, onEnd)
     if newCameraPos == nil then
         error("trackPosition newCameraPos is required.")
     end
@@ -186,6 +194,8 @@ local function trackPosition(newCameraPos, duration, onEnd)
     trackInfo.tracking = true
     trackInfo.startPos = camera.getPosition()
     trackInfo.endPos = newCameraPos
+    trackInfo.startPitch = camera.getPitch()
+    trackInfo.endPitch = newCameraPitch or camera.getPitch()
     trackInfo.startTime = core.getRealTime()
     duration = duration or 0
     trackInfo.endTime = trackInfo.startTime + duration

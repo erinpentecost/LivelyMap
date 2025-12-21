@@ -158,6 +158,24 @@ local function shallowMerge(data, ...)
     return copy
 end
 
+local function lerpAngle(startAngle, endAngle, t)
+    startAngle = util.normalizeAngle(startAngle)
+    endAngle = util.normalizeAngle(endAngle)
+
+    local diff = (endAngle - startAngle) % phi
+
+    -- if > pi, go the negative way (diff - 2pi)
+    if diff > math.pi then
+        diff = diff - phi
+    elseif math.abs(diff - math.pi) < eps then
+        -- tie (exact half-turn): choose the positive rotation (+pi)
+        diff = math.pi
+    end
+
+    local result = startAngle + diff * t
+    return util.normalizeAngle(result)
+end
+
 return {
     CELL_SIZE = CELL_SIZE,
     getMap = getMap,
@@ -165,6 +183,7 @@ return {
     getClosestMap = getClosestMap,
     lerpVec3 = lerpVec3,
     lerpVec2 = lerpVec2,
+    lerpAngle = lerpAngle,
     worldPosToCellPos = worldPosToCellPos,
     cellPosToWorldPos = cellPosToWorldPos,
     inBox = inBox,

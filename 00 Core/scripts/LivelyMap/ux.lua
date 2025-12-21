@@ -78,6 +78,22 @@ local hoverBox = ui.create {
     } }
 }
 
+
+local function mapClicked(mouseEvent, data)
+    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+    print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(cameraFocusPos))
+end
+local clickStartPos = nil
+local function mapClickPress(mouseEvent, data)
+    clickStartPos = mouseEvent.position
+end
+local function mapClickRelease(mouseEvent, data)
+    if (mouseEvent.position - clickStartPos):length2() < 30 then
+        mapClicked(mouseEvent, data)
+    end
+    clickStartPos = nil
+end
+
 local mainWindow = ui.create {
     name = "worldmaproot",
     layer = 'Windows',
@@ -85,6 +101,10 @@ local mainWindow = ui.create {
     props = {
         size = ui.screenSize(),
         visible = false,
+    },
+    events = {
+        mousePress = async:callback(mapClickPress),
+        mouseRelease = async:callback(mapClickRelease)
     },
     content = ui.content { hoverBox },
 }
@@ -188,6 +208,7 @@ local function renderIcons()
 
 
     -- debugging
+    --[[
     local screenCenter = ui.screenSize() / 2
     local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, screenCenter)
     if cameraFocusPos then
@@ -199,6 +220,7 @@ local function renderIcons()
                 tostring(settingCache) .. ", " .. tostring(cameraFocusPos) .. "): " .. aux_util.deepToString(recalced, 3))
         end
     end
+    --]]
 end
 
 local onMapMovedHandlers = {}
