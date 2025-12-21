@@ -27,15 +27,28 @@ local ui         = require("openmw.ui")
 local settings   = require("scripts.LivelyMap.settings")
 local async      = require("openmw.async")
 local interfaces = require('openmw.interfaces')
+local heightData = storage.globalSection(MOD_NAME .. "_heightData")
+local h3cam      = require("scripts.LivelyMap.h3.cam")
 
 
+---This is a world-space position, but x and y are divided by CELL_LENGTH.
+---@alias CellPos util.vector3
 
--- relativeCellPos return mapPos, but shifted by the current map Extents
--- so the bottom left becomes 0,0 and top right becomes 1,1.
-local function relativeCellPos(currentMapData, cellPos)
+---X and Y are between 0 and 1, and are the relative locations on the mesh.
+---@alias RelativeMeshPos util.vector2
+
+---World space coordinate.
+---@alias WorldSpacePos util.vector3
+
+--- cellPosToRelativeMeshPos return mapPos, but shifted by the current map Extents
+--- so the bottom left becomes 0,0 and top right becomes 1,1.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param cellPos CellPos
+--- @return RelativeMeshPos?
+local function cellPosToRelativeMeshPos(currentMapData, cellPos)
     if currentMapData == nil then
         error("missing mapObject")
-        return
+        return nil
     end
     if cellPos == nil then
         error("mapPos is nil")
@@ -51,12 +64,108 @@ local function relativeCellPos(currentMapData, cellPos)
     end
     local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right + 1, 0.0, 1.0)
     local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top + 1, 0.0, 1.0)
-    return util.vector3(x, y, cellPos.z)
+    return util.vector2(x, y)
 end
 
--- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
--- which is the position on the map mesh.
-local function relativeCellPosToMapPos(currentMapData, relCellPos)
+
+-- TODO: this is NOT TESTED and might not work
+-- relativeMeshPosToCellPos converts a relative [0,1) map position
+-- back into an absolute cell position.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param relMeshPos RelativeMeshPos
+--- @return CellPos?
+local function relativeMeshPosToCellPos(currentMapData, relMeshPos)
+    if currentMapData == nil then
+        error("missing mapObject")
+    end
+    if relMeshPos == nil then
+        error("relCellPos is nil")
+    end
+    if currentMapData.Extents == nil then
+        error("mapPos.Extents is nil")
+    end
+
+    local x = util.remap(
+        relMeshPos.x,
+        0.0, 1.0,
+        currentMapData.Extents.Left,
+        currentMapData.Extents.Right + 1
+    )
+
+    local y = util.remap(
+        relMeshPos.y,
+        0.0, 1.0,
+        currentMapData.Extents.Bottom,
+        currentMapData.Extents.Top + 1
+    )
+
+    -- We can't recover Z; lossy.
+    return util.vector3(x, y, 0)
+end
+
+
+--- mapPosToRelativeCellPos converts a world-space position on the map mesh
+--- into a relative mesh position in the range [0,1]x[0,1].
+---
+--- This is the inverse of relativeMeshPosToAbsoluteMeshPos and assumes the
+--- map mesh is a planar parallelogram defined by:
+---   bottomLeft -> bottomRight (X axis)
+---   bottomLeft -> topLeft     (Y axis)
+---
+--- The implementation projects the point onto the map plane and solves
+--- for barycentric-style coordinates using dot products (no quadratics).
+---
+--- @param currentMapData MeshAnnotatedMapData
+--- @param worldPos WorldSpacePos
+--- @return RelativeMeshPos? util.vector2 or nil if degenerate
+local function mapPosToRelativeCellPos(currentMapData, worldPos)
+    if not currentMapData then
+        error("missing map data")
+    end
+    if not currentMapData.bounds then
+        error("missing map bounds")
+    end
+    if not worldPos then
+        error("worldPos is nil")
+    end
+
+    local bl = currentMapData.bounds.bottomLeft
+    local br = currentMapData.bounds.bottomRight
+    local tl = currentMapData.bounds.topLeft
+
+    -- Basis vectors of the map
+    local u = br - bl -- X axis
+    local v = tl - bl -- Y axis
+    local w = worldPos - bl
+
+    -- Precompute dot products
+    local uu = u:dot(u)
+    local uv = u:dot(v)
+    local vv = v:dot(v)
+    local wu = w:dot(u)
+    local wv = w:dot(v)
+
+    local denom = uu * vv - uv * uv
+    if math.abs(denom) < 1e-8 then
+        return nil -- Degenerate map
+    end
+
+    -- Solve for barycentric-style coordinates
+    local x = (wu * vv - wv * uv) / denom
+    local y = (wv * uu - wu * uv) / denom
+
+    return util.vector2(x, y)
+end
+
+
+
+
+--- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
+--- which is the position on the map mesh.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param relCellPos RelativeMeshPos
+--- @return WorldSpacePos?
+local function relativeMeshPosToAbsoluteMeshPos(currentMapData, relCellPos)
     if currentMapData == nil then
         error("no current map")
     end
@@ -76,10 +185,159 @@ local function relativeCellPosToMapPos(currentMapData, relCellPos)
     -- interpolate along Y between bottom and top
     local worldPos  = mutil.lerpVec3(bottomPos, topPos, relCellPos.y)
 
-    return util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
+    local out       = util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
+
+    --[[
+    local inverse   = mapPosToRelativeCellPos(currentMapData, out)
+
+    print("expected relCellPos: " ..
+        tostring(relCellPos) .. "\ninput: " ..
+        tostring(out) .. "\n actual relCellPos: " .. tostring(inverse))
+    ]]
+    return out
 end
 
+
+---@class PsoSettings
+---@field psoPushdownOnly boolean
+---@field psoDepth number
+
+---@class ViewportData
+---@field viewportPos util.vector2?
+---@field  mapWorldPos util.vector3?
+---@field  viewportFacing util.vector3?
+
+--- realPosToViewportPos turns a world space coordinate into the corresponding coordinate for the map mesh on the viewport.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param psoSettings PsoSettings
+--- @param pos WorldSpacePos
+--- @param facingWorldDir util.vector2 | util.vector3 | nil
+--- @return ViewportData?
+local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorldDir)
+    -- this works ok, but fails when the camera gets too close.
+    if not currentMapData then
+        error("no current map")
+    end
+
+    local cellPos = mutil.worldPosToCellPos(pos)
+    local rel = cellPosToRelativeMeshPos(currentMapData, cellPos)
+    if not rel then
+        return
+    end
+
+    local mapWorldPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
+
+    -- POM: Calculate vertical offset so the icon appears glued
+    -- to the surface of the map, which has been distorted according
+    -- to the parallax shader.
+    local maxHeight = heightData:get("MaxHeight")
+    local height = util.clamp(cellPos.z * mutil.CELL_SIZE, 0, maxHeight)
+    local heightMax = 0.5
+    if psoSettings.psoPushdownOnly then
+        heightMax = 1.0
+    end
+    local heightRatio = heightMax - (height / maxHeight)
+    local camPos = camera.getPosition()
+    local viewDir = (camPos - mapWorldPos):normalize()
+    --local safeZ = math.max(math.abs(viewDir.z), 0.1)
+    local safeZ = 1
+    local parallaxWorldOffset =
+        util.vector3(
+            viewDir.x / safeZ,
+            viewDir.y / safeZ,
+            0
+        ) * (psoSettings.psoDepth * heightRatio)
+    -- POM Distance fade
+    local maxPOMDistance = 1000
+    local dist = (camPos - mapWorldPos):length()
+    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
+
+    parallaxWorldOffset = parallaxWorldOffset * fade
+
+    -- Extra calcs if we need facing
+    local viewportFacing = nil
+    if facingWorldDir then
+        --print("facingWorldDir: " .. tostring(facingWorldDir))
+        facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
+        local relFacing = cellPosToRelativeMeshPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
+
+        if relFacing then
+            local mapWorldFacingPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
+            local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
+            local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
+            if s0 and s1 then
+                viewportFacing = (s1 - s0):normalize()
+            end
+        end
+    end
+
+
+    return {
+        viewportPos = h3cam.worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
+        mapWorldPos = mapWorldPos,
+        viewportFacing = viewportFacing,
+    }
+end
+
+
+local function viewportPosToRealPos(currentMapData, viewportPos)
+    if not currentMapData or not currentMapData.bounds then
+        error("missing map data")
+    end
+
+    -- 1. Ray from viewport
+    local rayOrigin, rayDir = h3cam.viewportPosToWorldRay(viewportPos)
+    if not rayOrigin then
+        print("no rayOrigin")
+        return nil
+    end
+
+    -- 2. Intersect ray with map plane
+    local bl = currentMapData.bounds.bottomLeft
+    local br = currentMapData.bounds.bottomRight
+    local tl = currentMapData.bounds.topLeft
+
+    local planeNormal = (br - bl):cross(tl - bl):normalize()
+    local denom = planeNormal:dot(rayDir)
+    if math.abs(denom) < 1e-6 then
+        print("denom is near 0")
+        return nil
+    end
+
+    local t = planeNormal:dot(bl - rayOrigin) / denom
+    if t < 0 then
+        print("t is less than 0")
+        return nil
+    end
+
+    local hitPos = rayOrigin + rayDir * t
+
+    -- 3. Map-world → relative mesh
+    local rel = mapPosToRelativeCellPos(currentMapData, hitPos)
+    if not rel then
+        print("rel is nil")
+        return nil
+    end
+
+    -- 4. Relative mesh → cell
+    local cellPos = relativeMeshPosToCellPos(currentMapData, rel)
+    if not cellPos then
+        print("cellPos is nil")
+        return nil
+    end
+    print("viewportPosToRealPos intermediate variables: cellPos: " ..
+    tostring(cellPos) .. ", rel: " .. tostring(rel) .. ", denom: " .. tostring(denom) .. ", t: " .. tostring(t))
+    -- 5. Cell → world
+    return mutil.cellPosToWorldPos(cellPos)
+end
+
+
+
 return {
-    relativeCellPos = relativeCellPos,
-    relativeCellPosToMapPos = relativeCellPosToMapPos,
+    cellPosToRelativeMeshPos = cellPosToRelativeMeshPos,
+    relativeMeshPosToAbsoluteMeshPos = relativeMeshPosToAbsoluteMeshPos,
+    relativeMeshPosToCellPos = relativeMeshPosToCellPos,
+    mapPosToRelativeCellPos = mapPosToRelativeCellPos,
+    realPosToViewportPos = realPosToViewportPos,
+    viewportPosToRealPos = viewportPosToRealPos,
 }

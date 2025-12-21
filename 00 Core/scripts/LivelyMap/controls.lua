@@ -36,6 +36,9 @@ local uiInterface     = require("openmw.interfaces").UI
 local controls        = require('openmw.interfaces').Controls
 local cameraInterface = require("openmw.interfaces").Camera
 
+local defaultHeight   = 200
+local defaultPitch    = 1
+
 -- Exit the map when one of these triggers goes off:
 for _, exitTrigger in ipairs { "Journal", "Inventory", "GameMenu" } do
     input.registerTriggerHandler(exitTrigger, async:callback(function()
@@ -114,7 +117,15 @@ local function facing2D(camViewVector)
     return util.vector3(viewDir.x, viewDir.y, 0):normalize()
 end
 
--- moveCamera safely moves the camera within acceptable bounds.
+---@class CameraData
+---@field pitch number?
+---@field yaw number?
+---@field position util.vector3?
+---@field relativePosition util.vector3?
+
+
+--- moveCamera safely moves the camera within acceptable bounds.
+---@param data CameraData
 local function moveCamera(data)
     if data == nil then
         return
@@ -132,34 +143,56 @@ local function moveCamera(data)
     end
 end
 
--- Lerp the camera to a new position.
+
+---@class TrackInfo
+---@field tracking boolean
+---@field startTime number
+---@field endTime number
+---@field onEnd fun(finished: boolean)?
+---@field startCameraData CameraData?
+---@field endCameraData CameraData?
+
+--- Lerp the camera to a new position.
+---@type TrackInfo
 local trackInfo = {
     tracking = false,
     startTime = 0,
     endTime = 0,
-    startPos = nil,
-    endPos = nil,
-    -- onEnd is invoked when tracking stops.
-    -- the parameter will be true if it completed normally
-    -- (it will be false if interrupted)
-    onEnd = nil
+    onEnd = nil,
+    startCameraData = nil,
+    endCameraData = nil,
 }
+
+---@return CameraData
+local function currentCameraData()
+    return {
+        pitch = camera.getPitch(),
+        yaw = camera.getYaw(),
+        position = camera.getPosition()
+    }
+end
 
 local function advanceTracker()
     if not trackInfo.tracking then
         return
     end
     local currentTime = core.getRealTime()
-    local intermediatePosition = nil
+    local intermediate = nil
     local i = 0
     if currentTime >= trackInfo.endTime then
         -- set to end
         i = 1
-        intermediatePosition = trackInfo.endPos
+        intermediate = {
+            position = trackInfo.endCameraData.position,
+            pitch = trackInfo.endCameraData.pitch,
+        }
     else
         -- lerp!
         i = util.remap(currentTime, trackInfo.startTime, trackInfo.endTime, 0, 1)
-        intermediatePosition = mutil.lerpVec3(i, trackInfo.startPos, trackInfo.endPos)
+        intermediate = {
+            position = mutil.lerpVec3(trackInfo.startCameraData.position, trackInfo.endCameraData.position, i),
+            pitch = mutil.lerpAngle(trackInfo.startCameraData.pitch, trackInfo.endCameraData.pitch, i)
+        }
     end
 
     if i >= 1 then
@@ -168,33 +201,62 @@ local function advanceTracker()
             trackInfo.onEnd(true)
         end
     end
-
+    --print("advanceTracker: " .. i .. ": " .. aux_util.deepToString(intermediate, 3))
     -- TODO: maybe do fancy camera movements in the future
-    moveCamera({ position = intermediatePosition })
+    moveCamera(intermediate)
 end
 
-local function trackPosition(newCameraPos, duration, onEnd)
-    if newCameraPos == nil then
-        error("trackPosition newCameraPos is required.")
-    end
-    if duration and type(duration) ~= "number" then
-        error("trackPosition duration should be a number, not a " .. type(duration))
-    end
-    if onEnd and type(onEnd) ~= "function" then
-        error("trackPosition onEnd should be a function, not a " .. type(onEnd))
+---@param cameraData CameraData
+local function trackPosition(cameraData, duration, onEnd)
+    if cameraData == nil then
+        error("trackPosition cameraData is required.")
     end
     trackInfo.tracking = true
-    trackInfo.startPos = camera.getPosition()
-    trackInfo.endPos = newCameraPos
+    trackInfo.startCameraData = currentCameraData()
+    trackInfo.endCameraData = cameraData
+
+    if trackInfo.endCameraData.relativePosition and not trackInfo.endCameraData.position then
+        trackInfo.endCameraData.position = camera.getPosition() + trackInfo.endCameraData.relativePosition
+        trackInfo.endCameraData.relativePosition = nil
+    end
+
     trackInfo.startTime = core.getRealTime()
     duration = duration or 0
     trackInfo.endTime = trackInfo.startTime + duration
     trackInfo.onEnd = onEnd
 
+    print("trackPosition: " .. aux_util.deepToString(cameraData, 3))
+
     -- Immediate advance if no duration given.
     if duration <= 0 then
         advanceTracker()
     end
+end
+
+-- cameraOffset returns a vector offset for the camera position
+-- so that the center of the viewPort lands on targetPosition.
+local function cameraOffset(targetPosition, camPitch, camViewVector)
+    local pos = targetPosition or camera.getPosition()
+    local pitch = camPitch or camera.getPitch()
+    local height = pos.z - currentMapData.object.position.z
+    local viewDir = facing2D(camViewVector)
+    print(viewDir)
+    -- 1.5708 - pitch is the angle between straight down and camera center.
+    return viewDir * (-1 * height * math.tan(1.5708 - pitch))
+end
+
+local function trackToWorldPosition(worldPos, duration, onEnd)
+    camera.setYaw(0)
+    local mapCenter = currentMapData.object:getBoundingBox().center
+    local cellPos = mutil.worldPosToCellPos(worldPos)
+    local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
+    local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
+    local heightOffset = util.vector3(0, 0, defaultHeight)
+    local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
+    trackPosition({
+        pitch = defaultPitch,
+        position = mapWorldPos + camOffset + heightOffset,
+    }, duration, onEnd)
 end
 
 local vecForward = util.vector3(0, 1, 0)
@@ -242,20 +304,7 @@ local function onFrame(dt)
     end
 end
 
--- cameraOffset returns a vector offset for the camera position
--- so that the center of the viewPort lands on targetPosition.
-local function cameraOffset(targetPosition, camPitch, camViewVector)
-    local pos = targetPosition or camera.getPosition()
-    local pitch = camPitch or camera.getPitch()
-    local height = pos.z - currentMapData.object.position.z
-    local viewDir = facing2D(camViewVector)
-    print(viewDir)
-    -- 1.5708 - pitch is the angle between straight down and camera center.
-    return viewDir * (-1 * height * math.tan(1.5708 - pitch))
-end
 
-local defaultHeight = 200
-local defaultPitch = 1
 local function onMapMoved(data)
     print("controls.onMapMoved")
     currentMapData = data
@@ -266,8 +315,8 @@ local function onMapMoved(data)
         camera.setYaw(0)
         local mapCenter = data.object:getBoundingBox().center
         local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
-        local rel = putil.relativeCellPos(currentMapData, cellPos)
-        local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
+        local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
+        local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
         local heightOffset = util.vector3(0, 0, defaultHeight)
         local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
 
@@ -275,6 +324,9 @@ local function onMapMoved(data)
             pitch = defaultPitch,
             position = mapWorldPos + camOffset + heightOffset,
         })
+
+        -- TODO: maybe this can be used instead
+        --trackToWorldPosition(data.startWorldPosition)
     end
 end
 
@@ -292,6 +344,7 @@ return {
     interface = {
         version = 1,
         trackPosition = trackPosition,
+        trackToWorldPosition = trackToWorldPosition,
     },
     engineHandlers = {
         onFrame = onFrame,

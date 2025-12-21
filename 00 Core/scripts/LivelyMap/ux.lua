@@ -29,6 +29,7 @@ local async           = require("openmw.async")
 local interfaces      = require('openmw.interfaces')
 local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
+local h3cam           = require("scripts.LivelyMap.h3.cam")
 
 local currentMapData  = nil
 
@@ -36,116 +37,12 @@ local currentMapData  = nil
 local settingCache    = {
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
-    psoUnlock       = settings.psoUnlock,
 }
 local settingsChanged = false
 settings.subscribe(async:callback(function(_, key)
     settingCache[key] = settings[key]
     settingsChanged = true
 end))
-
-
-local function isObjectBehindCamera(worldPos)
-    -- this function works perfectly
-    local cameraPos = camera.getPosition()
-    local cameraForward = util.transform.identity
-        * util.transform.rotateZ(camera.getYaw())
-        * util.vector3(0, 1, 0)
-
-    -- Direction vector from camera to object
-    local toObject = worldPos - cameraPos
-
-    -- Normalize both vectors
-    cameraForward = cameraForward:normalize()
-    toObject = toObject:normalize()
-
-    -- Calculate the dot product
-    local dotProduct = cameraForward:dot(toObject)
-
-    -- If the dot product is negative, the object is behind the camera
-    return dotProduct < 0
-end
-
-
-
-
-local function worldPosToViewportPos(worldPos)
-    -- this function works perfectly
-    local viewportPos = camera.worldToViewportVector(worldPos)
-    local screenSize = ui.screenSize()
-
-    local validX = viewportPos.x > 0 and viewportPos.x < screenSize.x
-    local validY = viewportPos.y > 0 and viewportPos.y < screenSize.y
-    local withinViewDistance = viewportPos.z <= camera.getViewDistance()
-
-    if not validX or not validY or not withinViewDistance then return end
-
-    if isObjectBehindCamera(worldPos) then return end
-
-    return util.vector2(viewportPos.x, viewportPos.y)
-end
-
-
-local function realPosToViewportPos(pos, facingWorldDir)
-    -- this works ok, but fails when the camera gets too close.
-    if not currentMapData then
-        error("no current map")
-    end
-
-    local cellPos = mutil.worldPosToCellPos(pos)
-    local rel = putil.relativeCellPos(currentMapData, cellPos)
-
-    local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
-
-    -- POM: Calculate vertical offset so the icon appears glued
-    -- to the surface of the map, which has been distorted according
-    -- to the parallax shader.
-    local maxHeight = heightData:get("MaxHeight")
-    local height = util.clamp(rel.z * mutil.CELL_SIZE, 0, maxHeight)
-    local heightMax = 0.5
-    if settingCache.psoPushdownOnly then
-        heightMax = 1.0
-    end
-    local heightRatio = heightMax - (height / maxHeight)
-    local camPos = camera.getPosition()
-    local viewDir = (camPos - mapWorldPos):normalize()
-    --local safeZ = math.max(math.abs(viewDir.z), 0.1)
-    local safeZ = 1
-    local parallaxWorldOffset =
-        util.vector3(
-            viewDir.x / safeZ,
-            viewDir.y / safeZ,
-            0
-        ) * (settingCache.psoDepth * heightRatio)
-    -- POM Distance fade
-    local maxPOMDistance = 1000
-    local dist = (camPos - mapWorldPos):length()
-    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
-
-    parallaxWorldOffset = parallaxWorldOffset * fade
-
-    -- Extra calcs if we need facing
-    local viewportFacing = nil
-    if facingWorldDir then
-        --print("facingWorldDir: " .. tostring(facingWorldDir))
-        facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
-        local relFacing = putil.relativeCellPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
-
-        local mapWorldFacingPos = putil.relativeCellPosToMapPos(currentMapData, relFacing)
-        local s0 = worldPosToViewportPos(mapWorldPos)
-        local s1 = worldPosToViewportPos(mapWorldFacingPos)
-        if s0 and s1 then
-            viewportFacing = (s1 - s0):normalize()
-        end
-    end
-
-
-    return {
-        viewportPos = worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
-        mapWorldPos = mapWorldPos,
-        viewportFacing = viewportFacing,
-    }
-end
 
 
 -- icons is a list of {widget, fn() worldPos}
@@ -181,6 +78,24 @@ local hoverBox = ui.create {
     } }
 }
 
+
+local function mapClicked(mouseEvent, data)
+    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+    print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(cameraFocusPos))
+    -- need to go from world pos to cam pos now
+    interfaces.LivelyMapControls.trackToWorldPosition(cameraFocusPos, 1)
+end
+local clickStartPos = nil
+local function mapClickPress(mouseEvent, data)
+    clickStartPos = mouseEvent.position
+end
+local function mapClickRelease(mouseEvent, data)
+    if (mouseEvent.position - clickStartPos):length2() < 30 then
+        mapClicked(mouseEvent, data)
+    end
+    clickStartPos = nil
+end
+
 local mainWindow = ui.create {
     name = "worldmaproot",
     layer = 'Windows',
@@ -188,6 +103,10 @@ local mainWindow = ui.create {
     props = {
         size = ui.screenSize(),
         visible = false,
+    },
+    events = {
+        mousePress = async:callback(mapClickPress),
+        mouseRelease = async:callback(mapClickRelease)
     },
     content = ui.content { hoverBox },
 }
@@ -267,7 +186,7 @@ local function renderIcons()
         end
 
         if iPos then
-            local pos = realPosToViewportPos(iPos, iFacing)
+            local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
             if pos.viewportPos then
                 icons[i].onScreen = true
                 -- if the icon is hover-aware, get its info and
@@ -288,11 +207,28 @@ local function renderIcons()
     end
 
     setHoverBoxContent(hovering)
+
+
+    -- debugging
+    --[[
+    local screenCenter = ui.screenSize() / 2
+    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, screenCenter)
+    if cameraFocusPos then
+        local recalced = putil.realPosToViewportPos(currentMapData, settingCache, cameraFocusPos)
+        if recalced then
+            print("viewportPosToRealPos(mapData, " .. tostring(screenCenter) .. "): " ..
+                tostring(cameraFocusPos) ..
+                "\n realPosToViewportPos(mapData, " ..
+                tostring(settingCache) .. ", " .. tostring(cameraFocusPos) .. "): " .. aux_util.deepToString(recalced, 3))
+        end
+    end
+    --]]
 end
 
 local onMapMovedHandlers = {}
 local onMapHiddenHandlers = {}
 
+---@param data MeshAnnotatedMapData
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data
