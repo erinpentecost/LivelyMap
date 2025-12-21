@@ -58,6 +58,7 @@ end
 ---@class GloballyAnnotatedMapData : StoredMapData
 ---@field player userdata The player that owns this instance.
 ---@field object userdata The map mesh static object instance.
+---@field swapped boolean? Indicates the swap-in or swap-out state of the map.
 
 ---Returns immutable map metadata.
 ---@param data string | number | HasID
@@ -97,7 +98,6 @@ local function start(data)
         persist = data
     end
 end
-
 
 local function onShowMap(data)
     if not data then

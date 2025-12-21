@@ -266,8 +266,8 @@ local function onMapMoved(data)
         camera.setYaw(0)
         local mapCenter = data.object:getBoundingBox().center
         local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
-        local rel = putil.relativeCellPos(currentMapData, cellPos)
-        local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
+        local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
+        local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
         local heightOffset = util.vector3(0, 0, defaultHeight)
         local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
 

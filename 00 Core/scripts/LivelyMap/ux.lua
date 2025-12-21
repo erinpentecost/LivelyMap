@@ -253,6 +253,7 @@ end
 local onMapMovedHandlers = {}
 local onMapHiddenHandlers = {}
 
+---@param data MeshAnnotatedMapData
 local function onMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data

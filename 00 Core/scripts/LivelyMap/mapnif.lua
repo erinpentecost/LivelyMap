@@ -23,9 +23,11 @@ local pself = require("openmw.self")
 
 -- This script is attached to the 3d floating map objects.
 
--- mapData holds read-only map metadata for this extent.
--- It also contains "player", which is the player that
--- summoned it.
+---@class MeshAnnotatedMapData : GloballyAnnotatedMapData
+---@field bounds Bounds The actual bounds of the map mesh in world space.
+
+--- mapData holds read-only map metadata for this instance.
+---@type MeshAnnotatedMapData
 local mapData = nil
 
 local function onStart(initData)
@@ -37,6 +39,13 @@ local function onSave()
     return mapData
 end
 
+---@class Bounds
+---@field bottomLeft util.vector3
+---@field bottomRight util.vector3
+---@field topLeft util.vector3
+---@field topRight util.vector3
+
+---@return Bounds
 local function getBounds()
     -- this is called on the map object
     local verts = pself:getBoundingBox().vertices
@@ -63,43 +72,14 @@ local function getBounds()
     }
 end
 
--- Returns a util.transform that maps raw world-space positions to map mesh positions
-local function worldToMapMeshTransform(bounds, extents)
-    -- Width and height of map bounds in world units
-    local worldWidth  = bounds.bottomRight.x - bounds.bottomLeft.x
-    local worldHeight = bounds.topLeft.y - bounds.bottomLeft.y
-    local scaleZ      = 1
 
-    -- Width and height in cells (inclusive)
-    local cellWidth   = extents.Right - extents.Left + 1
-    local cellHeight  = extents.Top - extents.Bottom + 1
-
-    -- Scale factors: world → map mesh
-    local scaleX      = worldWidth / (cellWidth * mutil.CELL_SIZE)
-    local scaleY      = worldHeight / (cellHeight * mutil.CELL_SIZE)
-
-    -- Translation: align extents bottom-left with bounds bottom-left
-    local moveX       = bounds.bottomLeft.x - extents.Left * mutil.CELL_SIZE * scaleX
-    local moveY       = bounds.bottomLeft.y - extents.Bottom * mutil.CELL_SIZE * scaleY
-    local moveZ       = bounds.bottomLeft.z
-
-    -- Compose single transform
-    return util.transform.identity
-        * util.transform.scale(scaleX, scaleY, scaleZ)
-        * util.transform.move(util.vector3(moveX, moveY, moveZ))
-end
-
--- onMapMoved is called when the map is placed or moved.
--- this should move/create all the annotations it owns
+---@param data GloballyAnnotatedMapData
 local function onMapMoved(data)
     if data == nil then
         error("onTeleported data is nil")
     end
 
-    mapData = data
-
-    mapData.bounds = getBounds()
-    mapData.worldToMapMeshTransform = worldToMapMeshTransform(mapData.bounds, mapData.Extents)
+    mapData = mutil.shallowMerge(data, { bounds = getBounds() })
 
     print("onTeleported")
 

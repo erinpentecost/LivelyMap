@@ -179,8 +179,8 @@ end
 
 
 return {
-    relativeCellPos = cellPosToRelativeMeshPos,
-    relativeCellPosToMapPos = relativeMeshPosToAbsoluteMeshPos,
-    relativeCellPosToCellPos = relativeMeshPosToCellPos,
+    cellPosToRelativeMeshPos = cellPosToRelativeMeshPos,
+    relativeMeshPosToAbsoluteMeshPos = relativeMeshPosToAbsoluteMeshPos,
+    relativeMeshPosToCellPos = relativeMeshPosToCellPos,
     mapPosToRelativeCellPos = mapPosToRelativeCellPos,
 }
