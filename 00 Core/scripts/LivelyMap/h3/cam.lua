@@ -47,7 +47,41 @@ local function worldPosToViewportPos(worldPos)
     return util.vector2(viewportPos.x, viewportPos.y)
 end
 
+--- viewportPosToWorldRay builds a world-space ray from a viewport pixel.
+--- This is the inverse of camera.worldToViewportVector.
+---
+--- @param viewportPos util.vector2 -- pixel coordinates
+--- @return util.vector3? rayOrigin
+--- @return util.vector3? rayDir (normalized)
+local function viewportPosToWorldRay(viewportPos)
+    if not viewportPos then
+        error("viewportPos is nil")
+    end
+
+    local screenSize = ui.screenSize()
+    if screenSize.x == 0 or screenSize.y == 0 then
+        return nil, nil
+    end
+
+    -- Convert pixels → normalized screen coordinates
+    local normalized = util.vector2(
+        viewportPos.x / screenSize.x,
+        viewportPos.y / screenSize.y
+    )
+
+    -- Camera provides a direction vector
+    local rayDir = camera.viewportToWorldVector(normalized)
+    if not rayDir then
+        return nil, nil
+    end
+
+    return camera.getPosition(), rayDir:normalize()
+end
+
+
+
 return {
     isObjectBehindCamera = isObjectBehindCamera,
     worldPosToViewportPos = worldPosToViewportPos,
+    viewportPosToWorldRay = viewportPosToWorldRay,
 }

@@ -280,22 +280,19 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
 end
 
 
---- TODO: this is UNTESTED and may not work
---- viewportPosToRealPos inverts realPosToViewportPos (without parallax)
---- @param currentMapData MeshAnnotatedMapData
---- @param viewportPos util.vector2
---- @return WorldSpacePos?
 local function viewportPosToRealPos(currentMapData, viewportPos)
     if not currentMapData or not currentMapData.bounds then
         error("missing map data")
     end
 
-    -- 1. Build a ray from the camera through the viewport
-    local rayOrigin = camera.getPosition()
-    local rayDir = camera.viewportToWorldVector(viewportPos:normalize())
+    -- 1. Ray from viewport
+    local rayOrigin, rayDir = h3cam.viewportPosToWorldRay(viewportPos)
+    if not rayOrigin then
+        print("no rayOrigin")
+        return nil
+    end
 
     -- 2. Intersect ray with map plane
-    -- Assume map is planar using bottomLeft, bottomRight, topLeft
     local bl = currentMapData.bounds.bottomLeft
     local br = currentMapData.bounds.bottomRight
     local tl = currentMapData.bounds.topLeft
@@ -303,12 +300,14 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
     local planeNormal = (br - bl):cross(tl - bl):normalize()
     local denom = planeNormal:dot(rayDir)
     if math.abs(denom) < 1e-6 then
-        return nil -- Ray parallel to map
+        print("denom is near 0")
+        return nil
     end
 
     local t = planeNormal:dot(bl - rayOrigin) / denom
     if t < 0 then
-        return nil -- Intersection behind camera
+        print("t is less than 0")
+        return nil
     end
 
     local hitPos = rayOrigin + rayDir * t
@@ -316,15 +315,18 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
     -- 3. Map-world → relative mesh
     local rel = mapPosToRelativeCellPos(currentMapData, hitPos)
     if not rel then
+        print("rel is nil")
         return nil
     end
 
     -- 4. Relative mesh → cell
     local cellPos = relativeMeshPosToCellPos(currentMapData, rel)
     if not cellPos then
+        print("cellPos is nil")
         return nil
     end
-
+    print("viewportPosToRealPos intermediate variables: cellPos: " ..
+    tostring(cellPos) .. ", rel: " .. tostring(rel) .. ", denom: " .. tostring(denom) .. ", t: " .. tostring(t))
     -- 5. Cell → world
     return mutil.cellPosToWorldPos(cellPos)
 end

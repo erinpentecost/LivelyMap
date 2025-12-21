@@ -188,14 +188,15 @@ local function renderIcons()
 
 
     -- debugging
-    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, util.vector2(0.5, 0.5))
+    local screenCenter = ui.screenSize() / 2
+    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, screenCenter)
     if cameraFocusPos then
         local recalced = putil.realPosToViewportPos(currentMapData, settingCache, cameraFocusPos)
         if recalced then
-            print("viewportPosToRealPos(mapData, util.vector2(0.5,0.5)): " ..
-            tostring(cameraFocusPos) ..
-            "\n realPosToViewportPos(mapData, " ..
-            tostring(settingCache) .. ", " .. tostring(cameraFocusPos) .. "): " .. aux_util.deepToString(recalced, 3))
+            print("viewportPosToRealPos(mapData, " .. tostring(screenCenter) .. "): " ..
+                tostring(cameraFocusPos) ..
+                "\n realPosToViewportPos(mapData, " ..
+                tostring(settingCache) .. ", " .. tostring(cameraFocusPos) .. "): " .. aux_util.deepToString(recalced, 3))
         end
     end
 end
