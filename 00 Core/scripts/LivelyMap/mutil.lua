@@ -20,6 +20,33 @@ local storage = require('openmw.storage')
 local mapData = storage.globalSection(MOD_NAME .. "_mapData")
 local util = require('openmw.util')
 
+-- https://github.com/LuaLS/lua-language-server/wiki/Annotations
+
+---@class HasID
+---@field ID number
+
+---@class Connection
+---@field east number?
+---@field west number?
+---@field south number?
+---@field north number?
+
+---@class Extents
+---@field Top number
+---@field Bottom number
+---@field Left number
+---@field Right number
+
+---@class StoredMapData : HasID
+---@field ID number
+---@field Extents Extents
+---@field ConnectedTo Connection
+---@field CenterX number
+---@field CenterY number
+
+---Returns immutable map metadata.
+---@param data string | number | HasID
+---@return StoredMapData
 local function getMap(data)
     if type(data) == "string" then
         -- find the full map data
@@ -33,6 +60,10 @@ local function getMap(data)
     error("getMap: unknown type")
 end
 
+---Returns immutable map metadata for the map closest to the provided cell coordinates.
+---@param x number Cell grid X.
+---@param y number Cell grid y.
+---@return StoredMapData
 local function getClosestMap(x, y)
     local myLocation = util.vector2(x, y)
     local closest = nil
@@ -52,10 +83,12 @@ local function getClosestMap(x, y)
     return closest
 end
 
--- getScale returns a number that is the scaling factor to use
--- with this map.
--- This is used to ensure that all extents have the same in-game
--- DPI.
+--- getScale returns a number that is the scaling factor to use
+--- with this map.
+--- This is used to ensure that all extents have the same in-game
+--- DPI.
+---@param map StoredMapData
+---@return number
 local function getScale(map)
     local extents = getMap(map).Extents
     -- the "default" size is 16x16 cells
@@ -79,11 +112,15 @@ end
 
 local CELL_SIZE = 64 * 128 -- 8192
 
+---@param worldPos util.vector2 Position in world space.
 local function worldPosToCellPos(worldPos)
     if worldPos == nil then
         error("worldPos is nil")
     end
-    -- to get actual cell, do the floor after this
+
+    --- Position in world space, but units have been changed to match cell lengths.
+    --- To get the cell grid position, take the floor of these elements.
+    ---@type util.vector3
     return util.vector3(worldPos.x / CELL_SIZE, worldPos.y / CELL_SIZE, worldPos.z / CELL_SIZE)
 end
 
@@ -92,6 +129,23 @@ local function inBox(position, box)
     return math.abs(normalized.x) <= 1
         and math.abs(normalized.y) <= 1
         and math.abs(normalized.z) <= 1
+end
+
+---@param data table
+---@param ... table
+---@return table
+local function shallowMerge(data, ...)
+    local copy = {}
+    for k, v in pairs(data) do
+        copy[k] = v
+    end
+    local arg = { ... }
+    for _, extraData in ipairs(arg) do
+        for k, v in pairs(extraData) do
+            copy[k] = v
+        end
+    end
+    return copy
 end
 
 return {
@@ -103,4 +157,5 @@ return {
     lerpVec2 = lerpVec2,
     worldPosToCellPos = worldPosToCellPos,
     inBox = inBox,
+    shallowMerge = shallowMerge,
 }

@@ -30,9 +30,9 @@ local interfaces = require('openmw.interfaces')
 
 
 
--- relativeCellPos return mapPos, but shifted by the current map Extents
+-- cellPosToRelativeMeshPos return mapPos, but shifted by the current map Extents
 -- so the bottom left becomes 0,0 and top right becomes 1,1.
-local function relativeCellPos(currentMapData, cellPos)
+local function cellPosToRelativeMeshPos(currentMapData, cellPos)
     if currentMapData == nil then
         error("missing mapObject")
         return
@@ -54,9 +54,96 @@ local function relativeCellPos(currentMapData, cellPos)
     return util.vector3(x, y, cellPos.z)
 end
 
+
+-- TODO: might be trash
+-- relativeMeshPosToCellPos converts a relative [0,1) map position
+-- back into an absolute cell position.
+local function relativeMeshPosToCellPos(currentMapData, relMeshPos)
+    if currentMapData == nil then
+        error("missing mapObject")
+    end
+    if relMeshPos == nil then
+        error("relCellPos is nil")
+    end
+    if currentMapData.Extents == nil then
+        error("mapPos.Extents is nil")
+    end
+
+    local x = util.remap(
+        relMeshPos.x,
+        0.0, 1.0,
+        currentMapData.Extents.Left,
+        currentMapData.Extents.Right + 1
+    )
+
+    local y = util.remap(
+        relMeshPos.y,
+        0.0, 1.0,
+        currentMapData.Extents.Bottom,
+        currentMapData.Extents.Top + 1
+    )
+
+    return util.vector3(x, y, relMeshPos.z)
+end
+
+
+-- TODO: might be hot trash
+local function mapPosToRelativeCellPos(currentMapData, worldPos)
+    local bl = currentMapData.bounds.bottomLeft
+    local br = currentMapData.bounds.bottomRight
+    local tl = currentMapData.bounds.topLeft
+    local tr = currentMapData.bounds.topRight
+
+    -- Work in 2D
+    local px, py = worldPos.x, worldPos.y
+
+    local ax = bl.x
+    local ay = bl.y
+
+    local bx = br.x - bl.x
+    local by = br.y - bl.y
+
+    local cx = tl.x - bl.x
+    local cy = tl.y - bl.y
+
+    local dx = tr.x - tl.x - br.x + bl.x
+    local dy = tr.y - tl.y - br.y + bl.y
+
+    -- Solve for y using quadratic
+    local A = dx * cy - dy * cx
+    local B = dx * ay - dy * ax + bx * cy - by * cx + dy * px - dx * py
+    local C = bx * ay - by * ax + by * px - bx * py
+
+    local y
+    if math.abs(A) < 1e-8 then
+        -- Degenerate to linear
+        y = -C / B
+    else
+        local disc = B * B - 4 * A * C
+        if disc < 0 then
+            error("point not on map quad")
+        end
+        local sqrtDisc = math.sqrt(disc)
+
+        local y1 = (-B + sqrtDisc) / (2 * A)
+        local y2 = (-B - sqrtDisc) / (2 * A)
+
+        -- choose solution in [0,1]
+        y = (y1 >= 0 and y1 <= 1) and y1 or y2
+    end
+
+    -- Solve for x
+    local denom = bx + dx * y
+    local x = (px - ax - cx * y) / denom
+
+    return util.vector3(x, y, 0)
+end
+
+
+
 -- relativeMapPosToWorldPos turns a relative map position to a 3D world position,
 -- which is the position on the map mesh.
-local function relativeCellPosToMapPos(currentMapData, relCellPos)
+local function relativeMeshPosToAbsoluteMeshPos(currentMapData, relCellPos)
     if currentMapData == nil then
         error("no current map")
     end
@@ -76,10 +163,24 @@ local function relativeCellPosToMapPos(currentMapData, relCellPos)
     -- interpolate along Y between bottom and top
     local worldPos  = mutil.lerpVec3(bottomPos, topPos, relCellPos.y)
 
-    return util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
+    local out       = util.vector3(worldPos.x, worldPos.y, currentMapData.bounds.bottomRight.z)
+
+    --[[
+    local inverse   = mapPosToRelativeCellPos(currentMapData, out)
+
+    print("expected relCellPos: " ..
+        tostring(relCellPos) .. "\ninput: " ..
+        tostring(out) .. "\n actual relCellPos: " .. tostring(inverse))
+    ]]
+    return out
 end
 
+
+
+
 return {
-    relativeCellPos = relativeCellPos,
-    relativeCellPosToMapPos = relativeCellPosToMapPos,
+    relativeCellPos = cellPosToRelativeMeshPos,
+    relativeCellPosToMapPos = relativeMeshPosToAbsoluteMeshPos,
+    relativeCellPosToCellPos = relativeMeshPosToCellPos,
+    mapPosToRelativeCellPos = mapPosToRelativeCellPos,
 }

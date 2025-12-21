@@ -29,6 +29,7 @@ local async           = require("openmw.async")
 local interfaces      = require('openmw.interfaces')
 local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
+local h3cam           = require("scripts.LivelyMap.h3.cam")
 
 local currentMapData  = nil
 
@@ -45,47 +46,6 @@ settings.subscribe(async:callback(function(_, key)
 end))
 
 
-local function isObjectBehindCamera(worldPos)
-    -- this function works perfectly
-    local cameraPos = camera.getPosition()
-    local cameraForward = util.transform.identity
-        * util.transform.rotateZ(camera.getYaw())
-        * util.vector3(0, 1, 0)
-
-    -- Direction vector from camera to object
-    local toObject = worldPos - cameraPos
-
-    -- Normalize both vectors
-    cameraForward = cameraForward:normalize()
-    toObject = toObject:normalize()
-
-    -- Calculate the dot product
-    local dotProduct = cameraForward:dot(toObject)
-
-    -- If the dot product is negative, the object is behind the camera
-    return dotProduct < 0
-end
-
-
-
-
-local function worldPosToViewportPos(worldPos)
-    -- this function works perfectly
-    local viewportPos = camera.worldToViewportVector(worldPos)
-    local screenSize = ui.screenSize()
-
-    local validX = viewportPos.x > 0 and viewportPos.x < screenSize.x
-    local validY = viewportPos.y > 0 and viewportPos.y < screenSize.y
-    local withinViewDistance = viewportPos.z <= camera.getViewDistance()
-
-    if not validX or not validY or not withinViewDistance then return end
-
-    if isObjectBehindCamera(worldPos) then return end
-
-    return util.vector2(viewportPos.x, viewportPos.y)
-end
-
-
 local function realPosToViewportPos(pos, facingWorldDir)
     -- this works ok, but fails when the camera gets too close.
     if not currentMapData then
@@ -93,9 +53,9 @@ local function realPosToViewportPos(pos, facingWorldDir)
     end
 
     local cellPos = mutil.worldPosToCellPos(pos)
-    local rel = putil.relativeCellPos(currentMapData, cellPos)
+    local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
 
-    local mapWorldPos = putil.relativeCellPosToMapPos(currentMapData, rel)
+    local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
 
     -- POM: Calculate vertical offset so the icon appears glued
     -- to the surface of the map, which has been distorted according
@@ -129,11 +89,11 @@ local function realPosToViewportPos(pos, facingWorldDir)
     if facingWorldDir then
         --print("facingWorldDir: " .. tostring(facingWorldDir))
         facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
-        local relFacing = putil.relativeCellPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
+        local relFacing = putil.cellPosToRelativeMeshPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
 
-        local mapWorldFacingPos = putil.relativeCellPosToMapPos(currentMapData, relFacing)
-        local s0 = worldPosToViewportPos(mapWorldPos)
-        local s1 = worldPosToViewportPos(mapWorldFacingPos)
+        local mapWorldFacingPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
+        local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
+        local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
         if s0 and s1 then
             viewportFacing = (s1 - s0):normalize()
         end
@@ -141,7 +101,7 @@ local function realPosToViewportPos(pos, facingWorldDir)
 
 
     return {
-        viewportPos = worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
+        viewportPos = h3cam.worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
         mapWorldPos = mapWorldPos,
         viewportFacing = viewportFacing,
     }
