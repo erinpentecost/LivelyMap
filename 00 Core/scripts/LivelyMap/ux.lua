@@ -82,6 +82,8 @@ local hoverBox = ui.create {
 local function mapClicked(mouseEvent, data)
     local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
     print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(cameraFocusPos))
+    -- need to go from world pos to cam pos now
+    interfaces.LivelyMapControls.trackToWorldPosition(cameraFocusPos, 1)
 end
 local clickStartPos = nil
 local function mapClickPress(mouseEvent, data)

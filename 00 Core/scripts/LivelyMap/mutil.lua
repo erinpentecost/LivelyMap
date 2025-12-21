@@ -20,6 +20,9 @@ local storage = require('openmw.storage')
 local mapData = storage.globalSection(MOD_NAME .. "_mapData")
 local util = require('openmw.util')
 
+local phi = 2 * math.pi
+local eps = 1e-12
+
 -- https://github.com/LuaLS/lua-language-server/wiki/Annotations
 
 ---@class HasID
