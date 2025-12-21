@@ -37,80 +37,12 @@ local currentMapData  = nil
 local settingCache    = {
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
-    psoUnlock       = settings.psoUnlock,
 }
 local settingsChanged = false
 settings.subscribe(async:callback(function(_, key)
     settingCache[key] = settings[key]
     settingsChanged = true
 end))
-
-
-local function realPosToViewportPos(pos, facingWorldDir)
-    -- this works ok, but fails when the camera gets too close.
-    if not currentMapData then
-        error("no current map")
-    end
-
-    local cellPos = mutil.worldPosToCellPos(pos)
-    local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
-    if not rel then
-        return
-    end
-
-    local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
-
-    -- POM: Calculate vertical offset so the icon appears glued
-    -- to the surface of the map, which has been distorted according
-    -- to the parallax shader.
-    local maxHeight = heightData:get("MaxHeight")
-    local height = util.clamp(cellPos.z * mutil.CELL_SIZE, 0, maxHeight)
-    local heightMax = 0.5
-    if settingCache.psoPushdownOnly then
-        heightMax = 1.0
-    end
-    local heightRatio = heightMax - (height / maxHeight)
-    local camPos = camera.getPosition()
-    local viewDir = (camPos - mapWorldPos):normalize()
-    --local safeZ = math.max(math.abs(viewDir.z), 0.1)
-    local safeZ = 1
-    local parallaxWorldOffset =
-        util.vector3(
-            viewDir.x / safeZ,
-            viewDir.y / safeZ,
-            0
-        ) * (settingCache.psoDepth * heightRatio)
-    -- POM Distance fade
-    local maxPOMDistance = 1000
-    local dist = (camPos - mapWorldPos):length()
-    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
-
-    parallaxWorldOffset = parallaxWorldOffset * fade
-
-    -- Extra calcs if we need facing
-    local viewportFacing = nil
-    if facingWorldDir then
-        --print("facingWorldDir: " .. tostring(facingWorldDir))
-        facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
-        local relFacing = putil.cellPosToRelativeMeshPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
-
-        if relFacing then
-            local mapWorldFacingPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
-            local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
-            local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
-            if s0 and s1 then
-                viewportFacing = (s1 - s0):normalize()
-            end
-        end
-    end
-
-
-    return {
-        viewportPos = h3cam.worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
-        mapWorldPos = mapWorldPos,
-        viewportFacing = viewportFacing,
-    }
-end
 
 
 -- icons is a list of {widget, fn() worldPos}
@@ -232,7 +164,7 @@ local function renderIcons()
         end
 
         if iPos then
-            local pos = realPosToViewportPos(iPos, iFacing)
+            local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
             if pos.viewportPos then
                 icons[i].onScreen = true
                 -- if the icon is hover-aware, get its info and

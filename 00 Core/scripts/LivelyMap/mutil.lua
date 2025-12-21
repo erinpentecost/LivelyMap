@@ -112,7 +112,8 @@ end
 
 local CELL_SIZE = 64 * 128 -- 8192
 
----@param worldPos util.vector2 Position in world space.
+---@param worldPos WorldSpacePos
+---@return CellPos
 local function worldPosToCellPos(worldPos)
     if worldPos == nil then
         error("worldPos is nil")
@@ -120,7 +121,6 @@ local function worldPosToCellPos(worldPos)
 
     --- Position in world space, but units have been changed to match cell lengths.
     --- To get the cell grid position, take the floor of these elements.
-    ---@type util.vector3
     return util.vector3(worldPos.x / CELL_SIZE, worldPos.y / CELL_SIZE, worldPos.z / CELL_SIZE)
 end
 

@@ -27,6 +27,9 @@ local ui         = require("openmw.ui")
 local settings   = require("scripts.LivelyMap.settings")
 local async      = require("openmw.async")
 local interfaces = require('openmw.interfaces')
+local heightData = storage.globalSection(MOD_NAME .. "_heightData")
+local h3cam      = require("scripts.LivelyMap.h3.cam")
+
 
 ---This is a world-space position, but x and y are divided by CELL_LENGTH.
 ---@alias CellPos util.vector3
@@ -189,6 +192,82 @@ local function relativeMeshPosToAbsoluteMeshPos(currentMapData, relCellPos)
 end
 
 
+---@class PsoSettings
+---@field psoPushdownOnly boolean
+---@field psoDepth number
+
+
+--- realPosToViewportPos turns a world space coordinate into the corresponding coordinate for the map mesh on the viewport.
+--- @param currentMapData MeshAnnotatedMapData
+--- @param psoSettings PsoSettings
+--- @param pos WorldSpacePos
+--- @param facingWorldDir util.vector2 | util.vector3 | nil
+--- @return util.vector2?
+local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorldDir)
+    -- this works ok, but fails when the camera gets too close.
+    if not currentMapData then
+        error("no current map")
+    end
+
+    local cellPos = mutil.worldPosToCellPos(pos)
+    local rel = cellPosToRelativeMeshPos(currentMapData, cellPos)
+    if not rel then
+        return
+    end
+
+    local mapWorldPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
+
+    -- POM: Calculate vertical offset so the icon appears glued
+    -- to the surface of the map, which has been distorted according
+    -- to the parallax shader.
+    local maxHeight = heightData:get("MaxHeight")
+    local height = util.clamp(cellPos.z * mutil.CELL_SIZE, 0, maxHeight)
+    local heightMax = 0.5
+    if psoSettings.psoPushdownOnly then
+        heightMax = 1.0
+    end
+    local heightRatio = heightMax - (height / maxHeight)
+    local camPos = camera.getPosition()
+    local viewDir = (camPos - mapWorldPos):normalize()
+    --local safeZ = math.max(math.abs(viewDir.z), 0.1)
+    local safeZ = 1
+    local parallaxWorldOffset =
+        util.vector3(
+            viewDir.x / safeZ,
+            viewDir.y / safeZ,
+            0
+        ) * (psoSettings.psoDepth * heightRatio)
+    -- POM Distance fade
+    local maxPOMDistance = 1000
+    local dist = (camPos - mapWorldPos):length()
+    local fade = 1.0 - util.clamp(dist / maxPOMDistance, 0, 1)
+
+    parallaxWorldOffset = parallaxWorldOffset * fade
+
+    -- Extra calcs if we need facing
+    local viewportFacing = nil
+    if facingWorldDir then
+        --print("facingWorldDir: " .. tostring(facingWorldDir))
+        facingWorldDir = util.vector3(2000 * facingWorldDir.x, 2000 * facingWorldDir.y, 0)
+        local relFacing = cellPosToRelativeMeshPos(currentMapData, mutil.worldPosToCellPos(pos + facingWorldDir))
+
+        if relFacing then
+            local mapWorldFacingPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
+            local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
+            local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
+            if s0 and s1 then
+                viewportFacing = (s1 - s0):normalize()
+            end
+        end
+    end
+
+
+    return {
+        viewportPos = h3cam.worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
+        mapWorldPos = mapWorldPos,
+        viewportFacing = viewportFacing,
+    }
+end
 
 
 return {
@@ -196,4 +275,5 @@ return {
     relativeMeshPosToAbsoluteMeshPos = relativeMeshPosToAbsoluteMeshPos,
     relativeMeshPosToCellPos = relativeMeshPosToCellPos,
     mapPosToRelativeCellPos = mapPosToRelativeCellPos,
+    realPosToViewportPos = realPosToViewportPos,
 }
