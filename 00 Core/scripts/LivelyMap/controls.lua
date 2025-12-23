@@ -32,6 +32,7 @@ local input           = require('openmw.input')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local keytrack        = require("scripts.ErnOneStick.keytrack")
 local uiInterface     = require("openmw.interfaces").UI
+local h3cam           = require("scripts.LivelyMap.h3.cam")
 
 local controls        = require('openmw.interfaces').Controls
 local cameraInterface = require("openmw.interfaces").Camera
@@ -71,45 +72,67 @@ local function clearControls()
     pself.controls.run = false
 end
 
+---@class CameraData
+---@field pitch number?
+---@field yaw number?
+---@field roll number?
+---@field position util.vector3?
+---@field relativePosition util.vector3?
+---@field mode any
+
+---@type MeshAnnotatedMapData?
 local currentMapData = nil
+
+---@return CameraData
+local function currentCameraData()
+    return {
+        pitch = camera.getPitch(),
+        yaw = camera.getYaw(),
+        position = camera.getPosition(),
+        roll = camera.getRoll(),
+        mode = camera.getMode()
+    }
+end
+
+---@param data CameraData
+local function setCamera(data)
+    camera.setMode(data.mode, true)
+    camera.setPitch(data.pitch)
+    camera.setYaw(data.yaw)
+    camera.setRoll(data.roll)
+end
 
 -- Store old camera state so we can reset to that same state
 -- once we exit the map.
-local cameraState = nil
+-- Then set the initial camera state we need.
+---@type CameraData?
+local originalCameraState = nil
 local function startCamera()
     controls.overrideMovementControls(true)
     cameraInterface.disableModeControl(MOD_NAME)
     controls.overrideUiControls(true)
     uiInterface.setHudVisibility(false)
     clearControls()
-    if cameraState == nil then
+    if originalCameraState == nil then
         -- Don't override the old state.
         -- this might be called multiple times before
         -- endCamera() is called.
-        cameraState = {
-            pitch = camera.getPitch(),
-            yaw = camera.getYaw(),
-            roll = camera.getRoll(),
-            position = camera.getPosition(),
-            mode = camera.getMode()
-        }
+        originalCameraState = currentCameraData()
     end
     camera.setMode(camera.MODE.Static, true)
 end
 
+--- Restore the camera back to original state.
 local function endCamera()
     controls.overrideMovementControls(false)
     cameraInterface.enableModeControl(MOD_NAME)
     controls.overrideUiControls(false)
     uiInterface.setHudVisibility(true)
     clearControls()
-    if cameraState then
-        camera.setMode(cameraState.mode, true)
-        camera.setPitch(cameraState.pitch)
-        camera.setYaw(cameraState.yaw)
-        camera.setRoll(cameraState.roll)
+    if originalCameraState then
+        setCamera(originalCameraState)
     end
-    cameraState = nil
+    originalCameraState = nil
 end
 
 local function facing2D(camViewVector)
@@ -117,19 +140,98 @@ local function facing2D(camViewVector)
     return util.vector3(viewDir.x, viewDir.y, 0):normalize()
 end
 
----@class CameraData
----@field pitch number?
----@field yaw number?
----@field position util.vector3?
----@field relativePosition util.vector3?
 
+
+---
+---@return util.vector2[] normalized screen positions that don't see the map
+local function getBadScreenPositions()
+    -- Screen test points (corners + center)
+    local samples = {
+        util.vector2(0, 0),
+        util.vector2(1, 0),
+        util.vector2(1, 1),
+        util.vector2(0, 1),
+        util.vector2(0.5, 0.5),
+    }
+
+    local bounds = currentMapData.bounds
+    if not bounds then
+        return samples
+    end
+
+    -- Extract rectangle extents
+    local minX = bounds.bottomLeft.x
+    local maxX = bounds.bottomRight.x
+    local minY = bounds.bottomLeft.y
+    local maxY = bounds.topLeft.y
+    local planeZ = bounds.bottomLeft.z
+
+    print("bounds: " .. aux_util.deepToString(bounds, 3))
+
+    local camPos = camera.getPosition()
+
+    -- Camera must be above the map plane
+    if camPos.z <= planeZ then
+        return samples
+    end
+
+    local badPositions = {}
+    for _, screenPos in ipairs(samples) do
+        local dir = camera.viewportToWorldVector(screenPos):normalize()
+
+        -- Ray must intersect the plane
+        if math.abs(dir.z) < 1e-6 then
+            print("no intersection for screenPos " ..
+                tostring(screenPos) .. ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()))
+            table.insert(badPositions, screenPos)
+            goto continue
+        end
+
+        local t = (planeZ - camPos.z) / dir.z
+
+        -- Intersection must be in front of camera
+        if t <= 0 then
+            print("intersection behind camera for screenPos " ..
+                tostring(screenPos) .. ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()) ..
+                ", t: " .. tostring(t))
+            table.insert(badPositions, screenPos)
+            goto continue
+        end
+
+        local hit = camPos + dir * t
+
+        -- 2D bounds containment
+        if hit.x < minX or hit.x > maxX
+            or hit.y < minY or hit.y > maxY then
+            print("intersection beyond bounds for screenpos " ..
+                tostring(screenPos) ..
+                ", dir: " ..
+                tostring(dir) ..
+                ", camerapos: " .. tostring(camera.getPosition()) .. ", t: " .. tostring(t) .. ", hit:" .. tostring(hit))
+            table.insert(badPositions, screenPos)
+            goto continue
+        end
+        :: continue ::
+    end
+
+    return badPositions
+end
 
 --- moveCamera safely moves the camera within acceptable bounds.
----@param data CameraData
+--- Once we move the camera, we won't be able to reliable read
+--- from it for the rest of the frame.
+---@param data CameraData?
 local function moveCamera(data)
     if data == nil then
         return
     end
+
+    if #getBadScreenPositions() ~= 0 then
+        print("oopsy")
+        -- if this happens, modify data
+        -- so that we will adjust the camera so the next frame will be ok.
+    end
+
 
     if data.pitch then
         camera.setPitch(data.pitch)
@@ -162,15 +264,6 @@ local trackInfo = {
     startCameraData = nil,
     endCameraData = nil,
 }
-
----@return CameraData
-local function currentCameraData()
-    return {
-        pitch = camera.getPitch(),
-        yaw = camera.getYaw(),
-        position = camera.getPosition()
-    }
-end
 
 local function advanceTracker()
     if not trackInfo.tracking then
@@ -271,7 +364,7 @@ local function onFrame(dt)
         dt = 1 / 60
     end
     -- Only track inputs while the map is up.
-    if not cameraState then
+    if not originalCameraState then
         return
     end
     -- Track inputs.
@@ -312,21 +405,7 @@ local function onMapMoved(data)
     if not data.swapped then
         -- Orient the camera so starting position is in the center.
         startCamera()
-        camera.setYaw(0)
-        local mapCenter = data.object:getBoundingBox().center
-        local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
-        local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
-        local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
-        local heightOffset = util.vector3(0, 0, defaultHeight)
-        local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
-
-        moveCamera({
-            pitch = defaultPitch,
-            position = mapWorldPos + camOffset + heightOffset,
-        })
-
-        -- TODO: maybe this can be used instead
-        --trackToWorldPosition(data.startWorldPosition)
+        trackToWorldPosition(data.startWorldPosition)
     end
 end
 

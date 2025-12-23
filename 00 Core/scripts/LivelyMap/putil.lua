@@ -57,10 +57,16 @@ local function cellPosToRelativeMeshPos(currentMapData, cellPos)
         error("mapPos.Extents is nil")
     end
     if cellPos.x < currentMapData.Extents.Left or cellPos.x > currentMapData.Extents.Right then
-        error("offsetMapPos: x position is outside extents")
+        print("cellPosToRelativeMeshPos: x position (" ..
+            tostring(cellPos.x) ..
+            ") is outside extents [" .. currentMapData.Extents.Left .. " to " .. currentMapData.Extents.Right .. "]")
+        return nil
     end
     if cellPos.y < currentMapData.Extents.Bottom or cellPos.y > currentMapData.Extents.Top then
-        error("offsetMapPos: x position is outside extents")
+        print("cellPosToRelativeMeshPos: y position (" ..
+            tostring(cellPos.y) ..
+            ")  is outside extents [" .. currentMapData.Extents.Bottom .. " to " .. currentMapData.Extents.Top .. "]")
+        return nil
     end
     local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right + 1, 0.0, 1.0)
     local y = util.remap(cellPos.y, currentMapData.Extents.Bottom, currentMapData.Extents.Top + 1, 0.0, 1.0)
@@ -68,7 +74,6 @@ local function cellPosToRelativeMeshPos(currentMapData, cellPos)
 end
 
 
--- TODO: this is NOT TESTED and might not work
 -- relativeMeshPosToCellPos converts a relative [0,1) map position
 -- back into an absolute cell position.
 --- @param currentMapData MeshAnnotatedMapData
@@ -104,17 +109,7 @@ local function relativeMeshPosToCellPos(currentMapData, relMeshPos)
 end
 
 
---- mapPosToRelativeCellPos converts a world-space position on the map mesh
---- into a relative mesh position in the range [0,1]x[0,1].
----
---- This is the inverse of relativeMeshPosToAbsoluteMeshPos and assumes the
---- map mesh is a planar parallelogram defined by:
----   bottomLeft -> bottomRight (X axis)
----   bottomLeft -> topLeft     (Y axis)
----
---- The implementation projects the point onto the map plane and solves
---- for barycentric-style coordinates using dot products (no quadratics).
----
+--- Absolute point on the mesh to corresponding world position.
 --- @param currentMapData MeshAnnotatedMapData
 --- @param worldPos WorldSpacePos
 --- @return RelativeMeshPos? util.vector2 or nil if degenerate
@@ -153,6 +148,16 @@ local function mapPosToRelativeCellPos(currentMapData, worldPos)
     -- Solve for barycentric-style coordinates
     local x = (wu * vv - wv * uv) / denom
     local y = (wv * uu - wu * uv) / denom
+
+    if x < 0 or x > 1 or y < 0 or y > 1 then
+        -- outside bounds
+        print("mapPosToRelativeCellPos outside bounds. worldPos: " ..
+            tostring(worldPos) .. ", output: " .. tostring(util.vector2(x, y)))
+        return nil
+    else
+        print("mapPosToRelativeCellPos inside bounds. worldPos: " ..
+            tostring(worldPos) .. ", output: " .. tostring(util.vector2(x, y)))
+    end
 
     return util.vector2(x, y)
 end
@@ -286,9 +291,10 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
     end
 
     -- 1. Ray from viewport
-    local rayOrigin, rayDir = h3cam.viewportPosToWorldRay(viewportPos)
-    if not rayOrigin then
-        print("no rayOrigin")
+    local rayOrigin = camera.getPosition()
+    local rayDir = h3cam.viewportPosToWorldRay(viewportPos)
+    if not rayDir then
+        print("no rayDir")
         return nil
     end
 
@@ -297,13 +303,16 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
     local br = currentMapData.bounds.bottomRight
     local tl = currentMapData.bounds.topLeft
 
-    local planeNormal = (br - bl):cross(tl - bl):normalize()
+    --local planeNormal = (br - bl):cross(tl - bl):normalize()
+    local planeNormal = util.vector3(0, 0, 1)
     local denom = planeNormal:dot(rayDir)
     if math.abs(denom) < 1e-6 then
         print("denom is near 0")
         return nil
     end
 
+    -- t is the distance from the camera to the intersecting point
+    -- on the mesh plane
     local t = planeNormal:dot(bl - rayOrigin) / denom
     if t < 0 then
         print("t is less than 0")
@@ -315,9 +324,14 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
     -- 3. Map-world → relative mesh
     local rel = mapPosToRelativeCellPos(currentMapData, hitPos)
     if not rel then
-        print("rel is nil")
+        print("rel is nil. hitPos: " ..
+            tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
+            tostring(rayDir) .. ", t:" .. tostring(t))
         return nil
     end
+    print("rel is ok! hitPos: " ..
+        tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
+        tostring(rayDir) .. ", t:" .. tostring(t))
 
     -- 4. Relative mesh → cell
     local cellPos = relativeMeshPosToCellPos(currentMapData, rel)
@@ -325,8 +339,8 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
         print("cellPos is nil")
         return nil
     end
-    print("viewportPosToRealPos intermediate variables: cellPos: " ..
-    tostring(cellPos) .. ", rel: " .. tostring(rel) .. ", denom: " .. tostring(denom) .. ", t: " .. tostring(t))
+    --[[print("viewportPosToRealPos intermediate variables: cellPos: " ..
+    tostring(cellPos) .. ", rel: " .. tostring(rel) .. ", denom: " .. tostring(denom) .. ", t: " .. tostring(t))]]
     -- 5. Cell → world
     return mutil.cellPosToWorldPos(cellPos)
 end

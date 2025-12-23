@@ -31,6 +31,7 @@ local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local h3cam           = require("scripts.LivelyMap.h3.cam")
 
+---@type MeshAnnotatedMapData
 local currentMapData  = nil
 
 -- psoDepth determines how much to offset icons on the map.
