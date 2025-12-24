@@ -256,9 +256,10 @@ end
 --- Once we move the camera, we won't be able to reliable read
 --- from it for the rest of the frame.
 ---@param data CameraData?
+---@return boolean Indicating that the camera moved to the destination.
 local function moveCamera(data)
     if data == nil then
-        return
+        return false
     end
 
     local currentPosition = camera.getPosition()
@@ -274,44 +275,51 @@ local function moveCamera(data)
     local screenPositions = getScreenPositions()
     local validPositions = screenPositionsValid(screenPositions)
 
+    local out = true
+
     if validPositions ~= 4 then
-        print("Map collision failure.")
+        --print("Map collision failure.")
         if (not screenPositions.topLeft.hitMap) and (not screenPositions.topRight.hitMap) then
             -- we are too far up.
             if currentPosition.y <= newPos.y then
                 newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+                out = false
             end
         end
         if (not screenPositions.bottomLeft.hitMap) and (not screenPositions.bottomRight.hitMap) then
             -- we are too far down.
             if currentPosition.y >= newPos.y then
                 newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+                out = false
             end
         end
         if (not screenPositions.topLeft.hitMap) and (not screenPositions.bottomLeft.hitMap) then
             -- we are too far to the left
             if currentPosition.x >= newPos.x then
                 newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+                out = false
             end
         end
         if (not screenPositions.topRight.hitMap) and (not screenPositions.bottomRight.hitMap) then
             -- we are too far to the right
             if currentPosition.x <= newPos.x then
                 newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+                out = false
             end
         end
     end
 
 
     if data.pitch then
-        camera.setPitch(data.pitch)
+        camera.setPitch(util.clamp(data.pitch, 0.9, 1.1))
     end
     if data.yaw then
-        camera.setYaw(data.yaw)
+        camera.setYaw(util.clamp(data.yaw, 0.785, 1.4))
     end
     if newPos then
         camera.setStaticPosition(newPos)
     end
+    return out
 end
 
 
@@ -322,6 +330,7 @@ end
 ---@field onEnd fun(finished: boolean)?
 ---@field startCameraData CameraData?
 ---@field endCameraData CameraData?
+---@field movesOk boolean
 
 --- Lerp the camera to a new position.
 ---@type TrackInfo
@@ -332,6 +341,7 @@ local trackInfo = {
     onEnd = nil,
     startCameraData = nil,
     endCameraData = nil,
+    movesOk = true,
 }
 
 local function advanceTracker()
@@ -357,15 +367,15 @@ local function advanceTracker()
         }
     end
 
+    local moveResult = moveCamera(intermediate)
+    trackInfo.movesOk = trackInfo.movesOk and moveResult
+
     if i >= 1 then
         trackInfo.tracking = false
         if trackInfo.onEnd then
-            trackInfo.onEnd(true)
+            trackInfo.onEnd(trackInfo.movesOk)
         end
     end
-    --print("advanceTracker: " .. i .. ": " .. aux_util.deepToString(intermediate, 3))
-    -- TODO: maybe do fancy camera movements in the future
-    moveCamera(intermediate)
 end
 
 ---@param cameraData CameraData
@@ -376,6 +386,7 @@ local function trackPosition(cameraData, duration, onEnd)
     trackInfo.tracking = true
     trackInfo.startCameraData = currentCameraData()
     trackInfo.endCameraData = cameraData
+    trackInfo.movesOk = true
 
     if trackInfo.endCameraData.relativePosition and not trackInfo.endCameraData.position then
         trackInfo.endCameraData.position = camera.getPosition() + trackInfo.endCameraData.relativePosition
