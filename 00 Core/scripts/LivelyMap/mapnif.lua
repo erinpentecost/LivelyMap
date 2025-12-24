@@ -25,6 +25,7 @@ local pself = require("openmw.self")
 
 ---@class MeshAnnotatedMapData : GloballyAnnotatedMapData
 ---@field bounds Bounds The actual bounds of the map mesh in world space.
+---@field safeBounds Bounds The safe bounds of the map mesh in world space, where the edge cells are removed.
 
 --- mapData holds read-only map metadata for this instance.
 ---@type MeshAnnotatedMapData
@@ -72,6 +73,38 @@ local function getBounds()
     }
 end
 
+---Determine the safe bounds of the map mesh in world space,
+---which is the mesh minus the equivalent of one cell length
+---on each edge.
+---@param extents Extents
+---@param realBounds Bounds
+---@return Bounds
+local function getSafeBounds(extents, realBounds)
+    local meshCellLength = math.abs((realBounds.bottomRight - realBounds.bottomLeft).x / (extents.Right - extents.Left))
+    return {
+        bottomLeft  = util.vector3(
+            realBounds.bottomLeft.x + meshCellLength,
+            realBounds.bottomLeft.y + meshCellLength,
+            realBounds.bottomLeft.z
+        ),
+        bottomRight = util.vector3(
+            realBounds.bottomRight.x - meshCellLength,
+            realBounds.bottomRight.y + meshCellLength,
+            realBounds.bottomRight.z
+        ),
+        topLeft     = util.vector3(
+            realBounds.topLeft.x + meshCellLength,
+            realBounds.topLeft.y - meshCellLength,
+            realBounds.topLeft.z
+        ),
+        topRight    = util.vector3(
+            realBounds.topRight.x - meshCellLength,
+            realBounds.topRight.y - meshCellLength,
+            realBounds.topRight.z
+        )
+    }
+end
+
 
 ---@param data GloballyAnnotatedMapData
 local function onMapMoved(data)
@@ -79,7 +112,11 @@ local function onMapMoved(data)
         error("onTeleported data is nil")
     end
 
-    mapData = mutil.shallowMerge(data, { bounds = getBounds() })
+    local bounds = getBounds()
+    mapData = mutil.shallowMerge(data, {
+        bounds = bounds,
+        safeBounds = getSafeBounds(data.Extents, bounds)
+    })
 
     print("onTeleported")
 

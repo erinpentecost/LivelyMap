@@ -32,6 +32,7 @@ local input           = require('openmw.input')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local keytrack        = require("scripts.ErnOneStick.keytrack")
 local uiInterface     = require("openmw.interfaces").UI
+local h3cam           = require("scripts.LivelyMap.h3.cam")
 
 local controls        = require('openmw.interfaces').Controls
 local cameraInterface = require("openmw.interfaces").Camera
@@ -71,45 +72,67 @@ local function clearControls()
     pself.controls.run = false
 end
 
+---@class CameraData
+---@field pitch number?
+---@field yaw number?
+---@field roll number?
+---@field position util.vector3?
+---@field relativePosition util.vector3?
+---@field mode any
+
+---@type MeshAnnotatedMapData?
 local currentMapData = nil
+
+---@return CameraData
+local function currentCameraData()
+    return {
+        pitch = camera.getPitch(),
+        yaw = camera.getYaw(),
+        position = camera.getPosition(),
+        roll = camera.getRoll(),
+        mode = camera.getMode()
+    }
+end
+
+---@param data CameraData
+local function setCamera(data)
+    camera.setMode(data.mode, true)
+    camera.setPitch(data.pitch)
+    camera.setYaw(data.yaw)
+    camera.setRoll(data.roll)
+end
 
 -- Store old camera state so we can reset to that same state
 -- once we exit the map.
-local cameraState = nil
+-- Then set the initial camera state we need.
+---@type CameraData?
+local originalCameraState = nil
 local function startCamera()
     controls.overrideMovementControls(true)
     cameraInterface.disableModeControl(MOD_NAME)
     controls.overrideUiControls(true)
     uiInterface.setHudVisibility(false)
     clearControls()
-    if cameraState == nil then
+    if originalCameraState == nil then
         -- Don't override the old state.
         -- this might be called multiple times before
         -- endCamera() is called.
-        cameraState = {
-            pitch = camera.getPitch(),
-            yaw = camera.getYaw(),
-            roll = camera.getRoll(),
-            position = camera.getPosition(),
-            mode = camera.getMode()
-        }
+        originalCameraState = currentCameraData()
     end
     camera.setMode(camera.MODE.Static, true)
 end
 
+--- Restore the camera back to original state.
 local function endCamera()
     controls.overrideMovementControls(false)
     cameraInterface.enableModeControl(MOD_NAME)
     controls.overrideUiControls(false)
     uiInterface.setHudVisibility(true)
     clearControls()
-    if cameraState then
-        camera.setMode(cameraState.mode, true)
-        camera.setPitch(cameraState.pitch)
-        camera.setYaw(cameraState.yaw)
-        camera.setRoll(cameraState.roll)
+    if originalCameraState then
+        setCamera(originalCameraState)
     end
-    cameraState = nil
+    originalCameraState = nil
 end
 
 local function facing2D(camViewVector)
@@ -117,19 +140,168 @@ local function facing2D(camViewVector)
     return util.vector3(viewDir.x, viewDir.y, 0):normalize()
 end
 
----@class CameraData
----@field pitch number?
----@field yaw number?
----@field position util.vector3?
----@field relativePosition util.vector3?
 
+---@class ScreenHit
+---@field hitMap boolean Whether this corner collided with the map mesh or not.
+---@field normalizedScreenPosition util.vector2 The normalized screen position for this corner.
+---@field worldSpace util.vector3? The world space coordinate where the ray collided with a plane that is coplanar to the map mesh.
+
+---@class ScreenHits
+---@field bottomLeft ScreenHit
+---@field bottomRight ScreenHit
+---@field topLeft ScreenHit
+---@field topRight ScreenHit
+
+---@param data ScreenHits
+---@return number
+local function screenPositionsValid(data)
+    local count = 4
+    for _, pos in pairs(data) do
+        if not pos.hitMap then
+            count = count - 1
+        end
+    end
+    return count
+end
+
+---@return ScreenHits
+local function getScreenPositions()
+    ---@type ScreenHits
+    local out = {
+        topLeft = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(0, 0),
+        },
+        topRight = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(1, 0),
+        },
+        bottomLeft = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(0, 1),
+        },
+        bottomRight = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(1, 1),
+        },
+    }
+
+
+    local bounds = currentMapData ~= nil and currentMapData.safeBounds
+    if not bounds then
+        return out
+    end
+
+    -- Extract rectangle extents
+    local minX = bounds.bottomLeft.x
+    local maxX = bounds.bottomRight.x
+    local minY = bounds.bottomLeft.y
+    local maxY = bounds.topLeft.y
+    local planeZ = bounds.bottomLeft.z
+
+    --print("bounds: " .. aux_util.deepToString(bounds, 3))
+
+    local camPos = camera.getPosition()
+
+    -- Camera must be above the map plane
+    if camPos.z <= planeZ then
+        return out
+    end
+
+    for k, screenPos in pairs(out) do
+        local dir = camera.viewportToWorldVector(screenPos.normalizedScreenPosition):normalize()
+
+        -- Ray must intersect the plane
+        if math.abs(dir.z) < 1e-6 then
+            --[[print("no intersection for screenPos " ..
+                aux_util.deepToString(screenPos, 3) ..
+                ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()))]]
+            goto continue
+        end
+
+        local t = (planeZ - camPos.z) / dir.z
+
+        -- Intersection must be in front of camera
+        if t <= 0 then
+            --[[print("intersection behind camera for screenPos " ..
+                aux_util.deepToString(screenPos, 3) ..
+                ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()) ..
+                ", t: " .. tostring(t))]]
+            goto continue
+        end
+
+        out[k].worldSpace = camPos + dir * t
+
+        -- 2D bounds containment
+        if out[k].worldSpace.x < minX or out[k].worldSpace.x > maxX
+            or out[k].worldSpace.y < minY or out[k].worldSpace.y > maxY then
+            --[[print("intersection beyond bounds for screenpos " ..
+                aux_util.deepToString(screenPos, 3) ..
+                ", dir: " ..
+                tostring(dir) ..
+                ", camerapos: " ..
+                tostring(camera.getPosition()) .. ", t: " .. tostring(t) .. ", hit:" .. tostring(out[k].worldSpace))]]
+            goto continue
+        end
+
+        -- this point is in the mesh
+        out[k].hitMap = true
+        :: continue ::
+    end
+
+    return out
+end
 
 --- moveCamera safely moves the camera within acceptable bounds.
----@param data CameraData
+--- Once we move the camera, we won't be able to reliable read
+--- from it for the rest of the frame.
+---@param data CameraData?
 local function moveCamera(data)
     if data == nil then
         return
     end
+
+    local currentPosition = camera.getPosition()
+    --- newPos replaces data.position or data.relativePosition.
+    --- This is done because we might specify a relative position
+    --- instead of an absolute position for the camera.
+    ---@type util.vector3
+    local newPos = currentPosition
+    if data.position or data.relativePosition then
+        newPos = data.position or (currentPosition + data.relativePosition)
+    end
+
+    local screenPositions = getScreenPositions()
+    local validPositions = screenPositionsValid(screenPositions)
+
+    if validPositions ~= 4 then
+        print("Map collision failure.")
+        if (not screenPositions.topLeft.hitMap) and (not screenPositions.topRight.hitMap) then
+            -- we are too far up.
+            if currentPosition.y <= newPos.y then
+                newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+            end
+        end
+        if (not screenPositions.bottomLeft.hitMap) and (not screenPositions.bottomRight.hitMap) then
+            -- we are too far down.
+            if currentPosition.y >= newPos.y then
+                newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+            end
+        end
+        if (not screenPositions.topLeft.hitMap) and (not screenPositions.bottomLeft.hitMap) then
+            -- we are too far to the left
+            if currentPosition.x >= newPos.x then
+                newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+            end
+        end
+        if (not screenPositions.topRight.hitMap) and (not screenPositions.bottomRight.hitMap) then
+            -- we are too far to the right
+            if currentPosition.x <= newPos.x then
+                newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+            end
+        end
+    end
+
 
     if data.pitch then
         camera.setPitch(data.pitch)
@@ -137,9 +309,8 @@ local function moveCamera(data)
     if data.yaw then
         camera.setYaw(data.yaw)
     end
-    if data.position or data.relativePosition then
-        local pos = data.position or (camera.getPosition() + data.relativePosition)
-        camera.setStaticPosition(pos)
+    if newPos then
+        camera.setStaticPosition(newPos)
     end
 end
 
@@ -162,15 +333,6 @@ local trackInfo = {
     startCameraData = nil,
     endCameraData = nil,
 }
-
----@return CameraData
-local function currentCameraData()
-    return {
-        pitch = camera.getPitch(),
-        yaw = camera.getYaw(),
-        position = camera.getPosition()
-    }
-end
 
 local function advanceTracker()
     if not trackInfo.tracking then
@@ -271,7 +433,7 @@ local function onFrame(dt)
         dt = 1 / 60
     end
     -- Only track inputs while the map is up.
-    if not cameraState then
+    if not originalCameraState then
         return
     end
     -- Track inputs.
@@ -312,21 +474,7 @@ local function onMapMoved(data)
     if not data.swapped then
         -- Orient the camera so starting position is in the center.
         startCamera()
-        camera.setYaw(0)
-        local mapCenter = data.object:getBoundingBox().center
-        local cellPos = mutil.worldPosToCellPos(data.startWorldPosition)
-        local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
-        local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
-        local heightOffset = util.vector3(0, 0, defaultHeight)
-        local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
-
-        moveCamera({
-            pitch = defaultPitch,
-            position = mapWorldPos + camOffset + heightOffset,
-        })
-
-        -- TODO: maybe this can be used instead
-        --trackToWorldPosition(data.startWorldPosition)
+        trackToWorldPosition(data.startWorldPosition)
     end
 end
 
