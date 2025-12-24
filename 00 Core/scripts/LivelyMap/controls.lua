@@ -141,22 +141,55 @@ local function facing2D(camViewVector)
 end
 
 
+---@class ScreenHit
+---@field hitMap boolean Whether this corner collided with the map mesh or not.
+---@field normalizedScreenPosition util.vector2 The normalized screen position for this corner.
+---@field worldSpace util.vector3? The world space coordinate where the ray collided with a plane that is coplanar to the map mesh.
 
----
----@return util.vector2[] normalized screen positions that don't see the map
-local function getBadScreenPositions()
-    -- Screen test points (corners + center)
-    local samples = {
-        util.vector2(0, 0),
-        util.vector2(1, 0),
-        util.vector2(1, 1),
-        util.vector2(0, 1),
-        util.vector2(0.5, 0.5),
+---@class ScreenHits
+---@field bottomLeft ScreenHit
+---@field bottomRight ScreenHit
+---@field topLeft ScreenHit
+---@field topRight ScreenHit
+
+---@param data ScreenHits
+---@return number
+local function screenPositionsValid(data)
+    local count = 4
+    for _, pos in pairs(data) do
+        if not pos.hitMap then
+            count = count - 1
+        end
+    end
+    return count
+end
+
+---@return ScreenHits
+local function getScreenPositions()
+    ---@type ScreenHits
+    local out = {
+        topLeft = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(0, 0),
+        },
+        topRight = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(1, 0),
+        },
+        bottomLeft = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(0, 1),
+        },
+        bottomRight = {
+            hitMap = false,
+            normalizedScreenPosition = util.vector2(1, 1),
+        },
     }
 
-    local bounds = currentMapData.bounds
+
+    local bounds = currentMapData ~= nil and currentMapData.safeBounds
     if not bounds then
-        return samples
+        return out
     end
 
     -- Extract rectangle extents
@@ -166,24 +199,23 @@ local function getBadScreenPositions()
     local maxY = bounds.topLeft.y
     local planeZ = bounds.bottomLeft.z
 
-    print("bounds: " .. aux_util.deepToString(bounds, 3))
+    --print("bounds: " .. aux_util.deepToString(bounds, 3))
 
     local camPos = camera.getPosition()
 
     -- Camera must be above the map plane
     if camPos.z <= planeZ then
-        return samples
+        return out
     end
 
-    local badPositions = {}
-    for _, screenPos in ipairs(samples) do
-        local dir = camera.viewportToWorldVector(screenPos):normalize()
+    for k, screenPos in pairs(out) do
+        local dir = camera.viewportToWorldVector(screenPos.normalizedScreenPosition):normalize()
 
         -- Ray must intersect the plane
         if math.abs(dir.z) < 1e-6 then
-            print("no intersection for screenPos " ..
-                tostring(screenPos) .. ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()))
-            table.insert(badPositions, screenPos)
+            --[[print("no intersection for screenPos " ..
+                aux_util.deepToString(screenPos, 3) ..
+                ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()))]]
             goto continue
         end
 
@@ -191,30 +223,33 @@ local function getBadScreenPositions()
 
         -- Intersection must be in front of camera
         if t <= 0 then
-            print("intersection behind camera for screenPos " ..
-                tostring(screenPos) .. ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()) ..
-                ", t: " .. tostring(t))
-            table.insert(badPositions, screenPos)
+            --[[print("intersection behind camera for screenPos " ..
+                aux_util.deepToString(screenPos, 3) ..
+                ", dir: " .. tostring(dir) .. ", camerapos: " .. tostring(camera.getPosition()) ..
+                ", t: " .. tostring(t))]]
             goto continue
         end
 
-        local hit = camPos + dir * t
+        out[k].worldSpace = camPos + dir * t
 
         -- 2D bounds containment
-        if hit.x < minX or hit.x > maxX
-            or hit.y < minY or hit.y > maxY then
-            print("intersection beyond bounds for screenpos " ..
-                tostring(screenPos) ..
+        if out[k].worldSpace.x < minX or out[k].worldSpace.x > maxX
+            or out[k].worldSpace.y < minY or out[k].worldSpace.y > maxY then
+            --[[print("intersection beyond bounds for screenpos " ..
+                aux_util.deepToString(screenPos, 3) ..
                 ", dir: " ..
                 tostring(dir) ..
-                ", camerapos: " .. tostring(camera.getPosition()) .. ", t: " .. tostring(t) .. ", hit:" .. tostring(hit))
-            table.insert(badPositions, screenPos)
+                ", camerapos: " ..
+                tostring(camera.getPosition()) .. ", t: " .. tostring(t) .. ", hit:" .. tostring(out[k].worldSpace))]]
             goto continue
         end
+
+        -- this point is in the mesh
+        out[k].hitMap = true
         :: continue ::
     end
 
-    return badPositions
+    return out
 end
 
 --- moveCamera safely moves the camera within acceptable bounds.
@@ -226,10 +261,45 @@ local function moveCamera(data)
         return
     end
 
-    if #getBadScreenPositions() ~= 0 then
-        print("oopsy")
-        -- if this happens, modify data
-        -- so that we will adjust the camera so the next frame will be ok.
+    local currentPosition = camera.getPosition()
+    --- newPos replaces data.position or data.relativePosition.
+    --- This is done because we might specify a relative position
+    --- instead of an absolute position for the camera.
+    ---@type util.vector3
+    local newPos = currentPosition
+    if data.position or data.relativePosition then
+        newPos = data.position or (currentPosition + data.relativePosition)
+    end
+
+    local screenPositions = getScreenPositions()
+    local validPositions = screenPositionsValid(screenPositions)
+
+    if validPositions ~= 4 then
+        print("Map collision failure.")
+        if (not screenPositions.topLeft.hitMap) and (not screenPositions.topRight.hitMap) then
+            -- we are too far up.
+            if currentPosition.y <= newPos.y then
+                newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+            end
+        end
+        if (not screenPositions.bottomLeft.hitMap) and (not screenPositions.bottomRight.hitMap) then
+            -- we are too far down.
+            if currentPosition.y >= newPos.y then
+                newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+            end
+        end
+        if (not screenPositions.topLeft.hitMap) and (not screenPositions.bottomLeft.hitMap) then
+            -- we are too far to the left
+            if currentPosition.x >= newPos.x then
+                newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+            end
+        end
+        if (not screenPositions.topRight.hitMap) and (not screenPositions.bottomRight.hitMap) then
+            -- we are too far to the right
+            if currentPosition.x <= newPos.x then
+                newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+            end
+        end
     end
 
 
@@ -239,9 +309,8 @@ local function moveCamera(data)
     if data.yaw then
         camera.setYaw(data.yaw)
     end
-    if data.position or data.relativePosition then
-        local pos = data.position or (camera.getPosition() + data.relativePosition)
-        camera.setStaticPosition(pos)
+    if newPos then
+        camera.setStaticPosition(newPos)
     end
 end
 
