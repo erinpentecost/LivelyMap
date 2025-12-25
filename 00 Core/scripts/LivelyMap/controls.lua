@@ -79,6 +79,7 @@ end
 ---@field position util.vector3?
 ---@field relativePosition util.vector3?
 ---@field mode any
+---@field force boolean? Ignore validation!
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -90,10 +91,12 @@ local function currentCameraData()
         yaw = camera.getYaw(),
         position = camera.getPosition(),
         roll = camera.getRoll(),
-        mode = camera.getMode()
+        mode = camera.getMode(),
+        force = false,
     }
 end
 
+---Applies data changes to the actual camera.
 ---@param data CameraData
 local function setCamera(data)
     camera.setMode(data.mode, true)
@@ -120,6 +123,7 @@ local function startCamera()
         originalCameraState = currentCameraData()
     end
     camera.setMode(camera.MODE.Static, true)
+    camera.setYaw(0)
 end
 
 --- Restore the camera back to original state.
@@ -252,14 +256,43 @@ local function getScreenPositions()
     return out
 end
 
+---@class MoveResult
+---@field success boolean  Indicates that the camera moved to the destination.
+---@field northCollision boolean?
+---@field southCollision boolean?
+---@field westCollision boolean?
+---@field eastCollision boolean?
+
+---comment
+---@param a MoveResult
+---@param b MoveResult?
+---@return MoveResult
+local function mergeMoveResult(a, b)
+    if b == nil then
+        return a
+    end
+    a.success = a.success and b.success
+    a.northCollision = a.northCollision and b.northCollision
+    a.southCollision = a.southCollision and b.southCollision
+    a.westCollision = a.westCollision and b.westCollision
+    a.eastCollision = a.eastCollision and b.eastCollision
+
+    return a
+end
+
 --- moveCamera safely moves the camera within acceptable bounds.
 --- Once we move the camera, we won't be able to reliable read
 --- from it for the rest of the frame.
 ---@param data CameraData?
----@return boolean Indicating that the camera moved to the destination.
+---@return MoveResult
 local function moveCamera(data)
+    ---@type MoveResult
+    local out = { success = true }
+
     if data == nil then
-        return false
+        error("moveCamera: nil data!!")
+        out.success = false
+        return out
     end
 
     local currentPosition = camera.getPosition()
@@ -272,39 +305,43 @@ local function moveCamera(data)
         newPos = data.position or (currentPosition + data.relativePosition)
     end
 
-    local screenPositions = getScreenPositions()
-    local validPositions = screenPositionsValid(screenPositions)
+    if not data.force then
+        local screenPositions = getScreenPositions()
+        local validPositions = screenPositionsValid(screenPositions)
 
-    local out = true
-
-    if validPositions ~= 4 then
-        --print("Map collision failure.")
-        if (not screenPositions.topLeft.hitMap) and (not screenPositions.topRight.hitMap) then
-            -- we are too far up.
-            if currentPosition.y <= newPos.y then
-                newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
-                out = false
+        if validPositions ~= 4 then
+            --print("Map collision failure.")
+            if (not screenPositions.topLeft.hitMap) and (not screenPositions.topRight.hitMap) then
+                -- we are too far up.
+                if currentPosition.y <= newPos.y then
+                    newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+                    out.success = false
+                    out.northCollision = true
+                end
             end
-        end
-        if (not screenPositions.bottomLeft.hitMap) and (not screenPositions.bottomRight.hitMap) then
-            -- we are too far down.
-            if currentPosition.y >= newPos.y then
-                newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
-                out = false
+            if (not screenPositions.bottomLeft.hitMap) and (not screenPositions.bottomRight.hitMap) then
+                -- we are too far down.
+                if currentPosition.y >= newPos.y then
+                    newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+                    out.success = false
+                    out.southCollision = true
+                end
             end
-        end
-        if (not screenPositions.topLeft.hitMap) and (not screenPositions.bottomLeft.hitMap) then
-            -- we are too far to the left
-            if currentPosition.x >= newPos.x then
-                newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
-                out = false
+            if (not screenPositions.topLeft.hitMap) and (not screenPositions.bottomLeft.hitMap) then
+                -- we are too far to the left
+                if currentPosition.x >= newPos.x then
+                    newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+                    out.success = false
+                    out.westCollision = true
+                end
             end
-        end
-        if (not screenPositions.topRight.hitMap) and (not screenPositions.bottomRight.hitMap) then
-            -- we are too far to the right
-            if currentPosition.x <= newPos.x then
-                newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
-                out = false
+            if (not screenPositions.topRight.hitMap) and (not screenPositions.bottomRight.hitMap) then
+                -- we are too far to the right
+                if currentPosition.x <= newPos.x then
+                    newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+                    out.success = false
+                    out.eastCollision = true
+                end
             end
         end
     end
@@ -319,6 +356,7 @@ local function moveCamera(data)
     if newPos then
         camera.setStaticPosition(newPos)
     end
+    --print("moveCamera(" .. aux_util.deepToString(data, 3) .. "): " .. aux_util.deepToString(out, 3))
     return out
 end
 
@@ -327,10 +365,10 @@ end
 ---@field tracking boolean
 ---@field startTime number
 ---@field endTime number
----@field onEnd fun(finished: boolean)?
+---@field onEnd fun(result: MoveResult?)?
 ---@field startCameraData CameraData?
 ---@field endCameraData CameraData?
----@field movesOk boolean
+---@field movesResult MoveResult
 
 --- Lerp the camera to a new position.
 ---@type TrackInfo
@@ -341,7 +379,7 @@ local trackInfo = {
     onEnd = nil,
     startCameraData = nil,
     endCameraData = nil,
-    movesOk = true,
+    movesResult = { success = true },
 }
 
 local function advanceTracker()
@@ -367,26 +405,28 @@ local function advanceTracker()
         }
     end
 
-    local moveResult = moveCamera(intermediate)
-    trackInfo.movesOk = trackInfo.movesOk and moveResult
+    trackInfo.movesResult = mergeMoveResult(trackInfo.movesResult, moveCamera(intermediate))
 
     if i >= 1 then
         trackInfo.tracking = false
         if trackInfo.onEnd then
-            trackInfo.onEnd(trackInfo.movesOk)
+            trackInfo.onEnd(trackInfo.movesResult)
         end
     end
 end
 
 ---@param cameraData CameraData
+---@param duration number?
+---@param onEnd fun(result: MoveResult?)?
 local function trackPosition(cameraData, duration, onEnd)
+    --print("trackPosition: " .. aux_util.deepToString(cameraData, 3))
     if cameraData == nil then
         error("trackPosition cameraData is required.")
     end
     trackInfo.tracking = true
     trackInfo.startCameraData = currentCameraData()
     trackInfo.endCameraData = cameraData
-    trackInfo.movesOk = true
+    trackInfo.movesResult = { success = true }
 
     if trackInfo.endCameraData.relativePosition and not trackInfo.endCameraData.position then
         trackInfo.endCameraData.position = camera.getPosition() + trackInfo.endCameraData.relativePosition
@@ -397,13 +437,6 @@ local function trackPosition(cameraData, duration, onEnd)
     duration = duration or 0
     trackInfo.endTime = trackInfo.startTime + duration
     trackInfo.onEnd = onEnd
-
-    print("trackPosition: " .. aux_util.deepToString(cameraData, 3))
-
-    -- Immediate advance if no duration given.
-    if duration <= 0 then
-        advanceTracker()
-    end
 end
 
 -- cameraOffset returns a vector offset for the camera position
@@ -413,23 +446,46 @@ local function cameraOffset(targetPosition, camPitch, camViewVector)
     local pitch = camPitch or camera.getPitch()
     local height = pos.z - currentMapData.object.position.z
     local viewDir = facing2D(camViewVector)
-    print(viewDir)
     -- 1.5708 - pitch is the angle between straight down and camera center.
     return viewDir * (-1 * height * math.tan(1.5708 - pitch))
 end
 
-local function trackToWorldPosition(worldPos, duration, onEnd)
-    camera.setYaw(0)
+---@param worldPos util.vector3
+---@return CameraData?
+local function worldPosToCameraPos(worldPos)
+    if not currentMapData then
+        error("currentMapData is nil")
+    end
     local mapCenter = currentMapData.object:getBoundingBox().center
     local cellPos = mutil.worldPosToCellPos(worldPos)
     local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
+    if not rel then
+        return nil
+    end
     local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
     local heightOffset = util.vector3(0, 0, defaultHeight)
+    --- these vars are all good!
+    ---print("cellPos:" .. tostring(cellPos) .. ", rel:" .. tostring(rel) .. ", mapmeshpos:" .. tostring(mapWorldPos))
     local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
-    trackPosition({
+    local camData = {
         pitch = defaultPitch,
         position = mapWorldPos + camOffset + heightOffset,
-    }, duration, onEnd)
+    }
+    return camData
+end
+
+---@param worldPos util.vector3
+---@param duration number?
+---@param onEnd fun(result: MoveResult?)?
+local function trackToWorldPosition(worldPos, duration, onEnd)
+    print("trackToWorldPosition(" ..
+        aux_util.deepToString(worldPos, 3) ..
+        ", " .. tostring(duration) .. ", " .. aux_util.deepToString(onEnd, 1) .. ")")
+    local camPos = worldPosToCameraPos(worldPos)
+    if not camPos then
+        return nil
+    end
+    trackPosition(camPos, duration, onEnd)
 end
 
 local vecForward = util.vector3(0, 1, 0)
@@ -467,8 +523,9 @@ local function onFrame(dt)
         })
         -- Interrupt tracking
         if trackInfo.tracking then
+            trackInfo.movesResult.success = false
             if trackInfo.onEnd then
-                trackInfo.onEnd(false)
+                trackInfo.onEnd(trackInfo.movesResult)
             end
         end
         trackInfo.tracking = false
@@ -485,7 +542,10 @@ local function onMapMoved(data)
     if not data.swapped then
         -- Orient the camera so starting position is in the center.
         startCamera()
-        trackToWorldPosition(data.startWorldPosition)
+        print("initial track start")
+        local camPos = worldPosToCameraPos(data.startWorldPosition)
+        camPos.force = true
+        moveCamera(camPos)
     end
 end
 
