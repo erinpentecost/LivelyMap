@@ -144,18 +144,22 @@ local function inBox(position, box)
         and math.abs(normalized.z) <= 1
 end
 
----@param data table
----@param ... table
+---@param data table?
+---@param ... table?
 ---@return table
 local function shallowMerge(data, ...)
     local copy = {}
-    for k, v in pairs(data) do
-        copy[k] = v
+    if data ~= nil then
+        for k, v in pairs(data) do
+            copy[k] = v
+        end
     end
     local arg = { ... }
     for _, extraData in ipairs(arg) do
-        for k, v in pairs(extraData) do
-            copy[k] = v
+        if extraData ~= nil then
+            for k, v in pairs(extraData) do
+                copy[k] = v
+            end
         end
     end
     return copy

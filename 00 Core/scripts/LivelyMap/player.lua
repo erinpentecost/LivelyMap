@@ -79,7 +79,8 @@ local function merge(a, b)
 
     return {
         id = b.id or a.id,
-        paths = result_paths
+        paths = result_paths,
+        extra = mutil.shallowMerge(b, a),
     }
 end
 
@@ -90,8 +91,14 @@ local fromSave = {
     extra = {},
 }
 
--- mergedData contains the merged data from the savegame and file,
--- for all saves. The key is the playerName.
+---@class SavedPlayerData
+---@field id string
+---@field paths
+---@field extra any
+
+--- mergedData contains the merged data from the savegame and file,
+--- for all saves. The key is the playerName.
+---@type {[string]: SavedPlayerData}
 local allData = {}
 allData[playerName] = {
     id = playerName,
