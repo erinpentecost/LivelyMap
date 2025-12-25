@@ -62,10 +62,9 @@ local color = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
 local baseSize = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path)
-    local pip = ui.create {
+    local element = ui.create {
         name = "detect",
         type = ui.TYPE.Image,
-        layer = iutil.layer,
         props = {
             visible = false,
             position = util.vector2(100, 100),
@@ -77,26 +76,26 @@ local function newDetectIcon(path)
         }
     }
     local icon = {
-        pip = pip,
+        element = element,
         entity = nil,
         freed = true,
         pos = function() return nil end,
         onDraw = function(posData, s)
             -- s is this icon.
             if s.freed then
-                pip.layout.props.visible = false
+                element.layout.props.visible = false
             else
-                pip.layout.props.size = baseSize * iutil.distanceScale(posData)
-                pip.layout.props.visible = true
-                pip.layout.props.position = posData.viewportPos
+                element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                element.layout.props.visible = true
+                element.layout.props.position = posData.viewportPos
             end
-            pip:update()
+            element:update()
         end,
         onHide = function(s)
             -- s is this icon.
             --print("hiding " .. getRecord(s.entity).name)
-            pip.layout.props.visible = false
-            pip:update()
+            element.layout.props.visible = false
+            element:update()
         end,
         onHover = function(posData, s)
             return {
@@ -129,7 +128,7 @@ end)
 local function makeIcon(iconPool, entity, pos)
     --print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))
     local icon = iconPool:obtain()
-    icon.pip.layout.props.visible = true
+    icon.element.layout.props.visible = true
     icon.pos = function()
         return pos
     end
@@ -221,7 +220,7 @@ local function freeIcons()
             -- in onHide() being called.
             return nil
         end
-        icon.pip.layout.props.visible = false
+        icon.element.layout.props.visible = false
         icon.freed = true
         icon.entity = nil
         icon.pool:free(icon)

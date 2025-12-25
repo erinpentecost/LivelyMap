@@ -48,10 +48,9 @@ local function makeDebugPips()
                     100 * mutil.CELL_SIZE
                 )
 
-                local pip = ui.create {
+                local element = ui.create {
                     name = "debug_" .. tostring(x) .. "_" .. tostring(y),
                     type = ui.TYPE.Image,
-                    layer = iutil.layer,
                     props = {
                         visible = false,
                         position = util.vector2(100, 100),
@@ -77,21 +76,21 @@ local function makeDebugPips()
                     return castResult.hitPos
                 end
                 table.insert(debugIcons, {
-                    pip = pip,
+                    element = element,
                     pos = worldPos,
                     onDraw = function(posData)
                         if not debugEnabled then
-                            pip.layout.props.visible = false
+                            element.layout.props.visible = false
                             return
                         end
-                        pip.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData)
-                        pip.layout.props.visible = true
-                        pip.layout.props.position = posData.viewportPos
-                        pip:update()
+                        element.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData)
+                        element.layout.props.visible = true
+                        element.layout.props.position = posData.viewportPos
+                        element:update()
                     end,
                     onHide = function()
-                        pip.layout.props.visible = false
-                        pip:update()
+                        element.layout.props.visible = false
+                        element:update()
                     end,
                 })
             end

@@ -97,6 +97,18 @@ local function mapClickRelease(mouseEvent, data)
     clickStartPos = nil
 end
 
+local iconContainer = ui.create {
+    name = "icons",
+    --layer = 'Windows',
+    type = ui.TYPE.Widget,
+    props = {
+        size = ui.screenSize(),
+    },
+    events = {
+    },
+    content = ui.content {},
+}
+
 local mainWindow = ui.create {
     name = "worldmaproot",
     layer = 'Windows',
@@ -109,7 +121,7 @@ local mainWindow = ui.create {
         mousePress = async:callback(mapClickPress),
         mouseRelease = async:callback(mapClickRelease)
     },
-    content = ui.content { hoverBox },
+    content = ui.content { iconContainer, hoverBox },
 }
 
 local function setHoverBoxContent(content)
@@ -150,6 +162,7 @@ local function renderIcons()
     if currentMapData == nil then
         for i = #icons, 1, -1 do
             if icons[i].remove then
+                --iconContainer.layout.content[icons[i].name]:destroy()
                 table.remove(icons, i)
             else
                 hideIcon(icons[i])
@@ -209,6 +222,11 @@ local function renderIcons()
 
     setHoverBoxContent(hovering)
 
+    mainWindow:update()
+    print("render icons done")
+
+    --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
+
 
     -- debugging
     --[[
@@ -260,6 +278,7 @@ local function onMapHidden(data)
         mainWindow.layout.props.visible = false
         mainWindow:update()
     end
+    -- TODO: maybe hide icons
 end
 
 local lastCameraPos = nil
@@ -279,6 +298,8 @@ local function onUpdate(dt)
             renderIcons()
         end
     end
+    --- TODO: icons aren't being drawn on the first frame of map spawn,
+    --- probably because the camera is not in the right spot.
 end
 
 local function summonMap(id)
@@ -330,10 +351,13 @@ local function onConsoleCommand(mode, command, selectedObject)
     end
 end
 
-
+local nextName = 0
 local function registerIcon(icon)
     if not icon then
         error("registerIcon icon is nil")
+    end
+    if not icon.element or type(icon.element) ~= "userdata" then
+        error("registerIcon icon.element is: " .. aux_util.deepToString(icon, 3) .. ", expected UI element.")
     end
     if not icon.pos then
         error("registerIcon icon.pos is nil: " .. aux_util.deepToString(icon, 3))
@@ -344,13 +368,20 @@ local function registerIcon(icon)
     if not icon.onHide then
         error("registerIcon icon.onHide is nil: " .. aux_util.deepToString(icon, 3))
     end
+
+    nextName = nextName + 1
+    local name = "icon_" .. tostring(nextName)
     table.insert(icons, {
         -- onScreen exists so we don't call onHide every frame.
         onScreen = false,
         -- remove is used to signal deletion
         remove = false,
         ref = icon,
+        name = name,
     })
+    icon.element.layout.name = name
+    icon.onHide()
+    iconContainer.layout.content:add(icon.element)
 end
 
 

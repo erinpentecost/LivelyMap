@@ -37,7 +37,6 @@ local smokeAtlas = imageAtlas.constructAtlas({
     create = true,
 })
 smokeAtlas:spawn({
-    layer = iutil.layer,
     anchor = util.vector2(0.5, 0.5),
     color = color,
 })
@@ -58,6 +57,7 @@ local animIndex = 1
 local animSpeed = 1 / 30
 
 local smokeIcon = {
+    element = smokeAtlas:getElement(),
     pos = function()
         return redMountainPos
     end,
