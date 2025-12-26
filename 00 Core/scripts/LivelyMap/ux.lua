@@ -31,7 +31,7 @@ local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local h3cam           = require("scripts.LivelyMap.h3.cam")
 
----@type MeshAnnotatedMapData
+---@type MeshAnnotatedMapData?
 local currentMapData  = nil
 
 -- psoDepth determines how much to offset icons on the map.
@@ -124,13 +124,17 @@ local mainWindow = ui.create {
     content = ui.content { iconContainer, hoverBox },
 }
 
+--- Change hover box content.
+---@param content any[] UI element or layout array. Set to empty or nil to clear the hover box.
 local function setHoverBoxContent(content)
-    -- delete old items in hovercontent
-    for _, old in ipairs(hoverBox.layout.content["vflex"].content) do
+    -- delete old items in hovercontent?
+    --[[for _, old in ipairs(hoverBox.layout.content["vflex"].content) do
         if old.destroy then
             old:destroy()
         end
-    end
+    end]]
+
+    -- TODO: this is bad. just make it show one thing only.
     local temp = ui.content {}
 
     if content and #content > 0 then
@@ -172,7 +176,7 @@ local function renderIcons()
     end
 
     -- Track which icons we are hovering over.
-    local hovering = {}
+    --local hovering = {}
 
     -- Render all the icons.
     for i = #icons, 1, -1 do
@@ -201,14 +205,14 @@ local function renderIcons()
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
-            if pos.viewportPos then
+            if pos and pos.viewportPos then
                 icons[i].onScreen = true
                 -- if the icon is hover-aware, get its info and
                 -- embed the hover status in the pos table.
-                if icons[i].ref.onHover and closeToCenter(pos.viewportPos) then
+                --[[if icons[i].ref.onHover and closeToCenter(pos.viewportPos) then
                     pos.hovering = true
                     table.insert(hovering, icons[i].ref.onHover(pos, icons[i].ref))
-                end
+                end]]
                 icons[i].ref.onDraw(pos, icons[i].ref)
             else
                 hideIcon(icons[i])
@@ -220,10 +224,9 @@ local function renderIcons()
         ::continue::
     end
 
-    setHoverBoxContent(hovering)
+    --setHoverBoxContent(hovering)
 
     mainWindow:update()
-    print("render icons done")
 
     --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
 
@@ -278,12 +281,17 @@ local function onMapHidden(data)
         mainWindow.layout.props.visible = false
         mainWindow:update()
     end
-    -- TODO: maybe hide icons
+    -- TODO: maybe hide icons?
+    currentMapData = nil
 end
 
-local lastCameraPos = nil
+--local lastCameraPos = nil
 local function onUpdate(dt)
-    if settingsChanged then
+    if currentMapData == nil then
+        return
+    end
+    renderIcons()
+    --[[if settingsChanged then
         renderIcons()
         settingsChanged = false
         return
@@ -297,7 +305,7 @@ local function onUpdate(dt)
             lastCameraPos = curPos
             renderIcons()
         end
-    end
+        end]]
     --- TODO: icons aren't being drawn on the first frame of map spawn,
     --- probably because the camera is not in the right spot.
 end
@@ -397,6 +405,7 @@ return {
     interface = {
         version = 1,
         registerIcon = registerIcon,
+        setHoverBoxContent = setHoverBoxContent,
         onMapMoved = function(fn)
             return addHandler(fn, onMapMovedHandlers)
         end,
