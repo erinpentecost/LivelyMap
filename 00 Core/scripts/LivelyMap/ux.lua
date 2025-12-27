@@ -87,8 +87,9 @@ local mouseData = {
     dragging = false,
     clickStartViewportPos = nil,
     clickStartWorldPos = nil,
-    pixelRight = nil,
-    pixelUp = nil,
+    thousandPixelsRight = nil,
+    thousandPixelsUp = nil,
+    dragThreshold = 10,
 }
 local function mapClicked(mouseEvent, data)
     print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(mouseData.clickStartWorldPos))
@@ -98,6 +99,21 @@ end
 local function mapClickPress(mouseEvent, data)
     mouseData.clickStartViewportPos = mouseEvent.position
     mouseData.clickStartWorldPos    = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+end
+local function mapClickRelease(mouseEvent, data)
+    if (mouseEvent.position - mouseData.clickStartViewportPos):length2() < mouseData.dragThreshold then
+        mapClicked(mouseEvent, data)
+    end
+    mouseData.clickStartViewportPos = nil
+    mouseData.clickStartWorldPos = nil
+    mouseData.dragging = false
+    mouseData.thousandPixelsRight = nil
+    mouseData.thousandPixelsUp = nil
+end
+local function mapDragStart(mouseEvent, data)
+    -- re-anchor drag start
+    mouseData.clickStartViewportPos = mouseEvent.position
+
     -- Snapshot projection basis
     local rightWorld                = putil.viewportPosToRealPos(
         currentMapData,
@@ -112,25 +128,7 @@ local function mapClickPress(mouseEvent, data)
     mouseData.thousandPixelsRight   = rightWorld - mouseData.clickStartWorldPos
     mouseData.thousandPixelsUp      = upWorld - mouseData.clickStartWorldPos
 end
-local function mapClickRelease(mouseEvent, data)
-    if (mouseEvent.position - mouseData.clickStartViewportPos):length2() < 30 then
-        mapClicked(mouseEvent, data)
-    end
-    mouseData.clickStartViewportPos = nil
-    mouseData.clickStartWorldPos = nil
-    mouseData.dragging = false
-end
-local function mapMouseMove(mouseEvent, data)
-    if not mouseData.clickStartViewportPos then
-        return
-    end
-    if (not mouseData.dragging) and (mouseEvent.position - mouseData.clickStartViewportPos):length2() >= 30 then
-        mouseData.dragging = true
-    end
-    if not mouseData.dragging then
-        return
-    end
-
+local function mapDragging(mouseEvent, data)
     local deltaViewport =
         mouseEvent.position - mouseData.clickStartViewportPos
 
@@ -140,6 +138,20 @@ local function mapMouseMove(mouseEvent, data)
         mouseData.thousandPixelsUp * (-deltaViewport.y) / 1000
 
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos + deltaWorld, 0)
+end
+local function mapMouseMove(mouseEvent, data)
+    if not mouseData.clickStartViewportPos then
+        return
+    end
+    if (not mouseData.dragging) and (mouseEvent.position - mouseData.clickStartViewportPos):length2() >= mouseData.dragThreshold then
+        mapDragStart(mouseEvent, data)
+        mouseData.dragging = true
+    end
+    if not mouseData.dragging then
+        return
+    end
+
+    mapDragging(mouseEvent, data)
 end
 
 
