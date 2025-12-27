@@ -62,21 +62,13 @@ local hoverBox = ui.create {
     template = interfaces.MWUI.templates.boxSolid,
     props = {
         --relativePosition = util.vector2(0.5, 0.5),
-        --size = util.vector2(30, 30),
+        --size = util.vector2(200, 50),
         --anchor = util.vector2(0.5, 0.5),
         relativePosition = util.vector2(0.5, 0.9),
         anchor = util.vector2(0.5, 1),
         visible = false
     },
-    content = ui.content { {
-        name = "vflex",
-        type = ui.TYPE.Flex,
-        props = {
-            arrange = ui.ALIGNMENT.Center,
-            horizontal = false,
-        },
-        content = ui.content {},
-    } }
+    content = ui.content {}
 }
 
 
@@ -125,30 +117,15 @@ local mainWindow = ui.create {
 }
 
 --- Change hover box content.
----@param content any[] UI element or layout array. Set to empty or nil to clear the hover box.
-local function setHoverBoxContent(content)
-    -- delete old items in hovercontent?
-    --[[for _, old in ipairs(hoverBox.layout.content["vflex"].content) do
-        if old.destroy then
-            old:destroy()
-        end
-    end]]
-
-    -- TODO: this is bad. just make it show one thing only.
-    local temp = ui.content {}
-
-    if content and #content > 0 then
+---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
+local function setHoverBoxContent(layout)
+    if layout then
+        hoverBox.layout.content = ui.content { layout }
         hoverBox.layout.props.visible = true
-
-        for _, c in ipairs(content) do
-            temp:add(c)
-        end
     else
+        hoverBox.layout.content = ui.content {}
         hoverBox.layout.props.visible = false
     end
-
-    hoverBox.layout.content["vflex"].content = temp
-
     hoverBox:update()
 end
 
@@ -174,9 +151,6 @@ local function renderIcons()
         end
         return
     end
-
-    -- Track which icons we are hovering over.
-    --local hovering = {}
 
     -- Render all the icons.
     for i = #icons, 1, -1 do
@@ -205,14 +179,8 @@ local function renderIcons()
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
-            if pos and pos.viewportPos then
+            if pos and pos.viewportPos and pos.viewportPos.onScreen then
                 icons[i].onScreen = true
-                -- if the icon is hover-aware, get its info and
-                -- embed the hover status in the pos table.
-                --[[if icons[i].ref.onHover and closeToCenter(pos.viewportPos) then
-                    pos.hovering = true
-                    table.insert(hovering, icons[i].ref.onHover(pos, icons[i].ref))
-                end]]
                 icons[i].ref.onDraw(pos, icons[i].ref)
             else
                 hideIcon(icons[i])
@@ -224,7 +192,6 @@ local function renderIcons()
         ::continue::
     end
 
-    --setHoverBoxContent(hovering)
 
     mainWindow:update()
 

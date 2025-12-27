@@ -27,10 +27,12 @@ local function isObjectBehindCamera(worldPos)
     return dotProduct < 0
 end
 
-
+---@class ViewportPosResult
+---@field pos util.vector2?
+---@field onScreen boolean
 
 ---@param worldPos util.vector3
----@return util.vector2?
+---@return ViewportPosResult
 local function worldPosToViewportPos(worldPos)
     -- This is from h3.
     local viewportPos = camera.worldToViewportVector(worldPos)
@@ -40,11 +42,16 @@ local function worldPosToViewportPos(worldPos)
     local validY = viewportPos.y > 0 and viewportPos.y < screenSize.y
     local withinViewDistance = viewportPos.z <= camera.getViewDistance()
 
-    if not validX or not validY or not withinViewDistance then return end
+    if isObjectBehindCamera(worldPos) then return { onScreen = false } end
 
-    if isObjectBehindCamera(worldPos) then return end
+    local pos = util.vector2(viewportPos.x, viewportPos.y)
 
-    return util.vector2(viewportPos.x, viewportPos.y)
+    if not validX or not validY or not withinViewDistance then
+        return
+        { pos = pos, onScreen = false }
+    end
+
+    return { pos = pos, onScreen = true }
 end
 
 --- Builds a world-space ray from a viewport pixel.

@@ -84,6 +84,7 @@ local function newDetectIcon(path)
         entity = nil,
         freed = true,
         pos = function() return nil end,
+        ---@param posData ViewportData
         onDraw = function(posData, s)
             -- s is this icon.
             if s.freed then
@@ -91,7 +92,7 @@ local function newDetectIcon(path)
             else
                 element.layout.props.size = baseSize * iutil.distanceScale(posData)
                 element.layout.props.visible = true
-                element.layout.props.position = posData.viewportPos
+                element.layout.props.position = posData.viewportPos.pos
             end
             element:update()
         end,
@@ -104,7 +105,7 @@ local function newDetectIcon(path)
     }
 
     local focusGain = function()
-        print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
+        --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         if icon.entity then
             local hover = {
                 template = interfaces.MWUI.templates.textHeader,
@@ -117,13 +118,13 @@ local function newDetectIcon(path)
                     textColor = color,
                 }
             }
-            interfaces.LivelyMapDraw.setHoverBoxContent({ hover })
+            interfaces.LivelyMapDraw.setHoverBoxContent(hover)
         end
     end
 
     element.layout.events.focusGain = async:callback(focusGain)
     element.layout.events.focusLoss = async:callback(function()
-        print("focusLoss: " .. aux_util.deepToString(icon.entity, 3))
+        --print("focusLoss: " .. aux_util.deepToString(icon.entity, 3))
         interfaces.LivelyMapDraw.setHoverBoxContent()
         return nil
     end)

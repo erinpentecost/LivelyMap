@@ -78,6 +78,7 @@ local function makeDebugPips()
                 table.insert(debugIcons, {
                     element = element,
                     pos = worldPos,
+                    ---@param posData ViewportData
                     onDraw = function(posData)
                         if not debugEnabled then
                             element.layout.props.visible = false
@@ -85,7 +86,7 @@ local function makeDebugPips()
                         end
                         element.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData)
                         element.layout.props.visible = true
-                        element.layout.props.position = posData.viewportPos
+                        element.layout.props.position = posData.viewportPos.pos
                         element:update()
                     end,
                     onHide = function()

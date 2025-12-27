@@ -529,6 +529,7 @@ local function onFrame(dt)
             end
         end
         trackInfo.tracking = false
+        interfaces.LivelyMapDraw.setHoverBoxContent()
     else
         advanceTracker()
     end

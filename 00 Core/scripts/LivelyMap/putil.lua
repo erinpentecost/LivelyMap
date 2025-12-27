@@ -208,7 +208,7 @@ end
 ---@field psoDepth number
 
 ---@class ViewportData
----@field viewportPos util.vector2?
+---@field viewportPos ViewportPosResult
 ---@field  mapWorldPos util.vector3?
 ---@field  viewportFacing util.vector3?
 
@@ -270,8 +270,8 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
             local mapWorldFacingPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
             local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
             local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
-            if s0 and s1 then
-                viewportFacing = (s1 - s0):normalize()
+            if s0 and s1 and s0.pos and s1.pos then
+                viewportFacing = (s1.pos - s0.pos):normalize()
             end
         end
     end

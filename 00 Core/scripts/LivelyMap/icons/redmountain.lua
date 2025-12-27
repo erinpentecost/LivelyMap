@@ -61,9 +61,10 @@ local smokeIcon = {
     pos = function()
         return redMountainPos
     end,
+    ---@param posData ViewportData
     onDraw = function(posData)
         smokeAtlas:getElement().layout.props.visible = true
-        smokeAtlas:getElement().layout.props.position = posData.viewportPos
+        smokeAtlas:getElement().layout.props.position = posData.viewportPos.pos
 
         smokeAtlas:getElement().layout.props.size = baseSize * iutil.distanceScale(posData)
         smokeAtlas:setTile(animIndex)
