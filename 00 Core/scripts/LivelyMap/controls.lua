@@ -295,7 +295,12 @@ local function handleCollision(res)
         end
 
         local newMapCenter = putil.cellPosToRelativeMeshPos(currentMapData,
-            util.vector3(newMap.CenterX, newMap.CenterY, 0))
+            util.vector3(newMap.CenterX, newMap.CenterY, 0), true)
+
+        if not newMapCenter then
+            print("can't find relative position of " .. tostring(newMap.ID) .. " in current map")
+            return
+        end
 
         local absNewMapCenter = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, newMapCenter)
 
@@ -498,10 +503,10 @@ local function worldPosToCameraPos(worldPos)
     end
     local mapCenter = currentMapData.object:getBoundingBox().center
     local cellPos = mutil.worldPosToCellPos(worldPos)
-    local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos)
-    if not rel then
+    local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos, true)
+    --[[if not rel then
         return nil
-    end
+        end]]
     local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
     local heightOffset = util.vector3(0, 0, defaultHeight)
     --- these vars are all good!

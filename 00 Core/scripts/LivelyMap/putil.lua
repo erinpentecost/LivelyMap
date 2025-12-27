@@ -44,8 +44,9 @@ local h3cam      = require("scripts.LivelyMap.h3.cam")
 --- so the bottom left becomes 0,0 and top right becomes 1,1.
 --- @param currentMapData MeshAnnotatedMapData
 --- @param cellPos CellPos
+--- @param allowOutOfBounds boolean?
 --- @return RelativeMeshPos?
-local function cellPosToRelativeMeshPos(currentMapData, cellPos)
+local function cellPosToRelativeMeshPos(currentMapData, cellPos, allowOutOfBounds)
     if currentMapData == nil then
         error("missing mapObject")
         return nil
@@ -56,13 +57,13 @@ local function cellPosToRelativeMeshPos(currentMapData, cellPos)
     if currentMapData.Extents == nil then
         error("mapPos.Extents is nil")
     end
-    if cellPos.x < currentMapData.Extents.Left or cellPos.x > currentMapData.Extents.Right then
+    if (not allowOutOfBounds) and (cellPos.x < currentMapData.Extents.Left or cellPos.x > currentMapData.Extents.Right) then
         --[[print("cellPosToRelativeMeshPos: x position (" ..
             tostring(cellPos.x) ..
             ") is outside extents [" .. currentMapData.Extents.Left .. " to " .. currentMapData.Extents.Right .. "]")]]
         return nil
     end
-    if cellPos.y < currentMapData.Extents.Bottom or cellPos.y > currentMapData.Extents.Top then
+    if (not allowOutOfBounds) and (cellPos.y < currentMapData.Extents.Bottom or cellPos.y > currentMapData.Extents.Top) then
         --[[print("cellPosToRelativeMeshPos: y position (" ..
             tostring(cellPos.y) ..
             ")  is outside extents [" .. currentMapData.Extents.Bottom .. " to " .. currentMapData.Extents.Top .. "]")]]
