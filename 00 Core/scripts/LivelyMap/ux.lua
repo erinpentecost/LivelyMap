@@ -45,8 +45,20 @@ settings.subscribe(async:callback(function(_, key)
     settingsChanged = true
 end))
 
+---@class Icon
+--- @field element any UI element.
+--- @field pos fun(): util.vector3?
+--- @field facing (fun(): util.vector2|util.vector3|nil)?
+--- @field onDraw fun(posData : ViewportData, icon: Icon)
+--- @field onHide fun(icon: Icon)
 
--- icons is a list of {widget, fn() worldPos}
+---@class RegisteredIcon
+--- @field onScreen boolean Exists so we don't call onHide every frame.
+--- @field remove boolean Remove is used to signal deletion.
+--- @field ref Icon
+--- @name string
+
+---@type RegisteredIcon[]
 local icons = {}
 
 local function hideIcon(icon)
@@ -152,6 +164,8 @@ local function renderIcons()
         return
     end
 
+    local screenSize = ui.screenSize()
+
     -- Render all the icons.
     for i = #icons, 1, -1 do
         -- Remove if marked for removal.
@@ -161,27 +175,32 @@ local function renderIcons()
         end
 
         -- Get world position.
-        local iPos = nil
-        if type(icons[i].ref.pos) == "function" then
-            iPos = icons[i].ref.pos()
-        else
-            iPos = icons[i].ref.pos
-        end
+        local iPos = icons[i].ref.pos()
         -- Get optional world facing vector.
-        local iFacing = nil
-        if icons[i].ref.facing then
-            if type(icons[i].ref.facing) == "function" then
-                iFacing = icons[i].ref.facing()
-            else
-                iFacing = icons[i].ref.facing
-            end
-        end
+        local iFacing = icons[i].ref.facing and icons[i].ref.facing() or nil
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
-            if pos and pos.viewportPos and pos.viewportPos.onScreen then
-                icons[i].onScreen = true
-                icons[i].ref.onDraw(pos, icons[i].ref)
+            if pos and pos.viewportPos then
+                if pos.viewportPos.pos and pos.viewportPos.onScreen then
+                    icons[i].onScreen = true
+                    icons[i].ref.onDraw(pos, icons[i].ref)
+                elseif pos.viewportPos.pos and icons[i].ref.element.layout.props.size then
+                    -- is the edge visible?
+                    local halfBox = icons[i].ref.element.layout.props.size / 2
+                    local min = pos.viewportPos.pos - halfBox
+                    local max = pos.viewportPos.pos + halfBox
+
+                    if max.x >= 0 and max.y >= 0 and
+                        min.x <= screenSize.x and min.y <= screenSize.y then
+                        icons[i].onScreen = true
+                        icons[i].ref.onDraw(pos, icons[i].ref)
+                    else
+                        hideIcon(icons[i])
+                    end
+                else
+                    hideIcon(icons[i])
+                end
             else
                 hideIcon(icons[i])
             end

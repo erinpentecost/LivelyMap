@@ -23,7 +23,7 @@ local aux_util   = require('openmw_aux.util')
 local imageAtlas = require('scripts.LivelyMap.h3.imageAtlas')
 local iutil      = require("scripts.LivelyMap.icons.iutil")
 
-local color      = util.color.rgb(183 / 255, 65 / 255, 14 / 255)
+local color      = util.color.rgb(200 / 255, 60 / 255, 20 / 255)
 
 -- TODO: only enable this if the main quest exists
 -- TODO: change the color to not-red once the main quest finishes
@@ -51,7 +51,7 @@ interfaces.LivelyMapDraw.onMapHidden(function(_)
     mapUp = false
 end)
 
-local baseSize = util.vector2(256, 256)
+local baseSize = util.vector2(512, 512)
 local redMountainPos = util.vector3(20254, 69038, 2000) -- TODO: fix Z, it's wrong
 local animIndex = 1
 local animSpeed = 1 / 30
