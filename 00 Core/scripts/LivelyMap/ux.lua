@@ -83,23 +83,65 @@ local hoverBox = ui.create {
     content = ui.content {}
 }
 
-
+local mouseData = {
+    dragging = false,
+    clickStartViewportPos = nil,
+    clickStartWorldPos = nil,
+    pixelRight = nil,
+    pixelUp = nil,
+}
 local function mapClicked(mouseEvent, data)
-    local cameraFocusPos = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
-    print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(cameraFocusPos))
+    print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(mouseData.clickStartWorldPos))
     -- need to go from world pos to cam pos now
-    interfaces.LivelyMapControls.trackToWorldPosition(cameraFocusPos, 1)
+    interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos, 1)
 end
-local clickStartPos = nil
 local function mapClickPress(mouseEvent, data)
-    clickStartPos = mouseEvent.position
+    mouseData.clickStartViewportPos = mouseEvent.position
+    mouseData.clickStartWorldPos    = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+    -- Snapshot projection basis
+    local rightWorld                = putil.viewportPosToRealPos(
+        currentMapData,
+        mouseEvent.position + util.vector2(1000, 0)
+    )
+
+    local upWorld                   = putil.viewportPosToRealPos(
+        currentMapData,
+        mouseEvent.position + util.vector2(0, 1000)
+    )
+
+    mouseData.thousandPixelsRight   = rightWorld - mouseData.clickStartWorldPos
+    mouseData.thousandPixelsUp      = upWorld - mouseData.clickStartWorldPos
 end
 local function mapClickRelease(mouseEvent, data)
-    if (mouseEvent.position - clickStartPos):length2() < 30 then
+    if (mouseEvent.position - mouseData.clickStartViewportPos):length2() < 30 then
         mapClicked(mouseEvent, data)
     end
-    clickStartPos = nil
+    mouseData.clickStartViewportPos = nil
+    mouseData.clickStartWorldPos = nil
+    mouseData.dragging = false
 end
+local function mapMouseMove(mouseEvent, data)
+    if not mouseData.clickStartViewportPos then
+        return
+    end
+    if (not mouseData.dragging) and (mouseEvent.position - mouseData.clickStartViewportPos):length2() >= 30 then
+        mouseData.dragging = true
+    end
+    if not mouseData.dragging then
+        return
+    end
+
+    local deltaViewport =
+        mouseEvent.position - mouseData.clickStartViewportPos
+
+    -- Convert viewport delta → world delta using frozen basis
+    local deltaWorld =
+        mouseData.thousandPixelsRight * (-deltaViewport.x) / 1000 +
+        mouseData.thousandPixelsUp * (-deltaViewport.y) / 1000
+
+    interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos + deltaWorld, 0)
+end
+
 
 local iconContainer = ui.create {
     name = "icons",
@@ -123,7 +165,8 @@ local mainWindow = ui.create {
     },
     events = {
         mousePress = async:callback(mapClickPress),
-        mouseRelease = async:callback(mapClickRelease)
+        mouseRelease = async:callback(mapClickRelease),
+        mouseMove = async:callback(mapMouseMove),
     },
     content = ui.content { iconContainer, hoverBox },
 }
@@ -377,7 +420,11 @@ local function registerIcon(icon)
     })
     icon.element.layout.name = name
     icon.onHide()
-    iconContainer.layout.content:add(icon.element)
+    if icon.front then
+        iconContainer.layout.content:insert(1, icon.element)
+    else
+        iconContainer.layout.content:add(icon.element)
+    end
 end
 
 

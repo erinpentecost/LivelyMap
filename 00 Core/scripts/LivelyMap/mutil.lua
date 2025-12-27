@@ -120,6 +120,7 @@ local CELL_SIZE = 64 * 128 -- 8192
 local function worldPosToCellPos(worldPos)
     if worldPos == nil then
         error("worldPos is nil")
+        return
     end
 
     --- Position in world space, but units have been changed to match cell lengths.
