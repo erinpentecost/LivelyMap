@@ -303,15 +303,22 @@ local function handleCollision(res)
         -- offset the mapPosition for the new map so that the found position will
         -- match our previously determined absolute mesh position.
         -- since all meshes are identical in size, this can be done before we create the map.
+
+        --- this is the map coordinate that the center of the camera is pointing to.
+        local cameraWorldPos = putil.viewportPosToRealPos(currentMapData, ui.screenSize() / 2)
+        if not cameraWorldPos then
+            error("no valid cameraWorldPos")
+        end
+
         local mapPosition = nil
 
         local showData = mutil.shallowMerge(newMap, {
             cellID = pself.cell.id,
             player = pself,
             startWorldPosition = {
-                x = pself.position.x,
-                y = pself.position.y,
-                z = pself.position.z,
+                x = cameraWorldPos.x,
+                y = cameraWorldPos.y,
+                z = cameraWorldPos.z,
             },
             mapPosition = mapPosition,
         })

@@ -284,8 +284,7 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
     }
 end
 
-
-local function viewportPosToRealPos(currentMapData, viewportPos)
+local function viewportPosToRelativeMeshPos(currentMapData, viewportPos)
     if not currentMapData or not currentMapData.bounds then
         error("missing map data")
     end
@@ -332,6 +331,18 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
     print("rel is ok! hitPos: " ..
         tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
         tostring(rayDir) .. ", t:" .. tostring(t))
+    return rel
+end
+
+local function viewportPosToRealPos(currentMapData, viewportPos)
+    if not currentMapData or not currentMapData.bounds then
+        error("missing map data")
+    end
+
+    local rel = viewportPosToRelativeMeshPos(currentMapData, viewportPos)
+    if not rel then
+        return nil
+    end
 
     -- 4. Relative mesh → cell
     local cellPos = relativeMeshPosToCellPos(currentMapData, rel)
