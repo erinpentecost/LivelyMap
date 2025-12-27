@@ -57,15 +57,15 @@ local function cellPosToRelativeMeshPos(currentMapData, cellPos)
         error("mapPos.Extents is nil")
     end
     if cellPos.x < currentMapData.Extents.Left or cellPos.x > currentMapData.Extents.Right then
-        print("cellPosToRelativeMeshPos: x position (" ..
+        --[[print("cellPosToRelativeMeshPos: x position (" ..
             tostring(cellPos.x) ..
-            ") is outside extents [" .. currentMapData.Extents.Left .. " to " .. currentMapData.Extents.Right .. "]")
+            ") is outside extents [" .. currentMapData.Extents.Left .. " to " .. currentMapData.Extents.Right .. "]")]]
         return nil
     end
     if cellPos.y < currentMapData.Extents.Bottom or cellPos.y > currentMapData.Extents.Top then
-        print("cellPosToRelativeMeshPos: y position (" ..
+        --[[print("cellPosToRelativeMeshPos: y position (" ..
             tostring(cellPos.y) ..
-            ")  is outside extents [" .. currentMapData.Extents.Bottom .. " to " .. currentMapData.Extents.Top .. "]")
+            ")  is outside extents [" .. currentMapData.Extents.Bottom .. " to " .. currentMapData.Extents.Top .. "]")]]
         return nil
     end
     local x = util.remap(cellPos.x, currentMapData.Extents.Left, currentMapData.Extents.Right + 1, 0.0, 1.0)
@@ -149,6 +149,8 @@ local function mapPosToRelativeCellPos(currentMapData, worldPos)
     local x = (wu * vv - wv * uv) / denom
     local y = (wv * uu - wu * uv) / denom
 
+    --[[
+    -- TODO: add these checks back where needed
     if x < 0 or x > 1 or y < 0 or y > 1 then
         -- outside bounds
         print("mapPosToRelativeCellPos outside bounds. worldPos: " ..
@@ -158,6 +160,7 @@ local function mapPosToRelativeCellPos(currentMapData, worldPos)
         print("mapPosToRelativeCellPos inside bounds. worldPos: " ..
             tostring(worldPos) .. ", output: " .. tostring(util.vector2(x, y)))
     end
+    ]]
 
     return util.vector2(x, y)
 end
@@ -208,7 +211,7 @@ end
 ---@field psoDepth number
 
 ---@class ViewportData
----@field viewportPos util.vector2?
+---@field viewportPos ViewportPosResult
 ---@field  mapWorldPos util.vector3?
 ---@field  viewportFacing util.vector3?
 
@@ -270,8 +273,8 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
             local mapWorldFacingPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
             local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
             local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
-            if s0 and s1 then
-                viewportFacing = (s1 - s0):normalize()
+            if s0 and s1 and s0.pos and s1.pos then
+                viewportFacing = (s1.pos - s0.pos):normalize()
             end
         end
     end
@@ -284,8 +287,7 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
     }
 end
 
-
-local function viewportPosToRealPos(currentMapData, viewportPos)
+local function viewportPosToRelativeMeshPos(currentMapData, viewportPos)
     if not currentMapData or not currentMapData.bounds then
         error("missing map data")
     end
@@ -323,15 +325,28 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
 
     -- 3. Map-world → relative mesh
     local rel = mapPosToRelativeCellPos(currentMapData, hitPos)
-    if not rel then
-        print("rel is nil. hitPos: " ..
+    if not rel or (rel.x < 0 or rel.x > 1 or rel.y < 0 or rel.y > 1) then
+        print("rel is bad. hitPos: " ..
             tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
             tostring(rayDir) .. ", t:" .. tostring(t))
         return nil
     end
+
     print("rel is ok! hitPos: " ..
         tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
         tostring(rayDir) .. ", t:" .. tostring(t))
+    return rel
+end
+
+local function viewportPosToRealPos(currentMapData, viewportPos)
+    if not currentMapData or not currentMapData.bounds then
+        error("missing map data")
+    end
+
+    local rel = viewportPosToRelativeMeshPos(currentMapData, viewportPos)
+    if not rel then
+        return nil
+    end
 
     -- 4. Relative mesh → cell
     local cellPos = relativeMeshPosToCellPos(currentMapData, rel)
@@ -354,4 +369,5 @@ return {
     mapPosToRelativeCellPos = mapPosToRelativeCellPos,
     realPosToViewportPos = realPosToViewportPos,
     viewportPosToRealPos = viewportPosToRealPos,
+    viewportPosToRelativeMeshPos = viewportPosToRelativeMeshPos,
 }

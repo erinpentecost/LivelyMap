@@ -26,6 +26,8 @@ local iutil      = require("scripts.LivelyMap.icons.iutil")
 local pool       = require("scripts.LivelyMap.pool.pool")
 local settings   = require("scripts.LivelyMap.settings")
 local mutil      = require("scripts.LivelyMap.mutil")
+local async      = require("openmw.async")
+local aux_util   = require('openmw_aux.util')
 
 
 local detectAnimalId      = core.magic.EFFECT_TYPE.DetectAnimal
@@ -62,10 +64,9 @@ local color = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
 local baseSize = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path)
-    local pip = ui.create {
+    local element = ui.create {
         name = "detect",
         type = ui.TYPE.Image,
-        layer = iutil.layer,
         props = {
             visible = false,
             position = util.vector2(100, 100),
@@ -74,44 +75,60 @@ local function newDetectIcon(path)
             resource = ui.texture {
                 path = path,
             }
-        }
+        },
+        events = {
+        },
     }
     local icon = {
-        pip = pip,
+        element = element,
         entity = nil,
         freed = true,
         pos = function() return nil end,
+        ---@param posData ViewportData
         onDraw = function(posData, s)
             -- s is this icon.
             if s.freed then
-                pip.layout.props.visible = false
+                element.layout.props.visible = false
             else
-                pip.layout.props.size = baseSize * iutil.distanceScale(posData)
-                pip.layout.props.visible = true
-                pip.layout.props.position = posData.viewportPos
+                element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                element.layout.props.visible = true
+                element.layout.props.position = posData.viewportPos.pos
             end
-            pip:update()
+            element:update()
         end,
         onHide = function(s)
             -- s is this icon.
             --print("hiding " .. getRecord(s.entity).name)
-            pip.layout.props.visible = false
-            pip:update()
+            element.layout.props.visible = false
+            element:update()
         end,
-        onHover = function(posData, s)
-            return {
+    }
+
+    local focusGain = function()
+        --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
+        if icon.entity then
+            local hover = {
                 template = interfaces.MWUI.templates.textHeader,
                 type = ui.TYPE.Text,
                 alignment = ui.ALIGNMENT.End,
                 props = {
                     textAlignV = ui.ALIGNMENT.Center,
                     relativePosition = util.vector2(0, 0.5),
-                    text = getRecord(s.entity).name,
+                    text = getRecord(icon.entity).name,
                     textColor = color,
-                },
+                }
             }
+            interfaces.LivelyMapDraw.setHoverBoxContent(hover)
         end
-    }
+    end
+
+    element.layout.events.focusGain = async:callback(focusGain)
+    element.layout.events.focusLoss = async:callback(function()
+        --print("focusLoss: " .. aux_util.deepToString(icon.entity, 3))
+        interfaces.LivelyMapDraw.setHoverBoxContent()
+        return nil
+    end)
+    element:update()
     interfaces.LivelyMapDraw.registerIcon(icon)
     return icon
 end
@@ -129,7 +146,7 @@ end)
 local function makeIcon(iconPool, entity, pos)
     --print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))
     local icon = iconPool:obtain()
-    icon.pip.layout.props.visible = true
+    icon.element.layout.props.visible = true
     icon.pos = function()
         return pos
     end
@@ -221,7 +238,7 @@ local function freeIcons()
             -- in onHide() being called.
             return nil
         end
-        icon.pip.layout.props.visible = false
+        icon.element.layout.props.visible = false
         icon.freed = true
         icon.entity = nil
         icon.pool:free(icon)

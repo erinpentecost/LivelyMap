@@ -31,7 +31,7 @@ local storage         = require('openmw.storage')
 local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local h3cam           = require("scripts.LivelyMap.h3.cam")
 
----@type MeshAnnotatedMapData
+---@type MeshAnnotatedMapData?
 local currentMapData  = nil
 
 -- psoDepth determines how much to offset icons on the map.
@@ -45,8 +45,20 @@ settings.subscribe(async:callback(function(_, key)
     settingsChanged = true
 end))
 
+---@class Icon
+--- @field element any UI element.
+--- @field pos fun(): util.vector3?
+--- @field facing (fun(): util.vector2|util.vector3|nil)?
+--- @field onDraw fun(posData : ViewportData, icon: Icon)
+--- @field onHide fun(icon: Icon)
 
--- icons is a list of {widget, fn() worldPos}
+---@class RegisteredIcon
+--- @field onScreen boolean Exists so we don't call onHide every frame.
+--- @field remove boolean Remove is used to signal deletion.
+--- @field ref Icon
+--- @name string
+
+---@type RegisteredIcon[]
 local icons = {}
 
 local function hideIcon(icon)
@@ -62,21 +74,13 @@ local hoverBox = ui.create {
     template = interfaces.MWUI.templates.boxSolid,
     props = {
         --relativePosition = util.vector2(0.5, 0.5),
-        --size = util.vector2(30, 30),
+        --size = util.vector2(200, 50),
         --anchor = util.vector2(0.5, 0.5),
         relativePosition = util.vector2(0.5, 0.9),
         anchor = util.vector2(0.5, 1),
         visible = false
     },
-    content = ui.content { {
-        name = "vflex",
-        type = ui.TYPE.Flex,
-        props = {
-            arrange = ui.ALIGNMENT.Center,
-            horizontal = false,
-        },
-        content = ui.content {},
-    } }
+    content = ui.content {}
 }
 
 
@@ -97,6 +101,18 @@ local function mapClickRelease(mouseEvent, data)
     clickStartPos = nil
 end
 
+local iconContainer = ui.create {
+    name = "icons",
+    --layer = 'Windows',
+    type = ui.TYPE.Widget,
+    props = {
+        size = ui.screenSize(),
+    },
+    events = {
+    },
+    content = ui.content {},
+}
+
 local mainWindow = ui.create {
     name = "worldmaproot",
     layer = 'Windows',
@@ -109,30 +125,19 @@ local mainWindow = ui.create {
         mousePress = async:callback(mapClickPress),
         mouseRelease = async:callback(mapClickRelease)
     },
-    content = ui.content { hoverBox },
+    content = ui.content { iconContainer, hoverBox },
 }
 
-local function setHoverBoxContent(content)
-    -- delete old items in hovercontent
-    for _, old in ipairs(hoverBox.layout.content["vflex"].content) do
-        if old.destroy then
-            old:destroy()
-        end
-    end
-    local temp = ui.content {}
-
-    if content and #content > 0 then
+--- Change hover box content.
+---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
+local function setHoverBoxContent(layout)
+    if layout then
+        hoverBox.layout.content = ui.content { layout }
         hoverBox.layout.props.visible = true
-
-        for _, c in ipairs(content) do
-            temp:add(c)
-        end
     else
+        hoverBox.layout.content = ui.content {}
         hoverBox.layout.props.visible = false
     end
-
-    hoverBox.layout.content["vflex"].content = temp
-
     hoverBox:update()
 end
 
@@ -150,6 +155,7 @@ local function renderIcons()
     if currentMapData == nil then
         for i = #icons, 1, -1 do
             if icons[i].remove then
+                --iconContainer.layout.content[icons[i].name]:destroy()
                 table.remove(icons, i)
             else
                 hideIcon(icons[i])
@@ -158,8 +164,7 @@ local function renderIcons()
         return
     end
 
-    -- Track which icons we are hovering over.
-    local hovering = {}
+    local screenSize = ui.screenSize()
 
     -- Render all the icons.
     for i = #icons, 1, -1 do
@@ -170,33 +175,32 @@ local function renderIcons()
         end
 
         -- Get world position.
-        local iPos = nil
-        if type(icons[i].ref.pos) == "function" then
-            iPos = icons[i].ref.pos()
-        else
-            iPos = icons[i].ref.pos
-        end
+        local iPos = icons[i].ref.pos()
         -- Get optional world facing vector.
-        local iFacing = nil
-        if icons[i].ref.facing then
-            if type(icons[i].ref.facing) == "function" then
-                iFacing = icons[i].ref.facing()
-            else
-                iFacing = icons[i].ref.facing
-            end
-        end
+        local iFacing = icons[i].ref.facing and icons[i].ref.facing() or nil
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
-            if pos.viewportPos then
-                icons[i].onScreen = true
-                -- if the icon is hover-aware, get its info and
-                -- embed the hover status in the pos table.
-                if icons[i].ref.onHover and closeToCenter(pos.viewportPos) then
-                    pos.hovering = true
-                    table.insert(hovering, icons[i].ref.onHover(pos, icons[i].ref))
+            if pos and pos.viewportPos then
+                if pos.viewportPos.pos and pos.viewportPos.onScreen then
+                    icons[i].onScreen = true
+                    icons[i].ref.onDraw(pos, icons[i].ref)
+                elseif pos.viewportPos.pos and icons[i].ref.element.layout.props.size then
+                    -- is the edge visible?
+                    local halfBox = icons[i].ref.element.layout.props.size / 2
+                    local min = pos.viewportPos.pos - halfBox
+                    local max = pos.viewportPos.pos + halfBox
+
+                    if max.x >= 0 and max.y >= 0 and
+                        min.x <= screenSize.x and min.y <= screenSize.y then
+                        icons[i].onScreen = true
+                        icons[i].ref.onDraw(pos, icons[i].ref)
+                    else
+                        hideIcon(icons[i])
+                    end
+                else
+                    hideIcon(icons[i])
                 end
-                icons[i].ref.onDraw(pos, icons[i].ref)
             else
                 hideIcon(icons[i])
             end
@@ -207,7 +211,10 @@ local function renderIcons()
         ::continue::
     end
 
-    setHoverBoxContent(hovering)
+
+    mainWindow:update()
+
+    --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
 
 
     -- debugging
@@ -260,11 +267,17 @@ local function onMapHidden(data)
         mainWindow.layout.props.visible = false
         mainWindow:update()
     end
+    -- TODO: maybe hide icons?
+    currentMapData = nil
 end
 
-local lastCameraPos = nil
+--local lastCameraPos = nil
 local function onUpdate(dt)
-    if settingsChanged then
+    if currentMapData == nil then
+        return
+    end
+    renderIcons()
+    --[[if settingsChanged then
         renderIcons()
         settingsChanged = false
         return
@@ -278,7 +291,9 @@ local function onUpdate(dt)
             lastCameraPos = curPos
             renderIcons()
         end
-    end
+        end]]
+    --- TODO: icons aren't being drawn on the first frame of map spawn,
+    --- probably because the camera is not in the right spot.
 end
 
 local function summonMap(id)
@@ -289,14 +304,16 @@ local function summonMap(id)
         mapData = mutil.getMap(id)
     end
 
-    mapData.cellID = pself.cell.id
-    mapData.player = pself
-    mapData.startWorldPosition = {
-        x = pself.position.x,
-        y = pself.position.y,
-        z = pself.position.z,
-    }
-    core.sendGlobalEvent(MOD_NAME .. "onShowMap", mapData)
+    local showData = mutil.shallowMerge(mapData, {
+        cellID = pself.cell.id,
+        player = pself,
+        startWorldPosition = {
+            x = pself.position.x,
+            y = pself.position.y,
+            z = pself.position.z,
+        },
+    })
+    core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 
 local function splitString(str)
@@ -330,10 +347,13 @@ local function onConsoleCommand(mode, command, selectedObject)
     end
 end
 
-
+local nextName = 0
 local function registerIcon(icon)
     if not icon then
         error("registerIcon icon is nil")
+    end
+    if not icon.element or type(icon.element) ~= "userdata" then
+        error("registerIcon icon.element is: " .. aux_util.deepToString(icon, 3) .. ", expected UI element.")
     end
     if not icon.pos then
         error("registerIcon icon.pos is nil: " .. aux_util.deepToString(icon, 3))
@@ -344,13 +364,20 @@ local function registerIcon(icon)
     if not icon.onHide then
         error("registerIcon icon.onHide is nil: " .. aux_util.deepToString(icon, 3))
     end
+
+    nextName = nextName + 1
+    local name = "icon_" .. tostring(nextName)
     table.insert(icons, {
         -- onScreen exists so we don't call onHide every frame.
         onScreen = false,
         -- remove is used to signal deletion
         remove = false,
         ref = icon,
+        name = name,
     })
+    icon.element.layout.name = name
+    icon.onHide()
+    iconContainer.layout.content:add(icon.element)
 end
 
 
@@ -366,6 +393,7 @@ return {
     interface = {
         version = 1,
         registerIcon = registerIcon,
+        setHoverBoxContent = setHoverBoxContent,
         onMapMoved = function(fn)
             return addHandler(fn, onMapMovedHandlers)
         end,

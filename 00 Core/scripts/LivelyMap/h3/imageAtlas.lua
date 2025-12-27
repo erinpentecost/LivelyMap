@@ -70,7 +70,7 @@ function ImageAtlas:setTile(idx)
 end
 
 ---@class AtlasSpawnerData
----@field layer string
+---@field layer string?
 ---@field relativePosition util.vector2?
 ---@field name string?
 ---@field color util.color?

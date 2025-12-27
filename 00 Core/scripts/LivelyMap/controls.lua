@@ -256,6 +256,8 @@ local function getScreenPositions()
     return out
 end
 
+
+
 ---@class MoveResult
 ---@field success boolean  Indicates that the camera moved to the destination.
 ---@field northCollision boolean?
@@ -278,6 +280,41 @@ local function mergeMoveResult(a, b)
     a.eastCollision = a.eastCollision and b.eastCollision
 
     return a
+end
+
+---@param res MoveResult
+local function handleCollision(res)
+    if currentMapData == nil then
+        return
+    end
+    local swapWith = function(id)
+        local newMap = mutil.getMap(id)
+        if newMap == nil then
+            error("no data for map " .. id)
+            return
+        end
+
+        local newMapCenter = putil.cellPosToRelativeMeshPos(currentMapData,
+            util.vector3(newMap.CenterX, newMap.CenterY, 0))
+
+        local absNewMapCenter = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, newMapCenter)
+
+        local showData = mutil.shallowMerge(newMap, {
+            cellID = pself.cell.id,
+            player = pself,
+            mapPosition = absNewMapCenter,
+        })
+        core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
+    end
+    if res.eastCollision and currentMapData.ConnectedTo.east then
+        swapWith(currentMapData.ConnectedTo.east)
+    elseif res.northCollision and currentMapData.ConnectedTo.north then
+        swapWith(currentMapData.ConnectedTo.north)
+    elseif res.southCollision and currentMapData.ConnectedTo.south then
+        swapWith(currentMapData.ConnectedTo.south)
+    elseif res.westCollision and currentMapData.ConnectedTo.west then
+        swapWith(currentMapData.ConnectedTo.west)
+    end
 end
 
 --- moveCamera safely moves the camera within acceptable bounds.
@@ -356,6 +393,9 @@ local function moveCamera(data)
     if newPos then
         camera.setStaticPosition(newPos)
     end
+
+    handleCollision(out)
+
     --print("moveCamera(" .. aux_util.deepToString(data, 3) .. "): " .. aux_util.deepToString(out, 3))
     return out
 end
@@ -529,6 +569,7 @@ local function onFrame(dt)
             end
         end
         trackInfo.tracking = false
+        interfaces.LivelyMapDraw.setHoverBoxContent()
     else
         advanceTracker()
     end
@@ -539,7 +580,7 @@ local function onMapMoved(data)
     print("controls.onMapMoved")
     currentMapData = data
     -- If this is not a swap, then this is a brand new map session.
-    if not data.swapped then
+    if not data.swapped and data.startWorldPosition then
         -- Orient the camera so starting position is in the center.
         startCamera()
         print("initial track start")

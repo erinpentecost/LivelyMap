@@ -34,7 +34,6 @@ local compassAtlas = imageAtlas.constructAtlas({
     create = true,
 })
 compassAtlas:spawn({
-    layer = iutil.layer,
     anchor = util.vector2(0.5, 0.5),
     color = color,
 })
@@ -50,15 +49,17 @@ local function adjustedYaw(deg)
 end
 
 local compassIcon = {
+    element = compassAtlas:getElement(),
     pos = function()
         return pself.position
     end,
     facing = function()
         return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
     end,
+    ---@param posData ViewportData
     onDraw = function(posData)
         compassAtlas:getElement().layout.props.visible = true
-        compassAtlas:getElement().layout.props.position = posData.viewportPos
+        compassAtlas:getElement().layout.props.position = posData.viewportPos.pos
 
         if not posData.viewportFacing then
             compassAtlas:getElement().layout.props.visible = false
@@ -76,6 +77,7 @@ local compassIcon = {
 
         compassAtlas:setTile(deg)
         compassAtlas:getElement():update()
+        --print("compass onDraw done: " .. aux_util.deepToString(compassAtlas:getElement().layout.props))
     end,
     onHide = function()
         compassAtlas:getElement().layout.props.visible = false
