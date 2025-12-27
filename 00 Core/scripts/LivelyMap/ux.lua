@@ -87,6 +87,7 @@ local mouseData = {
     dragging = false,
     clickStartViewportPos = nil,
     clickStartWorldPos = nil,
+    clickStartCenterCameraWorldPos = nil,
     thousandPixelsRight = nil,
     thousandPixelsUp = nil,
     dragThreshold = 10,
@@ -97,8 +98,9 @@ local function mapClicked(mouseEvent, data)
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos, 1)
 end
 local function mapClickPress(mouseEvent, data)
-    mouseData.clickStartViewportPos = mouseEvent.position
-    mouseData.clickStartWorldPos    = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+    mouseData.clickStartViewportPos          = mouseEvent.position
+    mouseData.clickStartWorldPos             = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+    mouseData.clickStartCenterCameraWorldPos = putil.viewportPosToRealPos(currentMapData, ui.screenSize() / 2)
 end
 local function mapClickRelease(mouseEvent, data)
     if (mouseEvent.position - mouseData.clickStartViewportPos):length2() < mouseData.dragThreshold then
@@ -111,22 +113,26 @@ local function mapClickRelease(mouseEvent, data)
     mouseData.thousandPixelsUp = nil
 end
 local function mapDragStart(mouseEvent, data)
+    -- oh I know the problem!
+    -- the center of the camera is jumping to the drag anchor start immediately
+
     -- re-anchor drag start
     mouseData.clickStartViewportPos = mouseEvent.position
-
+    mouseData.clickStartWorldPos    = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+    print("drag! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(mouseData.clickStartWorldPos))
     -- Snapshot projection basis
-    local rightWorld                = putil.viewportPosToRealPos(
+    local rightWorld              = putil.viewportPosToRealPos(
         currentMapData,
         mouseEvent.position + util.vector2(1000, 0)
     )
 
-    local upWorld                   = putil.viewportPosToRealPos(
+    local upWorld                 = putil.viewportPosToRealPos(
         currentMapData,
         mouseEvent.position + util.vector2(0, 1000)
     )
 
-    mouseData.thousandPixelsRight   = rightWorld - mouseData.clickStartWorldPos
-    mouseData.thousandPixelsUp      = upWorld - mouseData.clickStartWorldPos
+    mouseData.thousandPixelsRight = rightWorld - mouseData.clickStartWorldPos
+    mouseData.thousandPixelsUp    = upWorld - mouseData.clickStartWorldPos
 end
 local function mapDragging(mouseEvent, data)
     local deltaViewport =
@@ -137,7 +143,7 @@ local function mapDragging(mouseEvent, data)
         mouseData.thousandPixelsRight * (-deltaViewport.x) / 1000 +
         mouseData.thousandPixelsUp * (-deltaViewport.y) / 1000
 
-    interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos + deltaWorld, 0)
+    interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartCenterCameraWorldPos + deltaWorld, 0)
 end
 local function mapMouseMove(mouseEvent, data)
     if not mouseData.clickStartViewportPos then
@@ -146,6 +152,7 @@ local function mapMouseMove(mouseEvent, data)
     if (not mouseData.dragging) and (mouseEvent.position - mouseData.clickStartViewportPos):length2() >= mouseData.dragThreshold then
         mapDragStart(mouseEvent, data)
         mouseData.dragging = true
+        -- the jump happens even if I return here
     end
     if not mouseData.dragging then
         return
