@@ -294,33 +294,15 @@ local function handleCollision(res)
             return
         end
 
-        -- TODO:
-        -- find a seamless map position so I don't have to move the camera.
-        -- so:
-        -- get the absolute mesh position that the center of the map is pointing to
-        -- get the world position that the center of the camera is pointing to
-        -- find the relative mesh position of that world position on the new map
-        -- offset the mapPosition for the new map so that the found position will
-        -- match our previously determined absolute mesh position.
-        -- since all meshes are identical in size, this can be done before we create the map.
+        local newMapCenter = putil.cellPosToRelativeMeshPos(currentMapData,
+            util.vector3(newMap.CenterX, newMap.CenterY, 0))
 
-        --- this is the map coordinate that the center of the camera is pointing to.
-        local cameraWorldPos = putil.viewportPosToRealPos(currentMapData, ui.screenSize() / 2)
-        if not cameraWorldPos then
-            error("no valid cameraWorldPos")
-        end
-
-        local mapPosition = nil
+        local absNewMapCenter = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, newMapCenter)
 
         local showData = mutil.shallowMerge(newMap, {
             cellID = pself.cell.id,
             player = pself,
-            startWorldPosition = {
-                x = cameraWorldPos.x,
-                y = cameraWorldPos.y,
-                z = cameraWorldPos.z,
-            },
-            mapPosition = mapPosition,
+            mapPosition = absNewMapCenter,
         })
         core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
     end
@@ -411,6 +393,9 @@ local function moveCamera(data)
     if newPos then
         camera.setStaticPosition(newPos)
     end
+
+    handleCollision(out)
+
     --print("moveCamera(" .. aux_util.deepToString(data, 3) .. "): " .. aux_util.deepToString(out, 3))
     return out
 end
@@ -595,7 +580,7 @@ local function onMapMoved(data)
     print("controls.onMapMoved")
     currentMapData = data
     -- If this is not a swap, then this is a brand new map session.
-    if not data.swapped then
+    if not data.swapped and data.startWorldPosition then
         -- Orient the camera so starting position is in the center.
         startCamera()
         print("initial track start")
