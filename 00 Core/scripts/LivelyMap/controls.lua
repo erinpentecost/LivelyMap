@@ -256,6 +256,8 @@ local function getScreenPositions()
     return out
 end
 
+
+
 ---@class MoveResult
 ---@field success boolean  Indicates that the camera moved to the destination.
 ---@field northCollision boolean?
@@ -278,6 +280,52 @@ local function mergeMoveResult(a, b)
     a.eastCollision = a.eastCollision and b.eastCollision
 
     return a
+end
+
+---@param res MoveResult
+local function handleCollision(res)
+    if currentMapData == nil then
+        return
+    end
+    local swapWith = function(id)
+        local newMap = mutil.getMap(id)
+        if newMap == nil then
+            error("no data for map " .. id)
+            return
+        end
+
+        -- TODO:
+        -- find a seamless map position so I don't have to move the camera.
+        -- so:
+        -- get the absolute mesh position that the center of the map is pointing to
+        -- get the world position that the center of the camera is pointing to
+        -- find the relative mesh position of that world position on the new map
+        -- offset the mapPosition for the new map so that the found position will
+        -- match our previously determined absolute mesh position.
+        -- since all meshes are identical in size, this can be done before we create the map.
+        local mapPosition = nil
+
+        local showData = mutil.shallowMerge(newMap, {
+            cellID = pself.cell.id,
+            player = pself,
+            startWorldPosition = {
+                x = pself.position.x,
+                y = pself.position.y,
+                z = pself.position.z,
+            },
+            mapPosition = mapPosition,
+        })
+        core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
+    end
+    if res.eastCollision and currentMapData.ConnectedTo.east then
+        swapWith(currentMapData.ConnectedTo.east)
+    elseif res.northCollision and currentMapData.ConnectedTo.north then
+        swapWith(currentMapData.ConnectedTo.north)
+    elseif res.southCollision and currentMapData.ConnectedTo.south then
+        swapWith(currentMapData.ConnectedTo.south)
+    elseif res.westCollision and currentMapData.ConnectedTo.west then
+        swapWith(currentMapData.ConnectedTo.west)
+    end
 end
 
 --- moveCamera safely moves the camera within acceptable bounds.

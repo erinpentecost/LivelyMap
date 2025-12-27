@@ -304,14 +304,16 @@ local function summonMap(id)
         mapData = mutil.getMap(id)
     end
 
-    mapData.cellID = pself.cell.id
-    mapData.player = pself
-    mapData.startWorldPosition = {
-        x = pself.position.x,
-        y = pself.position.y,
-        z = pself.position.z,
-    }
-    core.sendGlobalEvent(MOD_NAME .. "onShowMap", mapData)
+    local showData = mutil.shallowMerge(mapData, {
+        cellID = pself.cell.id,
+        player = pself,
+        startWorldPosition = {
+            x = pself.position.x,
+            y = pself.position.y,
+            z = pself.position.z,
+        },
+    })
+    core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 
 local function splitString(str)
