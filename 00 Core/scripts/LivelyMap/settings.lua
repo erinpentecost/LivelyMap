@@ -64,6 +64,13 @@ local function init()
                 description = "extendDetectRangeDescription",
                 default = true,
                 renderer = "checkbox",
+            },
+            {
+                key = "drawLimitNeravarinesJourney",
+                name = "drawLimitNeravarinesJourneyName",
+                description = "drawLimitNeravarinesJourneyDescription",
+                default = true,
+                renderer = "checkbox",
             }
         }
     }

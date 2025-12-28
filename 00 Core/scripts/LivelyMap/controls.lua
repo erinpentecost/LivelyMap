@@ -110,6 +110,7 @@ end
 -- Then set the initial camera state we need.
 ---@type CameraData?
 local originalCameraState = nil
+--- TODO: persist originalCameraState with onsave and onload
 local function startCamera()
     controls.overrideMovementControls(true)
     cameraInterface.disableModeControl(MOD_NAME)

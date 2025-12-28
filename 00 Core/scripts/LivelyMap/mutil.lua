@@ -113,6 +113,15 @@ local function lerpVec2(a, b, t)
     )
 end
 
+local function lerpColor(a, b, t)
+    return util.color.rgba(
+        a.r + (b.r - a.r) * t,
+        a.g + (b.g - a.g) * t,
+        a.b + (b.b - a.b) * t,
+        a.a + (b.a - a.a) * t
+    )
+end
+
 local CELL_SIZE = 64 * 128 -- 8192
 
 ---@param worldPos WorldSpacePos
@@ -191,6 +200,7 @@ return {
     getClosestMap = getClosestMap,
     lerpVec3 = lerpVec3,
     lerpVec2 = lerpVec2,
+    lerpColor = lerpColor,
     lerpAngle = lerpAngle,
     worldPosToCellPos = worldPosToCellPos,
     cellPosToWorldPos = cellPosToWorldPos,

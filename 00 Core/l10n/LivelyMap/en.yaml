@@ -10,3 +10,6 @@ psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
 
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."
+
+drawLimitNeravarinesJourneyName: "Limit Neravarine's Journey"
+drawLimitNeravarinesJourneyDescription: "Only draw the last 4 hours of the Neravarine's Journey. Path data will still be saved."
