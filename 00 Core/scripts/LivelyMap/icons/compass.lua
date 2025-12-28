@@ -22,6 +22,7 @@ local pself        = require("openmw.self")
 local aux_util     = require('openmw_aux.util')
 local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
 local iutil        = require("scripts.LivelyMap.icons.iutil")
+local async        = require("openmw.async")
 
 local color        = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
 
@@ -36,6 +37,8 @@ local compassAtlas = imageAtlas.constructAtlas({
 compassAtlas:spawn({
     anchor = util.vector2(0.5, 0.5),
     color = color,
+    events = {},
+    propagateEvents = false,
 })
 
 local baseSize = util.vector2(50, 50)
@@ -48,6 +51,7 @@ local function adjustedYaw(deg)
     return util.clamp(util.round(yaw), 1, 360)
 end
 
+--- TODO: add an off-screen indicator for where you are
 local compassIcon = {
     element = compassAtlas:getElement(),
     pos = function()
@@ -84,5 +88,10 @@ local compassIcon = {
         compassAtlas:getElement():update()
     end,
 }
+
+compassAtlas:getElement().layout.events.mouseClick = async:callback(function()
+    --print("focusLoss: " .. aux_util.deepToString(icon.entity, 3))
+    interfaces.LivelyMapJourneyIcons.toggleJourney()
+end)
 
 interfaces.LivelyMapDraw.registerIcon(compassIcon)

@@ -28,6 +28,7 @@ local settings     = require("scripts.LivelyMap.settings")
 local mutil        = require("scripts.LivelyMap.mutil")
 local async        = require("openmw.async")
 local aux_util     = require('openmw_aux.util')
+local MOD_NAME     = require("scripts.LivelyMap.ns")
 
 local settingCache = {
     drawLimitNeravarinesJourney = settings.drawLimitNeravarinesJourney,
@@ -143,7 +144,7 @@ local function findOldestAfter(paths, oldestTime)
 end
 
 local function makeIcons()
-    myPaths = interfaces.LivelyMapPath.getPaths()[interfaces.LivelyMapPath.playerName].paths
+    myPaths = interfaces.LivelyMapPlayerData.getPaths()[interfaces.LivelyMapPlayerData.playerName].paths
 
     if settingCache.drawLimitNeravarinesJourney then
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
@@ -176,19 +177,19 @@ local function freeIcons()
     pathIcons = {}
 end
 
-interfaces.LivelyMapDraw.onMapMoved(function(_)
-    --- TODO: this needs to be enabled instead of always on
-    --- toggle it by clicking on the compass icon.
+local displaying = false
+
+interfaces.LivelyMapDraw.onMapMoved(function(mapData)
     print("map up")
     mapUp = true
-    makeIcons()
 end)
 
 interfaces.LivelyMapDraw.onMapHidden(function(_)
     print("map down")
     mapUp = false
-    freeIcons()
 end)
+
+
 
 --- how long it takes to move between two adjacent points.
 local speed = 1.1
@@ -196,6 +197,10 @@ local speed = 1.1
 local function onUpdate(dt)
     -- Don't run if the map is not up.
     if not mapUp then
+        return
+    end
+
+    if not displaying then
         return
     end
 
@@ -222,6 +227,18 @@ local function onUpdate(dt)
 end
 
 return {
+    interfaceName = MOD_NAME .. "JourneyIcons",
+    interface = {
+        version = 1,
+        toggleJourney = function()
+            if displaying then
+                freeIcons()
+            else
+                makeIcons()
+            end
+            displaying = not displaying
+        end,
+    },
     engineHandlers = {
         onUpdate = onUpdate,
     },
