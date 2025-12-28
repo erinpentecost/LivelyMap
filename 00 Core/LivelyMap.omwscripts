@@ -8,4 +8,5 @@ CUSTOM: scripts/LivelyMap/mapnif.lua
 PLAYER: scripts/LivelyMap/icons/compass.lua
 PLAYER: scripts/LivelyMap/icons/debug.lua
 PLAYER: scripts/LivelyMap/icons/detect.lua
+PLAYER: scripts/LivelyMap/icons/journey.lua
 PLAYER: scripts/LivelyMap/icons/redmountain.lua

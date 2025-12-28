@@ -57,7 +57,7 @@ local compassIcon = {
         return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
     end,
     ---@param posData ViewportData
-    onDraw = function(posData)
+    onDraw = function(_, posData)
         compassAtlas:getElement().layout.props.visible = true
         compassAtlas:getElement().layout.props.position = posData.viewportPos.pos
 

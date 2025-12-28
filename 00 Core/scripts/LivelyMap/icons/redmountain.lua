@@ -62,7 +62,7 @@ local smokeIcon = {
         return redMountainPos
     end,
     ---@param posData ViewportData
-    onDraw = function(posData)
+    onDraw = function(_, posData)
         smokeAtlas:getElement().layout.props.visible = true
         smokeAtlas:getElement().layout.props.position = posData.viewportPos.pos
 

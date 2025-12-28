@@ -71,7 +71,7 @@ local function newDetectIcon(path)
             visible = false,
             position = util.vector2(100, 100),
             anchor = util.vector2(0.5, 0.5),
-            size = util.vector2(32, 32),
+            size = baseSize,
             resource = ui.texture {
                 path = path,
             }
@@ -85,7 +85,7 @@ local function newDetectIcon(path)
         freed = true,
         pos = function() return nil end,
         ---@param posData ViewportData
-        onDraw = function(posData, s)
+        onDraw = function(s, posData)
             -- s is this icon.
             if s.freed then
                 element.layout.props.visible = false
@@ -287,9 +287,9 @@ local function onUpdate(dt)
         end
     end
     -- DEBUG!
-    animalMagnitude = 100
-    enchantmentMagnitude = 100
-    keyMagnitude = 100
+    --animalMagnitude = 100
+    --enchantmentMagnitude = 100
+    --keyMagnitude = 100
     -- delete old icons
     freeIcons()
     if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then

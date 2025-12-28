@@ -47,9 +47,9 @@ end))
 
 ---@class Icon
 --- @field element any UI element.
---- @field pos fun(): util.vector3?
---- @field facing (fun(): util.vector2|util.vector3|nil)?
---- @field onDraw fun(posData : ViewportData, icon: Icon)
+--- @field pos fun(icon: Icon): util.vector3?
+--- @field facing (fun(icon: Icon): util.vector2|util.vector3|nil)?
+--- @field onDraw fun(icon: Icon, posData : ViewportData)
 --- @field onHide fun(icon: Icon)
 
 ---@class RegisteredIcon
@@ -237,16 +237,16 @@ local function renderIcons()
         end
 
         -- Get world position.
-        local iPos = icons[i].ref.pos()
+        local iPos = icons[i].ref.pos(icons[i].ref)
         -- Get optional world facing vector.
-        local iFacing = icons[i].ref.facing and icons[i].ref.facing() or nil
+        local iFacing = icons[i].ref.facing and icons[i].ref.facing(icons[i].ref) or nil
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
             if pos and pos.viewportPos then
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icons[i].onScreen = true
-                    icons[i].ref.onDraw(pos, icons[i].ref)
+                    icons[i].ref.onDraw(icons[i].ref, pos)
                 elseif pos.viewportPos.pos and icons[i].ref.element.layout.props.size then
                     -- is the edge visible?
                     local halfBox = icons[i].ref.element.layout.props.size / 2
@@ -256,7 +256,7 @@ local function renderIcons()
                     if max.x >= 0 and max.y >= 0 and
                         min.x <= screenSize.x and min.y <= screenSize.y then
                         icons[i].onScreen = true
-                        icons[i].ref.onDraw(pos, icons[i].ref)
+                        icons[i].ref.onDraw(icons[i].ref, pos)
                     else
                         hideIcon(icons[i])
                     end
