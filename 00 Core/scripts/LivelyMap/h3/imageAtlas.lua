@@ -80,6 +80,8 @@ end
 ---@field size util.vector2?
 ---@field position util.vector2?
 ---@field relativeSize util.vector2?
+---@field events any[]?
+---@field propagateEvents boolean?
 
 ---@param elementData AtlasSpawnerData
 function ImageAtlas:spawn(elementData)
@@ -97,7 +99,9 @@ function ImageAtlas:spawn(elementData)
             anchor = elementData.anchor,
             alpha = elementData.alpha or 1.0,
             visible = elementData.visible or true,
+            propagateEvents = elementData.propagateEvents,
         },
+        events = elementData.events or {},
     }
 end
 

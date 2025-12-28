@@ -246,7 +246,7 @@ local function onUpdate(dt)
 end
 
 return {
-    interfaceName = MOD_NAME .. "Path",
+    interfaceName = MOD_NAME .. "PlayerData",
     interface = {
         version = 1,
         getPaths = function() return allData end,

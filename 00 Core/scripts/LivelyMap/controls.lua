@@ -110,7 +110,6 @@ end
 -- Then set the initial camera state we need.
 ---@type CameraData?
 local originalCameraState = nil
---- TODO: persist originalCameraState with onsave and onload
 local function startCamera()
     controls.overrideMovementControls(true)
     cameraInterface.disableModeControl(MOD_NAME)
@@ -602,6 +601,14 @@ local function onMapHidden(data)
     end
 end
 
+local function onLoad(data)
+    originalCameraState = data
+end
+
+local function onSave()
+    return originalCameraState
+end
+
 return {
     interfaceName = MOD_NAME .. "Controls",
     interface = {
@@ -611,6 +618,8 @@ return {
     },
     engineHandlers = {
         onFrame = onFrame,
+        onSave = onSave,
+        onLoad = onLoad,
     },
     eventHandlers = {
         [MOD_NAME .. "onMapMoved"] = onMapMoved,
