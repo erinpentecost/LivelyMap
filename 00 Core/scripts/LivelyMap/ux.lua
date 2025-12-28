@@ -28,7 +28,6 @@ local settings        = require("scripts.LivelyMap.settings")
 local async           = require("openmw.async")
 local interfaces      = require('openmw.interfaces')
 local storage         = require('openmw.storage')
-local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local h3cam           = require("scripts.LivelyMap.h3.cam")
 
 ---@type MeshAnnotatedMapData?

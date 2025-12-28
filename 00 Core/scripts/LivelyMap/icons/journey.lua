@@ -15,31 +15,40 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces = require('openmw.interfaces')
-local ui         = require('openmw.ui')
-local util       = require('openmw.util')
-local pself      = require("openmw.self")
-local types      = require("openmw.types")
-local core       = require("openmw.core")
-local nearby     = require("openmw.nearby")
-local iutil      = require("scripts.LivelyMap.icons.iutil")
-local pool       = require("scripts.LivelyMap.pool.pool")
-local settings   = require("scripts.LivelyMap.settings")
-local mutil      = require("scripts.LivelyMap.mutil")
-local async      = require("openmw.async")
-local aux_util   = require('openmw_aux.util')
+local interfaces   = require('openmw.interfaces')
+local ui           = require('openmw.ui')
+local util         = require('openmw.util')
+local pself        = require("openmw.self")
+local types        = require("openmw.types")
+local core         = require("openmw.core")
+local nearby       = require("openmw.nearby")
+local iutil        = require("scripts.LivelyMap.icons.iutil")
+local pool         = require("scripts.LivelyMap.pool.pool")
+local settings     = require("scripts.LivelyMap.settings")
+local mutil        = require("scripts.LivelyMap.mutil")
+local async        = require("openmw.async")
+local aux_util     = require('openmw_aux.util')
+
+local settingCache = {
+    drawLimitNeravarinesJourney = settings.drawLimitNeravarinesJourney,
+}
+settings.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings[key]
+end))
 
 
+local mapUp        = false
+local pathIcons    = {}
 
-local mapUp     = false
-local pathIcons = {}
-local myPaths   = nil
+local myPaths      = nil
+local minimumIndex = 1
 
+local pathIcon     = "textures/LivelyMap/stamps/circle.png"
 
-local pathIcon = "textures/LivelyMap/stamps/circle.png"
+local startColor   = util.color.rgba(255 / 255, 204 / 255, 1 / 255, 0.75)
+local endColor     = util.color.rgba(255 / 255, 91 / 255, 2 / 255, 1)
 
-local color = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
-local baseSize = util.vector2(16, 16)
+local baseSize     = util.vector2(16, 16)
 -- creates an unattached icon and registers it.
 local function newIcon()
     local element = ui.create {
@@ -50,9 +59,9 @@ local function newIcon()
             position = util.vector2(100, 100),
             anchor = util.vector2(0.5, 0.5),
             size = baseSize,
+            color = startColor,
             resource = ui.texture {
                 path = pathIcon,
-                color = color,
             }
         },
         events = {
@@ -95,24 +104,64 @@ local iconPool = pool.create(function()
     return newIcon()
 end)
 
+local function color(currentIdx)
+    return mutil.lerpColor(startColor, endColor, currentIdx / (1 + #myPaths - minimumIndex))
+end
+
 local function makeIcon(startIdx)
-    print("making journey icon at index " .. startIdx)
+    ---print("making journey icon at index " .. startIdx)
     local icon = iconPool:obtain()
     icon.element.layout.props.visible = true
+    icon.element.layout.props.color = color(startIdx)
     icon.freed = false
     icon.currentIdx = startIdx
     icon.pool = iconPool
     table.insert(pathIcons, icon)
 end
 
+
+---@param paths PathEntry[]  -- sorted by increasing t
+---@param oldestTime number
+---@return integer? index    -- nil if not found
+local function findOldestAfter(paths, oldestTime)
+    local lo = 1
+    local hi = #paths
+    local result = nil
+
+    while lo <= hi do
+        local mid = math.floor((lo + hi) / 2)
+        local t = paths[mid].t
+
+        if t > oldestTime then
+            result = mid -- candidate; try to find an earlier one
+            hi = mid - 1
+        else
+            lo = mid + 1
+        end
+    end
+    return result
+end
+
 local function makeIcons()
     myPaths = interfaces.LivelyMapPath.getPaths()[interfaces.LivelyMapPath.playerName].paths
-    print("#myPaths: " .. tostring(#myPaths))
-    if #myPaths <= 0 then
+
+    if settingCache.drawLimitNeravarinesJourney then
+        local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
+        local oldestTime = core.getGameTime() - oldDuration
+        minimumIndex = findOldestAfter(myPaths, oldestTime) or 1
+        if #myPaths - minimumIndex > 1000 then
+            minimumIndex = #myPaths - 1000
+        end
+    else
+        minimumIndex = 1
+    end
+
+    print("#myPaths: " .. tostring(#myPaths) .. ", minimumIndex:" .. minimumIndex)
+    if #myPaths <= 0 or minimumIndex > #myPaths then
         return
     end
 
-    for i = 1, #myPaths, 5 do
+    for i = minimumIndex, #myPaths, 5 do
         makeIcon(i)
     end
 end
@@ -129,6 +178,7 @@ end
 
 interfaces.LivelyMapDraw.onMapMoved(function(_)
     --- TODO: this needs to be enabled instead of always on
+    --- toggle it by clicking on the compass icon.
     print("map up")
     mapUp = true
     makeIcons()
@@ -161,12 +211,13 @@ local function onUpdate(dt)
             --print("step " .. icon.currentIdx .. " done. pt: " .. icon.partialStep)
             icon.currentIdx = icon.currentIdx + fullStep
             icon.partialStep = icon.partialStep - fullStep
-            if icon.currentIdx >= #myPaths then
-                icon.currentIdx = 1
-            end
+        end
+        if icon.currentIdx >= #myPaths then
+            icon.currentIdx = minimumIndex
         end
         --print("pt: " .. icon.partialStep)
         icon.cachedPos = mutil.lerpVec3(myPaths[icon.currentIdx], myPaths[icon.currentIdx + 1], icon.partialStep)
+        icon.element.layout.props.color = color(icon.currentIdx)
     end
 end
 
