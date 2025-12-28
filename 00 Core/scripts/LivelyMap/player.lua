@@ -91,9 +91,16 @@ local fromSave = {
     extra = {},
 }
 
+---@class PathEntry
+---@field t number Timestamp.
+---@field x number? Exterior world position component.
+---@field y number? Exterior world position component.
+---@field z number? Exterior world position component.
+---@field c string? Interior cell ID.
+
 ---@class SavedPlayerData
 ---@field id string
----@field paths
+---@field paths PathEntry[]
 ---@field extra any
 
 --- mergedData contains the merged data from the savegame and file,
@@ -168,6 +175,7 @@ local function onLoad(data)
     end
 end
 
+---@return PathEntry
 local function newEntry()
     return {
         t = math.ceil(core.getGameTime()),

@@ -287,9 +287,9 @@ local function onUpdate(dt)
         end
     end
     -- DEBUG!
-    animalMagnitude = 100
-    enchantmentMagnitude = 100
-    keyMagnitude = 100
+    --animalMagnitude = 100
+    --enchantmentMagnitude = 100
+    --keyMagnitude = 100
     -- delete old icons
     freeIcons()
     if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then
