@@ -79,7 +79,7 @@ local function makeDebugPips()
                     element = element,
                     pos = worldPos,
                     ---@param posData ViewportData
-                    onDraw = function(posData)
+                    onDraw = function(_, posData)
                         if not debugEnabled then
                             element.layout.props.visible = false
                             return

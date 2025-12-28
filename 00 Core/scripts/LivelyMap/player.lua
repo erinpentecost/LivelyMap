@@ -47,34 +47,45 @@ local playerName = types.NPC.record(pself.recordId).name
 -- Merge two SaveData-like tables: a and b
 -- Returns a new table shaped like SaveData
 local function merge(a, b)
-    if a == nil then return b end
-    if b == nil then return a end
-    local apaths = a.paths or {}
-    local bpaths = b.paths or {}
-
+    a = a or {
+        id = playerName,
+        paths = {},
+        extra = {},
+    }
+    b = b or {
+        id = playerName,
+        paths = {},
+        extra = {},
+    }
     -- If a or b is empty, easy cases
-    if #apaths == 0 then
-        return { id = b.id, paths = bpaths }
+    local result_paths = {}
+    if #a.paths == 0 then
+        for _, p in ipairs(b.paths) do
+            table.insert(result_paths, p)
+        end
+        return { id = b.id, paths = result_paths, extra = b.extra }
     end
-    if #bpaths == 0 then
-        return { id = a.id, paths = apaths }
+    if #b.paths == 0 then
+        for _, p in ipairs(a.paths) do
+            table.insert(result_paths, p)
+        end
+        return { id = b.id, paths = result_paths, extra = a.extra }
     end
 
     -- Find newest timestamp in b
-    local b_newest = bpaths[#bpaths].t
+    local b_newest = b.paths[#b.paths].t
 
     -- Copy from a until timestamps overlap
-    local result_paths = {}
-    for i = 1, #apaths do
-        if apaths[i].t >= b_newest then
+    for i = 1, #a.paths do
+        if a.paths[i].t >= b_newest then
             break
         end
-        result_paths[#result_paths + 1] = apaths[i]
+        result_paths[#result_paths + 1] = a.paths[i]
     end
 
     -- Append all of b
-    for i = 1, #bpaths do
-        result_paths[#result_paths + 1] = bpaths[i]
+    for i = 1, #b.paths do
+        result_paths[#result_paths + 1] = b.paths[i]
     end
 
     return {
@@ -126,7 +137,6 @@ local function parseFile(path)
     local handle, err = vfs.open(path)
     if handle == nil then
         print("OnLoad: Failed to read " .. path .. " - " .. tostring(err))
-        allData[playerName] = fromSave
         return
     end
     return json.decode(handle:read("*all"))
@@ -142,7 +152,14 @@ local function endsWith(str, ending)
     return str:sub(- #ending) == ending
 end
 
+local loadDone = false
 local function onLoad(data)
+    if loadDone then
+        error("onLoad called twice")
+    end
+    loadDone = true
+
+
     local path = "scripts\\" .. MOD_NAME .. "\\data\\paths\\" .. playerName .. ".json"
     print("onLoad: Started. Path file: " .. path)
 
@@ -158,7 +175,7 @@ local function onLoad(data)
     allData[playerName] = merge(fromFile, fromSave)
 
     -- debug
-    print("onLoad: " .. aux_util.deepToString(allData, 3))
+    --print("onLoad: " .. aux_util.deepToString(allData, 3))
 
     -- now load all other character data
     local allSaves = "scripts\\" .. MOD_NAME .. "\\data\\paths\\"
@@ -201,8 +218,8 @@ local function addEntry()
         allData[playerName].paths = { entry }
         return
     end
+    local tail = allData[playerName].paths[#(allData[playerName].paths)]
     -- otherwise, don't do anything if the interior cell is the same.
-    local tail = allData[playerName].paths[#allData[playerName].paths]
     if entry.c ~= nil and tail.c == entry.c then
         return
     end
@@ -215,6 +232,9 @@ local function addEntry()
     table.insert(allData[playerName].paths, entry)
     table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
+    print("#allData[" ..
+        playerName ..
+        "] = " .. tostring(#(allData[playerName].paths)) .. ", #fromSave.paths = " .. tostring(#fromSave.paths))
 end
 
 local function onUpdate(dt)
@@ -230,6 +250,7 @@ return {
     interface = {
         version = 1,
         getPaths = function() return allData end,
+        playerName = playerName,
     },
     engineHandlers = {
         onUpdate = onUpdate,
