@@ -107,12 +107,12 @@ end
 
 local function makeIcons()
     myPaths = interfaces.LivelyMapPath.getPaths()[interfaces.LivelyMapPath.playerName].paths
-    --print("my paths: " .. aux_util.deepToString(myPaths, 3))
+    print("#myPaths: " .. tostring(#myPaths))
     if #myPaths <= 0 then
         return
     end
 
-    for i = 1, #myPaths, 100 do
+    for i = 1, #myPaths, 5 do
         makeIcon(i)
     end
 end
