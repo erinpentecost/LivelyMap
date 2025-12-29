@@ -73,7 +73,6 @@ local animalPath      = "textures/LivelyMap/stamps/circle-stroked.png"
 local keyPath         = "textures/LivelyMap/stamps/square-stroked.png"
 local enchantmentPath = "textures/LivelyMap/stamps/triangle-stroked.png"
 
-local color           = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
 local baseSize        = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path, color)
