@@ -215,6 +215,7 @@ interfaces.LivelyMapDraw.onMapHidden(function(mapData)
         print("map closed")
         mapUp = false
         displaying = false
+        freeIcons()
     end
 end)
 
