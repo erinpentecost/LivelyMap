@@ -98,6 +98,7 @@ local function newIcon()
             element.layout.props.visible = false
             element:update()
         end,
+        priority = -900,
     }
     element:update()
     interfaces.LivelyMapDraw.registerIcon(icon)
@@ -126,29 +127,6 @@ local function makeIcon(startIdx)
     table.insert(pathIcons, icon)
 end
 
-
----@param paths PathEntry[]  -- sorted by increasing t
----@param oldestTime number
----@return integer? index    -- nil if not found
-local function findOldestAfter(paths, oldestTime)
-    local lo = 1
-    local hi = #paths
-    local result = nil
-
-    while lo <= hi do
-        local mid = math.floor((lo + hi) / 2)
-        local t = paths[mid].t
-
-        if t > oldestTime then
-            result = mid -- candidate; try to find an earlier one
-            hi = mid - 1
-        else
-            lo = mid + 1
-        end
-    end
-    return result
-end
-
 local function makeIcons()
     myPaths = interfaces.LivelyMapPlayerData.exteriorsOnly(
         interfaces.LivelyMapPlayerData.getPaths()
@@ -158,7 +136,7 @@ local function makeIcons()
     if settingCache.drawLimitNeravarinesJourney then
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
         local oldestTime = core.getGameTime() - oldDuration
-        minimumIndex = findOldestAfter(myPaths, oldestTime) or 1
+        minimumIndex = mutil.binarySearchFirst(myPaths, function(p) return p.t > oldestTime end) or 1
         --- hard limit to 1000
         if #myPaths - minimumIndex > 1000 then
             minimumIndex = #myPaths - 1000

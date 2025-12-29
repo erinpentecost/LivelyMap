@@ -50,6 +50,7 @@ end))
 --- @field facing (fun(icon: Icon): util.vector2|util.vector3|nil)?
 --- @field onDraw fun(icon: Icon, posData : ViewportData)
 --- @field onHide fun(icon: Icon)
+--- @field priority number? The higher the priority, the higher the layer.
 
 ---@class RegisteredIcon
 --- @field onScreen boolean Exists so we don't call onHide every frame.
@@ -426,9 +427,19 @@ local function registerIcon(icon)
         error("registerIcon icon.onHide is nil: " .. aux_util.deepToString(icon, 3))
     end
 
+    if icon.priority == nil then
+        icon.priority = 0
+    elseif type(icon.priority) ~= "number" then
+        error("icon.priority must be a number")
+    end
+
     nextName = nextName + 1
     local name = "icon_" .. tostring(nextName)
-    table.insert(icons, {
+    icon.element.layout.name = name
+
+    local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.priority end) or 1
+
+    table.insert(icons, insertIndex, {
         -- onScreen exists so we don't call onHide every frame.
         onScreen = false,
         -- remove is used to signal deletion
@@ -436,13 +447,9 @@ local function registerIcon(icon)
         ref = icon,
         name = name,
     })
-    icon.element.layout.name = name
+
     icon.onHide()
-    if icon.front then
-        iconContainer.layout.content:insert(1, icon.element)
-    else
-        iconContainer.layout.content:add(icon.element)
-    end
+    iconContainer.layout.content:insert(insertIndex, icon.element)
 end
 
 

@@ -94,6 +94,7 @@ local function makeDebugPips()
                         element.layout.props.visible = false
                         element:update()
                     end,
+                    priority = -1000,
                 })
             end
         end

@@ -91,7 +91,7 @@ local function merge(a, b)
     return {
         id = b.id or a.id,
         paths = result_paths,
-        extra = mutil.shallowMerge(b, a),
+        extra = mutil.shallowMerge(a, b),
     }
 end
 

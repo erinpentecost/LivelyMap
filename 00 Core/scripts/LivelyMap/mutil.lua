@@ -193,6 +193,49 @@ local function lerpAngle(startAngle, endAngle, t)
     return util.normalizeAngle(result)
 end
 
+---@generic T
+---@param arr T[]
+--- Sorted array over which the predicate transitions from false → true.
+--- The predicate MUST be monotonic:
+---   - For all i < j: if predicate(arr[i]) is true, predicate(arr[j]) is also true
+--- In other words, there exists a single boundary index where the predicate
+--- first becomes true, and remains true for all later elements.
+---
+---@param predicate fun(item: T): boolean
+--- Returns true if the element satisfies the search condition.
+--- This function will find the *first* index for which predicate(item) == true.
+---
+---@return integer? index
+--- The lowest index i such that predicate(arr[i]) is true.
+--- Returns nil if the predicate is false for all elements.
+local function binarySearchFirst(arr, predicate)
+    local lo = 1
+    local hi = #arr
+    local result = nil
+
+    -- Standard binary search over a monotonic predicate.
+    -- Invariant:
+    --   - All indices < lo are known to be false
+    --   - All indices > hi are known to be true
+    while lo <= hi do
+        local mid = math.floor((lo + hi) / 2)
+
+        if predicate(arr[mid]) then
+            -- mid is a valid candidate; keep searching left
+            -- to ensure we return the *first* true index.
+            result = mid
+            hi = mid - 1
+        else
+            -- mid does not satisfy the predicate; discard left half
+            lo = mid + 1
+        end
+    end
+
+    return result
+end
+
+
+
 return {
     CELL_SIZE = CELL_SIZE,
     getMap = getMap,
@@ -204,6 +247,7 @@ return {
     lerpAngle = lerpAngle,
     worldPosToCellPos = worldPosToCellPos,
     cellPosToWorldPos = cellPosToWorldPos,
+    binarySearchFirst = binarySearchFirst,
     inBox = inBox,
     shallowMerge = shallowMerge,
 }

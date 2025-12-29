@@ -98,6 +98,7 @@ local compassIcon = {
         compassAtlas:getElement().layout.props.visible = false
         compassAtlas:getElement():update()
     end,
+    priority = 1000,
 }
 
 compassAtlas:getElement().layout.events.mouseClick = async:callback(function()
