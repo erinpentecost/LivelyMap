@@ -22,3 +22,5 @@ palleteColor2Name: "Pallete Color 2"
 palleteColor3Name: "Pallete Color 3"
 palleteColor4Name: "Pallete Color 4"
 palleteColor5Name: "Pallete Color 5"
+
+debugName: "Debug Mode"

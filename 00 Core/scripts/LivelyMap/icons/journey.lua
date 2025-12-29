@@ -114,12 +114,14 @@ local function color(currentIdx)
 end
 
 local function makeIcon(startIdx)
+    local floored = math.floor(startIdx)
     ---print("making journey icon at index " .. startIdx)
     local icon = iconPool:obtain()
     icon.element.layout.props.visible = true
-    icon.element.layout.props.color = color(startIdx)
+    icon.element.layout.props.color = color(floored)
     icon.freed = false
-    icon.currentIdx = startIdx
+    icon.currentIdx = floored
+    icon.partialStep = startIdx - floored
     icon.pool = iconPool
     table.insert(pathIcons, icon)
 end

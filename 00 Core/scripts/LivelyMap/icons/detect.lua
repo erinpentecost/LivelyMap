@@ -35,6 +35,7 @@ local settingCache = {
     palleteColor3 = settings.palleteColor3,
     palleteColor4 = settings.palleteColor4,
     extendDetectRange = settings.extendDetectRange,
+    debug = settings.debug,
 }
 
 settings.subscribe(async:callback(function(_, key)
@@ -300,9 +301,11 @@ local function onUpdate(dt)
         end
     end
     -- DEBUG!
-    animalMagnitude = 100
-    enchantmentMagnitude = 100
-    keyMagnitude = 100
+    if settingCache.debug then
+        animalMagnitude = 100
+        enchantmentMagnitude = 100
+        keyMagnitude = 100
+    end
     -- delete old icons
     freeIcons()
     if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then

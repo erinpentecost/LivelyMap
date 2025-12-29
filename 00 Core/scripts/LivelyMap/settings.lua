@@ -103,6 +103,12 @@ local function init()
                 renderer = MOD_NAME .. "color",
                 default = util.color.hex("3A86FF"),
             },
+            {
+                key = "debug",
+                name = "debugName",
+                default = false,
+                renderer = "checkbox",
+            },
         }
     }
 end

@@ -28,8 +28,8 @@ local iutil      = require("scripts.LivelyMap.icons.iutil")
 
 local debugEnabled = false
 settings.subscribe(async:callback(function(_, key)
-    if key == "psoUnlock" then
-        debugEnabled = settings.psoUnlock
+    if key == "psoUnlock" or key == "debug" then
+        debugEnabled = settings.psoUnlock or settings.debug
     end
 end))
 debugEnabled = settings.psoUnlock
@@ -37,6 +37,7 @@ debugEnabled = settings.psoUnlock
 
 
 local debugIcons = {}
+local baseSize = util.vector2(32, 32)
 
 local function makeDebugPips()
     for x = -2, 2, 1 do
@@ -55,9 +56,9 @@ local function makeDebugPips()
                         visible = false,
                         position = util.vector2(100, 100),
                         anchor = util.vector2(0.5, 0.5),
-                        size = util.vector2(32, 32),
+                        size = baseSize,
                         resource = ui.texture {
-                            path = "textures/detect_key_icon.dds"
+                            path = "textures/LivelyMap/stamps/cross.png"
                         }
                     }
                 }
@@ -84,7 +85,7 @@ local function makeDebugPips()
                             element.layout.props.visible = false
                             return
                         end
-                        element.layout.props.size = util.vector2(32, 32) * iutil.distanceScale(posData)
+                        element.layout.props.size = baseSize * iutil.distanceScale(posData)
                         element.layout.props.visible = true
                         element.layout.props.position = posData.viewportPos.pos
                         element:update()
