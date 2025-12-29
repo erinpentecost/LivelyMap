@@ -107,14 +107,14 @@ local function newIcon()
         ---@param posData ViewportData
         onDraw = function(s, posData)
             -- s is this icon.
-            if s.cachedPos == nil then
+            if s.cachedPos == nil or (not posData.viewportPos.onScreen) then
                 s.element.layout.props.visible = false
             else
                 s.element.layout.props.size = baseSize * iutil.distanceScale(posData)
                 s.element.layout.props.visible = true
                 s.element.layout.props.position = posData.viewportPos.pos
             end
-            element:update()
+            s.element:update()
         end,
         onHide = function(s)
             -- s is this icon.
@@ -127,14 +127,12 @@ local function newIcon()
     if settingCache.debug then
         attachDebugEventsToIcon(icon)
     end
-    element:update()
+    icon.element:update()
     interfaces.LivelyMapDraw.registerIcon(icon)
     return icon
 end
 
-local iconPool = pool.create(function()
-    return newIcon()
-end)
+local iconPool = pool.create(newIcon, 0)
 
 local function color(currentIdx)
     return mutil.lerpColor(settingCache.palleteColor2, settingCache.palleteColor1,

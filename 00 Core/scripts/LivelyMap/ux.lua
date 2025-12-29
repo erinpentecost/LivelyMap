@@ -273,6 +273,7 @@ local function renderIcons()
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
                     icon.ref.onDraw(icon.ref, pos)
+                    goto continue
                 elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
                     local halfBox = icon.ref.element.layout.props.size / 2
@@ -283,21 +284,17 @@ local function renderIcons()
                         min.x <= screenSize.x and min.y <= screenSize.y then
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos)
-                    else
-                        hideIcon(icon)
+                        goto continue
                     end
-                else
-                    hideIcon(icon)
                 end
-            else
-                hideIcon(icon)
             end
-        else
-            hideIcon(icon)
         end
+        hideIcon(icon)
+        :: continue ::
     end
 
 
+    iconContainer:update()
     mainWindow:update()
 
     --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
