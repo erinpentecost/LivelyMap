@@ -241,7 +241,7 @@ local function purgeRemovedIcons()
     end
 
     icons = remainingIcons
-    iconContainer.layout.content = remainingContent
+    iconContainer.layout.content = ui.content(remainingContent)
     if #remainingIcons ~= #remainingContent then
         error("mismatch between icons list and icons container content")
     end
@@ -447,8 +447,6 @@ local function registerIcon(icon)
     if not icon.onHide then
         error("registerIcon icon.onHide is nil: " .. aux_util.deepToString(icon, 3))
     end
-
-
 
     nextName = nextName + 1
     local name = "icon_" .. tostring(nextName)

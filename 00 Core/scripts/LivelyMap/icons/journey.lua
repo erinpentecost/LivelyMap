@@ -114,7 +114,7 @@ local function newIcon()
                 s.element.layout.props.visible = true
                 s.element.layout.props.position = posData.viewportPos.pos
             end
-            s.element:update()
+            element:update()
         end,
         onHide = function(s)
             -- s is this icon.
