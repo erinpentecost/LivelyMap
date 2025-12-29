@@ -187,7 +187,6 @@ local function makeIcons()
     local totalPips = 16
     local stepSize = (#myPaths - minimumIndex + 1) / totalPips
 
-    --- the last step size is one is 1 short!
     for i = minimumIndex, #myPaths, stepSize do
         makeIcon(i)
     end
@@ -208,14 +207,15 @@ local displaying = false
 interfaces.LivelyMapDraw.onMapMoved(function(mapData)
     print("map up")
     mapUp = true
-    if not mapData.swapped then
-        displaying = false
-    end
 end)
 
-interfaces.LivelyMapDraw.onMapHidden(function(_)
+interfaces.LivelyMapDraw.onMapHidden(function(mapData)
     print("map down")
-    mapUp = false
+    if not mapData.swapped then
+        print("map closed")
+        mapUp = false
+        displaying = false
+    end
 end)
 
 
