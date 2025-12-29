@@ -150,7 +150,10 @@ local function findOldestAfter(paths, oldestTime)
 end
 
 local function makeIcons()
-    myPaths = interfaces.LivelyMapPlayerData.getPaths()[interfaces.LivelyMapPlayerData.playerName].paths
+    myPaths = interfaces.LivelyMapPlayerData.exteriorsOnly(
+        interfaces.LivelyMapPlayerData.getPaths()
+        [interfaces.LivelyMapPlayerData.playerName].paths)
+
 
     if settingCache.drawLimitNeravarinesJourney then
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
