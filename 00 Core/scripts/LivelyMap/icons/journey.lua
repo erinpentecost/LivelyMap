@@ -108,19 +108,19 @@ local function newIcon()
         onDraw = function(s, posData)
             -- s is this icon.
             if s.cachedPos == nil then
-                element.layout.props.visible = false
+                s.element.layout.props.visible = false
             else
-                element.layout.props.size = baseSize * iutil.distanceScale(posData)
-                element.layout.props.visible = true
-                element.layout.props.position = posData.viewportPos.pos
+                s.element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                s.element.layout.props.visible = true
+                s.element.layout.props.position = posData.viewportPos.pos
             end
-            element:update()
+            s.element:update()
         end,
         onHide = function(s)
             -- s is this icon.
             --print("hiding " .. getRecord(s.entity).name)
-            element.layout.props.visible = false
-            element:update()
+            s.element.layout.props.visible = false
+            s.element:update()
         end,
         priority = -900,
     }
@@ -144,13 +144,20 @@ end
 local function makeIcon(startIdx)
     local floored = math.floor(startIdx)
     local icon = iconPool:obtain()
-    print("making journey icon at index " .. startIdx .. ". name= " .. tostring(icon.element.layout.name))
+    local name = icon.element.layout.name
+    print("made journey icon at index " .. startIdx .. ". name= " .. tostring(name))
     icon.element.layout.props.visible = true
     icon.element.layout.props.color = color(floored)
     icon.currentIdx = floored
     icon.partialStep = startIdx - floored
     icon.pool = iconPool
     table.insert(pathIcons, icon)
+
+    if settings.debug then
+        local registered = interfaces.LivelyMapDraw.getIcon(name)
+        print("post-register: " .. aux_util.deepToString(registered, 2))
+        print(aux_util.deepToString(registered.ref.element.layout, 3))
+    end
 end
 
 local function makeIcons()
@@ -184,7 +191,9 @@ local function makeIcons()
     --- They are being created and registered, though.
     --- This has something to do with the object pool pre-creating 16 objects.
     --- Lazilly-created objects are getting messed up somehow.
-    local totalPips = 16
+    --- If use 32 and toggle displaying on and off, the first and second set of icons
+    --- swap being visible.
+    local totalPips = 32
     local stepSize = (#myPaths - minimumIndex + 1) / totalPips
 
     for i = minimumIndex, #myPaths, stepSize do

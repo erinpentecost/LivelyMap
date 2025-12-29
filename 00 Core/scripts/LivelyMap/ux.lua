@@ -242,6 +242,9 @@ local function purgeRemovedIcons()
 
     icons = remainingIcons
     iconContainer.layout.content = remainingContent
+    if #remainingIcons ~= #remainingContent then
+        error("mismatch between icons list and icons container content")
+    end
 end
 
 local function renderIcons()
@@ -258,39 +261,39 @@ local function renderIcons()
     local screenSize = ui.screenSize()
 
     -- Render all the icons.
-    for i = #icons, 1, -1 do
+    for _, icon in ipairs(icons) do
         -- Get world position.
-        local iPos = icons[i].ref.pos(icons[i].ref)
+        local iPos = icon.ref.pos(icon.ref)
         -- Get optional world facing vector.
-        local iFacing = icons[i].ref.facing and icons[i].ref.facing(icons[i].ref) or nil
+        local iFacing = icon.ref.facing and icon.ref.facing(icon.ref) or nil
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
             if pos and pos.viewportPos then
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
-                    icons[i].onScreen = true
-                    icons[i].ref.onDraw(icons[i].ref, pos)
-                elseif pos.viewportPos.pos and icons[i].ref.element.layout.props.size then
+                    icon.onScreen = true
+                    icon.ref.onDraw(icon.ref, pos)
+                elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
-                    local halfBox = icons[i].ref.element.layout.props.size / 2
+                    local halfBox = icon.ref.element.layout.props.size / 2
                     local min = pos.viewportPos.pos - halfBox
                     local max = pos.viewportPos.pos + halfBox
 
                     if max.x >= 0 and max.y >= 0 and
                         min.x <= screenSize.x and min.y <= screenSize.y then
-                        icons[i].onScreen = true
-                        icons[i].ref.onDraw(icons[i].ref, pos)
+                        icon.onScreen = true
+                        icon.ref.onDraw(icon.ref, pos)
                     else
-                        hideIcon(icons[i])
+                        hideIcon(icon)
                     end
                 else
-                    hideIcon(icons[i])
+                    hideIcon(icon)
                 end
             else
-                hideIcon(icons[i])
+                hideIcon(icon)
             end
         else
-            hideIcon(icons[i])
+            hideIcon(icon)
         end
     end
 
@@ -472,7 +475,7 @@ local function registerIcon(icon)
         name = name,
     })
 
-    icon.onHide()
+    icon.onHide(icon)
     iconContainer.layout.content:insert(insertIndex, icon.element)
 
     return name
