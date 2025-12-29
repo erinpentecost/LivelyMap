@@ -37,6 +37,7 @@ local currentMapData  = nil
 local settingCache    = {
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
+    debug           = settings.debug,
 }
 local settingsChanged = false
 settings.subscribe(async:callback(function(_, key)
@@ -56,7 +57,7 @@ end))
 --- @field onScreen boolean Exists so we don't call onHide every frame.
 --- @field remove boolean Remove is used to signal deletion.
 --- @field ref Icon
---- @name string
+--- @field name string Matches the layout name.
 
 ---@type RegisteredIcon[]
 local icons = {}
@@ -212,30 +213,52 @@ local function closeToCenter(viewportPos)
     return (viewportPos - (screenSize / 2)):length2() < radius2
 end
 
+local function purgeRemovedIcons()
+    --- check if remove is pending
+    local doRemoval = false
+    for _, icon in ipairs(icons) do
+        if icon.remove then
+            doRemoval = true
+            break
+        end
+    end
+
+    if not doRemoval then
+        return
+    end
+
+    local remainingIcons = {}
+    local remainingContent = {}
+
+    for _, icon in ipairs(icons) do
+        if not icon.remove then
+            table.insert(remainingIcons, icon)
+            table.insert(remainingContent, icon.ref.element)
+            -- icon is responsible for destroying the UI element
+        elseif settingCache.debug then
+            print("Removing icon '" .. icon.name .. "'.")
+        end
+    end
+
+    icons = remainingIcons
+    iconContainer.layout.content = remainingContent
+end
+
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
-        for i = #icons, 1, -1 do
-            if icons[i].remove then
-                --iconContainer.layout.content[icons[i].name]:destroy()
-                table.remove(icons, i)
-            else
-                hideIcon(icons[i])
-            end
+        for _, icon in ipairs(icons) do
+            hideIcon(icon)
         end
         return
     end
+
+    purgeRemovedIcons()
 
     local screenSize = ui.screenSize()
 
     -- Render all the icons.
     for i = #icons, 1, -1 do
-        -- Remove if marked for removal.
-        if icons[i].remove then
-            table.remove(icons, i)
-            goto continue
-        end
-
         -- Get world position.
         local iPos = icons[i].ref.pos(icons[i].ref)
         -- Get optional world facing vector.
@@ -269,8 +292,6 @@ local function renderIcons()
         else
             hideIcon(icons[i])
         end
-
-        ::continue::
     end
 
 
@@ -308,10 +329,7 @@ local function onMapMoved(data)
     end
 
     if not data.swapped then
-        -- need to steal some interface and also turn off pausing during it.
-        -- this is because I want
         interfaces.UI.setMode('Interface', { windows = {} })
-        --interfaces.UI.setPauseOnMode('Travel', false)
         mainWindow.layout.props.visible = true
         mainWindow:update()
     end
@@ -427,16 +445,22 @@ local function registerIcon(icon)
         error("registerIcon icon.onHide is nil: " .. aux_util.deepToString(icon, 3))
     end
 
-    if icon.priority == nil then
-        icon.priority = 0
-    elseif type(icon.priority) ~= "number" then
-        error("icon.priority must be a number")
-    end
+
 
     nextName = nextName + 1
     local name = "icon_" .. tostring(nextName)
     icon.element.layout.name = name
 
+    if settingCache.debug then
+        print("Registering icon '" .. name .. "': " .. aux_util.deepToString(icon, 4))
+    end
+
+    --- Determine where to insert the icon
+    if icon.priority == nil then
+        icon.priority = 0
+    elseif type(icon.priority) ~= "number" then
+        error("icon.priority must be a number")
+    end
     local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.priority end) or 1
 
     table.insert(icons, insertIndex, {
@@ -450,6 +474,8 @@ local function registerIcon(icon)
 
     icon.onHide()
     iconContainer.layout.content:insert(insertIndex, icon.element)
+
+    return name
 end
 
 
@@ -460,11 +486,21 @@ local function addHandler(fn, list)
     table.insert(list, fn)
 end
 
+local function getIcon(name)
+    for _, icon in ipairs(icons) do
+        if icon.name == name then
+            return icon
+        end
+    end
+    return nil
+end
+
 return {
     interfaceName = MOD_NAME .. "Draw",
     interface = {
         version = 1,
         registerIcon = registerIcon,
+        getIcon = getIcon,
         setHoverBoxContent = setHoverBoxContent,
         onMapMoved = function(fn)
             return addHandler(fn, onMapMovedHandlers)

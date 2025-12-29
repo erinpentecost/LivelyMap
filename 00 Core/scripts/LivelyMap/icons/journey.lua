@@ -34,11 +34,8 @@ local settingCache = {
     palleteColor1 = settings.palleteColor1,
     palleteColor2 = settings.palleteColor2,
     drawLimitNeravarinesJourney = settings.drawLimitNeravarinesJourney,
+    debug = settings.debug,
 }
-settings.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
-end))
-
 settings.subscribe(async:callback(function(_, key)
     settingCache[key] = settings[key]
 end))
@@ -53,6 +50,34 @@ local minimumIndex = 1
 local pathIcon     = "textures/LivelyMap/stamps/circle.png"
 
 local baseSize     = util.vector2(16, 16)
+
+
+local function attachDebugEventsToIcon(icon)
+    local focusGain = function()
+        local hover = {
+            template = interfaces.MWUI.templates.textHeader,
+            type = ui.TYPE.Text,
+            alignment = ui.ALIGNMENT.End,
+            props = {
+                textAlignV = ui.ALIGNMENT.Center,
+                relativePosition = util.vector2(0, 0.5),
+                text = icon.element.layout.name .. ", path index: " .. tostring(icon.currentIdx),
+            }
+        }
+        interfaces.LivelyMapDraw.setHoverBoxContent(hover)
+
+        --- I think the issue is that "freed" is passed by value or something
+        local registered = interfaces.LivelyMapDraw.getIcon(icon.element.layout.name)
+        print(aux_util.deepToString(registered, 5))
+    end
+
+    icon.element.layout.events.focusGain = async:callback(focusGain)
+    icon.element.layout.events.focusLoss = async:callback(function()
+        interfaces.LivelyMapDraw.setHoverBoxContent()
+        return nil
+    end)
+end
+
 -- creates an unattached icon and registers it.
 local function newIcon()
     local element = ui.create {
@@ -76,14 +101,13 @@ local function newIcon()
         currentIdx = nil,
         partialStep = 0,
         cachedPos = nil,
-        freed = true,
         pos = function(s)
             return s.cachedPos
         end,
         ---@param posData ViewportData
         onDraw = function(s, posData)
             -- s is this icon.
-            if s.freed then
+            if s.cachedPos == nil then
                 element.layout.props.visible = false
             else
                 element.layout.props.size = baseSize * iutil.distanceScale(posData)
@@ -100,6 +124,9 @@ local function newIcon()
         end,
         priority = -900,
     }
+    if settingCache.debug then
+        attachDebugEventsToIcon(icon)
+    end
     element:update()
     interfaces.LivelyMapDraw.registerIcon(icon)
     return icon
@@ -116,11 +143,10 @@ end
 
 local function makeIcon(startIdx)
     local floored = math.floor(startIdx)
-    print("making journey icon at index " .. startIdx)
     local icon = iconPool:obtain()
+    print("making journey icon at index " .. startIdx .. ". name= " .. tostring(icon.element.layout.name))
     icon.element.layout.props.visible = true
     icon.element.layout.props.color = color(floored)
-    icon.freed = false
     icon.currentIdx = floored
     icon.partialStep = startIdx - floored
     icon.pool = iconPool
@@ -154,21 +180,23 @@ local function makeIcons()
         return
     end
 
-    -- this gets has weird behavior if it goes over 16 pips.
-    -- something might be wrong with the pool.
-    local stepSize = (#myPaths - minimumIndex + 1) / 16
+    --- TODO: BUG: If totalPips is greater than 16, some icons don't actually get rendered.
+    --- They are being created and registered, though.
+    --- This has something to do with the object pool pre-creating 16 objects.
+    --- Lazilly-created objects are getting messed up somehow.
+    local totalPips = 16
+    local stepSize = (#myPaths - minimumIndex + 1) / totalPips
 
-    local made = 0
+    --- the last step size is one is 1 short!
     for i = minimumIndex, #myPaths, stepSize do
         makeIcon(i)
-        made = made + 1
     end
 end
 
 local function freeIcons()
     for _, icon in ipairs(pathIcons) do
         icon.element.layout.props.visible = false
-        icon.freed = true
+        icon.cachedPos = nil
         icon.currentIdx = nil
         icon.pool:free(icon)
     end
@@ -180,6 +208,9 @@ local displaying = false
 interfaces.LivelyMapDraw.onMapMoved(function(mapData)
     print("map up")
     mapUp = true
+    if not mapData.swapped then
+        displaying = false
+    end
 end)
 
 interfaces.LivelyMapDraw.onMapHidden(function(_)
