@@ -15,19 +15,32 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces = require('openmw.interfaces')
-local ui         = require('openmw.ui')
-local util       = require('openmw.util')
-local pself      = require("openmw.self")
-local types      = require("openmw.types")
-local core       = require("openmw.core")
-local nearby     = require("openmw.nearby")
-local iutil      = require("scripts.LivelyMap.icons.iutil")
-local pool       = require("scripts.LivelyMap.pool.pool")
-local settings   = require("scripts.LivelyMap.settings")
-local mutil      = require("scripts.LivelyMap.mutil")
-local async      = require("openmw.async")
-local aux_util   = require('openmw_aux.util')
+local interfaces   = require('openmw.interfaces')
+local ui           = require('openmw.ui')
+local util         = require('openmw.util')
+local pself        = require("openmw.self")
+local types        = require("openmw.types")
+local core         = require("openmw.core")
+local nearby       = require("openmw.nearby")
+local iutil        = require("scripts.LivelyMap.icons.iutil")
+local pool         = require("scripts.LivelyMap.pool.pool")
+local mutil        = require("scripts.LivelyMap.mutil")
+local async        = require("openmw.async")
+local aux_util     = require('openmw_aux.util')
+
+local settings     = require("scripts.LivelyMap.settings")
+
+local settingCache = {
+    palleteColor2 = settings.palleteColor2,
+    palleteColor3 = settings.palleteColor3,
+    palleteColor4 = settings.palleteColor4,
+    extendDetectRange = settings.extendDetectRange,
+    debug = settings.debug,
+}
+
+settings.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings[key]
+end))
 
 
 local detectAnimalId      = core.magic.EFFECT_TYPE.DetectAnimal
@@ -56,14 +69,14 @@ local function isEnchanted(record)
 end
 
 
-local animalPath = "textures/detect_animal_icon.dds"
-local keyPath = "textures/detect_key_icon.dds"
-local enchantmentPath = "textures/detect_enchantment_icon.dds"
+local animalPath      = "textures/LivelyMap/stamps/circle-stroked.png"
+local keyPath         = "textures/LivelyMap/stamps/square-stroked.png"
+local enchantmentPath = "textures/LivelyMap/stamps/triangle-stroked.png"
 
-local color = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
-local baseSize = util.vector2(32, 32)
+local color           = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
+local baseSize        = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
-local function newDetectIcon(path)
+local function newDetectIcon(path, color)
     local element = ui.create {
         name = "detect",
         type = ui.TYPE.Image,
@@ -72,6 +85,7 @@ local function newDetectIcon(path)
             position = util.vector2(100, 100),
             anchor = util.vector2(0.5, 0.5),
             size = baseSize,
+            color = color,
             resource = ui.texture {
                 path = path,
             }
@@ -134,13 +148,13 @@ local function newDetectIcon(path)
 end
 
 local iconPoolAnimal = pool.create(function()
-    return newDetectIcon(animalPath)
+    return newDetectIcon(animalPath, settingCache.palleteColor2)
 end)
 local iconPoolEnchantment = pool.create(function()
-    return newDetectIcon(enchantmentPath)
+    return newDetectIcon(enchantmentPath, settingCache.palleteColor3)
 end)
 local iconPoolKey = pool.create(function()
-    return newDetectIcon(keyPath)
+    return newDetectIcon(keyPath, settingCache.palleteColor4)
 end)
 
 local function makeIcon(iconPool, entity, pos)
@@ -157,7 +171,7 @@ local function makeIcon(iconPool, entity, pos)
 end
 
 local function magnitudeToSqDist(mag)
-    if settings.extendDetectRange then
+    if settingCache.extendDetectRange then
         -- 8192 at 100 mag
         local v = mag * mutil.CELL_SIZE / 100
         return v * v
@@ -287,9 +301,11 @@ local function onUpdate(dt)
         end
     end
     -- DEBUG!
-    --animalMagnitude = 100
-    --enchantmentMagnitude = 100
-    --keyMagnitude = 100
+    if settingCache.debug then
+        animalMagnitude = 100
+        enchantmentMagnitude = 100
+        keyMagnitude = 100
+    end
     -- delete old icons
     freeIcons()
     if animalMagnitude <= 0 and enchantmentMagnitude <= 0 and keyMagnitude <= 0 then

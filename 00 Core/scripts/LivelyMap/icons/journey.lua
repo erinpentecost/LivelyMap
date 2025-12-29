@@ -31,8 +31,14 @@ local aux_util     = require('openmw_aux.util')
 local MOD_NAME     = require("scripts.LivelyMap.ns")
 
 local settingCache = {
+    palleteColor1 = settings.palleteColor1,
+    palleteColor2 = settings.palleteColor2,
     drawLimitNeravarinesJourney = settings.drawLimitNeravarinesJourney,
 }
+settings.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings[key]
+end))
+
 settings.subscribe(async:callback(function(_, key)
     settingCache[key] = settings[key]
 end))
@@ -46,9 +52,6 @@ local minimumIndex = 1
 
 local pathIcon     = "textures/LivelyMap/stamps/circle.png"
 
-local startColor   = util.color.rgba(255 / 255, 204 / 255, 1 / 255, 0.75)
-local endColor     = util.color.rgba(255 / 255, 91 / 255, 2 / 255, 1)
-
 local baseSize     = util.vector2(16, 16)
 -- creates an unattached icon and registers it.
 local function newIcon()
@@ -60,7 +63,7 @@ local function newIcon()
             position = util.vector2(100, 100),
             anchor = util.vector2(0.5, 0.5),
             size = baseSize,
-            color = startColor,
+            color = settingCache.palleteColor2,
             resource = ui.texture {
                 path = pathIcon,
             }
@@ -106,16 +109,19 @@ local iconPool = pool.create(function()
 end)
 
 local function color(currentIdx)
-    return mutil.lerpColor(startColor, endColor, currentIdx / (1 + #myPaths - minimumIndex))
+    return mutil.lerpColor(settingCache.palleteColor2, settingCache.palleteColor1,
+        currentIdx / (1 + #myPaths - minimumIndex))
 end
 
 local function makeIcon(startIdx)
-    ---print("making journey icon at index " .. startIdx)
+    local floored = math.floor(startIdx)
+    print("making journey icon at index " .. startIdx)
     local icon = iconPool:obtain()
     icon.element.layout.props.visible = true
-    icon.element.layout.props.color = color(startIdx)
+    icon.element.layout.props.color = color(floored)
     icon.freed = false
-    icon.currentIdx = startIdx
+    icon.currentIdx = floored
+    icon.partialStep = startIdx - floored
     icon.pool = iconPool
     table.insert(pathIcons, icon)
 end
@@ -150,20 +156,31 @@ local function makeIcons()
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
         local oldestTime = core.getGameTime() - oldDuration
         minimumIndex = findOldestAfter(myPaths, oldestTime) or 1
+        --- hard limit to 1000
         if #myPaths - minimumIndex > 1000 then
             minimumIndex = #myPaths - 1000
+        end
+        --- don't limit too much if we haven't moved in a long time
+        if minimumIndex >= #myPaths and #myPaths > 10 then
+            minimumIndex = #myPaths - 10
         end
     else
         minimumIndex = 1
     end
 
     print("#myPaths: " .. tostring(#myPaths) .. ", minimumIndex:" .. minimumIndex)
-    if #myPaths <= 0 or minimumIndex > #myPaths then
+    if #myPaths <= 0 or minimumIndex >= #myPaths then
         return
     end
 
-    for i = minimumIndex, #myPaths, 5 do
+    -- this gets has weird behavior if it goes over 16 pips.
+    -- something might be wrong with the pool.
+    local stepSize = (#myPaths - minimumIndex + 1) / 16
+
+    local made = 0
+    for i = minimumIndex, #myPaths, stepSize do
         makeIcon(i)
+        made = made + 1
     end
 end
 

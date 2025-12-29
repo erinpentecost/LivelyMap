@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 local interfaces = require("openmw.interfaces")
 local storage    = require("openmw.storage")
 local MOD_NAME   = require("scripts.LivelyMap.ns")
+local util       = require('openmw.util')
 
 local function init()
     interfaces.Settings.registerPage {
@@ -71,7 +72,43 @@ local function init()
                 description = "drawLimitNeravarinesJourneyDescription",
                 default = true,
                 renderer = "checkbox",
-            }
+            },
+            {
+                key = "palleteColor1",
+                name = "palleteColor1Name",
+                renderer = MOD_NAME .. "color",
+                default = util.color.hex("FFBE0B"),
+            },
+            {
+                key = "palleteColor2",
+                name = "palleteColor2Name",
+                renderer = MOD_NAME .. "color",
+                default = util.color.hex("FB5607"),
+            },
+            {
+                key = "palleteColor3",
+                name = "palleteColor3Name",
+                renderer = MOD_NAME .. "color",
+                default = util.color.hex("FF006E"),
+            },
+            {
+                key = "palleteColor4",
+                name = "palleteColor4Name",
+                renderer = MOD_NAME .. "color",
+                default = util.color.hex("8338EC"),
+            },
+            {
+                key = "palleteColor5",
+                name = "palleteColor5Name",
+                renderer = MOD_NAME .. "color",
+                default = util.color.hex("3A86FF"),
+            },
+            {
+                key = "debug",
+                name = "debugName",
+                default = false,
+                renderer = "checkbox",
+            },
         }
     }
 end
@@ -98,6 +135,7 @@ local lookupFuncTable = {
 local container = {
     section = storage.playerSection("Settings" .. MOD_NAME)
 }
+--container.section:reset()
 setmetatable(container, lookupFuncTable)
 
 return container

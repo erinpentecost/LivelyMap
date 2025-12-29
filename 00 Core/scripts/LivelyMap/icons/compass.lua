@@ -23,8 +23,11 @@ local aux_util     = require('openmw_aux.util')
 local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
 local iutil        = require("scripts.LivelyMap.icons.iutil")
 local async        = require("openmw.async")
+local settings     = require("scripts.LivelyMap.settings")
 
-local color        = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
+local settingCache = {
+    palleteColor1 = settings.palleteColor1,
+}
 
 -- "/home/ern/workspace/LivelyMap/cmd/h3/make_atlas.sh" -i  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow.png" -o "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow_atlas.dds" -r 20 -c 18
 local compassAtlas = imageAtlas.constructAtlas({
@@ -36,10 +39,18 @@ local compassAtlas = imageAtlas.constructAtlas({
 })
 compassAtlas:spawn({
     anchor = util.vector2(0.5, 0.5),
-    color = color,
+    color = settingCache.palleteColor1,
     events = {},
     propagateEvents = false,
 })
+
+settings.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings[key]
+    if key == "palleteColor1" then
+        compassAtlas:getElement().layout.props.color = settingCache.palleteColor1
+        compassAtlas:getElement():update()
+    end
+end))
 
 local baseSize = util.vector2(50, 50)
 

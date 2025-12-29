@@ -1,5 +1,6 @@
 name: "Lively Map"
 description: "Overworld map replacer."
+settings: "Settings"
 
 map: "Map"
 
@@ -7,9 +8,19 @@ psoDepthName: "Parallax Depth"
 psoDepthDescription: "How deep to offset icons on the world map. Relates to you parallax shader. If the icons on the map seem 'floaty', or not glued to the ground, try adjusting this value."
 psoPushdownOnlyName: "Parallax Pushdown Only"
 psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
+psoUnlockName: "Unlock Parallax"
+psoUnlockDescription: "TODO: mouse wheel changes parallax depth instead of zooming"
 
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."
 
 drawLimitNeravarinesJourneyName: "Limit Neravarine's Journey"
 drawLimitNeravarinesJourneyDescription: "Only draw the last 4 hours of the Neravarine's Journey. Path data will still be saved."
+
+palleteColor1Name: "Pallete Color 1"
+palleteColor2Name: "Pallete Color 2"
+palleteColor3Name: "Pallete Color 3"
+palleteColor4Name: "Pallete Color 4"
+palleteColor5Name: "Pallete Color 5"
+
+debugName: "Debug Mode"
