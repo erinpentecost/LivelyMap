@@ -144,7 +144,7 @@ local function makeIcon(startIdx)
     local icon = iconPool:obtain()
     local name = icon.element.layout.name
     print("made journey icon at index " .. startIdx .. ". name= " .. tostring(name))
-    icon.element.layout.props.visible = true
+    icon.element.layout.props.visible = false
     icon.element.layout.props.color = color(floored)
     icon.currentIdx = floored
     icon.partialStep = startIdx - floored
@@ -185,13 +185,7 @@ local function makeIcons()
         return
     end
 
-    --- TODO: BUG: If totalPips is greater than 16, some icons don't actually get rendered.
-    --- They are being created and registered, though.
-    --- This has something to do with the object pool pre-creating 16 objects.
-    --- Lazilly-created objects are getting messed up somehow.
-    --- If use 32 and toggle displaying on and off, the first and second set of icons
-    --- swap being visible.
-    local totalPips = 32
+    local totalPips = math.max(1, 10 * math.log(#myPaths - minimumIndex + 1))
     local stepSize = (#myPaths - minimumIndex + 1) / totalPips
 
     for i = minimumIndex, #myPaths, stepSize do
