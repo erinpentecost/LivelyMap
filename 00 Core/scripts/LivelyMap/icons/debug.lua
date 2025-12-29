@@ -32,7 +32,7 @@ settings.subscribe(async:callback(function(_, key)
         debugEnabled = settings.psoUnlock or settings.debug
     end
 end))
-debugEnabled = settings.psoUnlock
+debugEnabled = settings.psoUnlock or settings.debug
 
 
 

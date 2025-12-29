@@ -115,7 +115,7 @@ end
 
 local function makeIcon(startIdx)
     local floored = math.floor(startIdx)
-    ---print("making journey icon at index " .. startIdx)
+    print("making journey icon at index " .. startIdx)
     local icon = iconPool:obtain()
     icon.element.layout.props.visible = true
     icon.element.layout.props.color = color(floored)
@@ -156,20 +156,31 @@ local function makeIcons()
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
         local oldestTime = core.getGameTime() - oldDuration
         minimumIndex = findOldestAfter(myPaths, oldestTime) or 1
+        --- hard limit to 1000
         if #myPaths - minimumIndex > 1000 then
             minimumIndex = #myPaths - 1000
+        end
+        --- don't limit too much if we haven't moved in a long time
+        if minimumIndex >= #myPaths and #myPaths > 10 then
+            minimumIndex = #myPaths - 10
         end
     else
         minimumIndex = 1
     end
 
     print("#myPaths: " .. tostring(#myPaths) .. ", minimumIndex:" .. minimumIndex)
-    if #myPaths <= 0 or minimumIndex > #myPaths then
+    if #myPaths <= 0 or minimumIndex >= #myPaths then
         return
     end
 
-    for i = minimumIndex, #myPaths, 5 do
+    -- this gets has weird behavior if it goes over 16 pips.
+    -- something might be wrong with the pool.
+    local stepSize = (#myPaths - minimumIndex + 1) / 16
+
+    local made = 0
+    for i = minimumIndex, #myPaths, stepSize do
         makeIcon(i)
+        made = made + 1
     end
 end
 
