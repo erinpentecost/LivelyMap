@@ -91,7 +91,7 @@ local function merge(a, b)
     return {
         id = b.id or a.id,
         paths = result_paths,
-        extra = mutil.shallowMerge(b, a),
+        extra = mutil.shallowMerge(a, b),
     }
 end
 
@@ -245,11 +245,25 @@ local function onUpdate(dt)
     addEntry()
 end
 
+---comment
+---@param paths PathEntry[]
+---@return PathEntry[]
+local function exteriorsOnly(paths)
+    local out = {}
+    for _, path in ipairs(paths) do
+        if not path.c then
+            table.insert(out, path)
+        end
+    end
+    return out
+end
+
 return {
     interfaceName = MOD_NAME .. "PlayerData",
     interface = {
         version = 1,
         getPaths = function() return allData end,
+        exteriorsOnly = exteriorsOnly,
         playerName = playerName,
     },
     engineHandlers = {

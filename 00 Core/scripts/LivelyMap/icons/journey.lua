@@ -34,11 +34,8 @@ local settingCache = {
     palleteColor1 = settings.palleteColor1,
     palleteColor2 = settings.palleteColor2,
     drawLimitNeravarinesJourney = settings.drawLimitNeravarinesJourney,
+    debug = settings.debug,
 }
-settings.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
-end))
-
 settings.subscribe(async:callback(function(_, key)
     settingCache[key] = settings[key]
 end))
@@ -53,6 +50,34 @@ local minimumIndex = 1
 local pathIcon     = "textures/LivelyMap/stamps/circle.png"
 
 local baseSize     = util.vector2(16, 16)
+
+
+local function attachDebugEventsToIcon(icon)
+    local focusGain = function()
+        local hover = {
+            template = interfaces.MWUI.templates.textHeader,
+            type = ui.TYPE.Text,
+            alignment = ui.ALIGNMENT.End,
+            props = {
+                textAlignV = ui.ALIGNMENT.Center,
+                relativePosition = util.vector2(0, 0.5),
+                text = icon.element.layout.name .. ", path index: " .. tostring(icon.currentIdx),
+            }
+        }
+        interfaces.LivelyMapDraw.setHoverBoxContent(hover)
+
+        --- I think the issue is that "freed" is passed by value or something
+        local registered = interfaces.LivelyMapDraw.getIcon(icon.element.layout.name)
+        print(aux_util.deepToString(registered, 5))
+    end
+
+    icon.element.layout.events.focusGain = async:callback(focusGain)
+    icon.element.layout.events.focusLoss = async:callback(function()
+        interfaces.LivelyMapDraw.setHoverBoxContent()
+        return nil
+    end)
+end
+
 -- creates an unattached icon and registers it.
 local function newIcon()
     local element = ui.create {
@@ -76,37 +101,38 @@ local function newIcon()
         currentIdx = nil,
         partialStep = 0,
         cachedPos = nil,
-        freed = true,
         pos = function(s)
             return s.cachedPos
         end,
         ---@param posData ViewportData
         onDraw = function(s, posData)
             -- s is this icon.
-            if s.freed then
-                element.layout.props.visible = false
+            if s.cachedPos == nil or (not posData.viewportPos.onScreen) then
+                s.element.layout.props.visible = false
             else
-                element.layout.props.size = baseSize * iutil.distanceScale(posData)
-                element.layout.props.visible = true
-                element.layout.props.position = posData.viewportPos.pos
+                s.element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                s.element.layout.props.visible = true
+                s.element.layout.props.position = posData.viewportPos.pos
             end
-            element:update()
+            s.element:update()
         end,
         onHide = function(s)
             -- s is this icon.
             --print("hiding " .. getRecord(s.entity).name)
-            element.layout.props.visible = false
-            element:update()
+            s.element.layout.props.visible = false
+            s.element:update()
         end,
+        priority = -900,
     }
-    element:update()
+    if settingCache.debug then
+        attachDebugEventsToIcon(icon)
+    end
+    icon.element:update()
     interfaces.LivelyMapDraw.registerIcon(icon)
     return icon
 end
 
-local iconPool = pool.create(function()
-    return newIcon()
-end)
+local iconPool = pool.create(newIcon, 0)
 
 local function color(currentIdx)
     return mutil.lerpColor(settingCache.palleteColor2, settingCache.palleteColor1,
@@ -115,47 +141,33 @@ end
 
 local function makeIcon(startIdx)
     local floored = math.floor(startIdx)
-    print("making journey icon at index " .. startIdx)
     local icon = iconPool:obtain()
-    icon.element.layout.props.visible = true
+    local name = icon.element.layout.name
+    print("made journey icon at index " .. startIdx .. ". name= " .. tostring(name))
+    icon.element.layout.props.visible = false
     icon.element.layout.props.color = color(floored)
-    icon.freed = false
     icon.currentIdx = floored
     icon.partialStep = startIdx - floored
     icon.pool = iconPool
     table.insert(pathIcons, icon)
-end
 
-
----@param paths PathEntry[]  -- sorted by increasing t
----@param oldestTime number
----@return integer? index    -- nil if not found
-local function findOldestAfter(paths, oldestTime)
-    local lo = 1
-    local hi = #paths
-    local result = nil
-
-    while lo <= hi do
-        local mid = math.floor((lo + hi) / 2)
-        local t = paths[mid].t
-
-        if t > oldestTime then
-            result = mid -- candidate; try to find an earlier one
-            hi = mid - 1
-        else
-            lo = mid + 1
-        end
+    if settings.debug then
+        local registered = interfaces.LivelyMapDraw.getIcon(name)
+        print("post-register: " .. aux_util.deepToString(registered, 2))
+        print(aux_util.deepToString(registered.ref.element.layout, 3))
     end
-    return result
 end
 
 local function makeIcons()
-    myPaths = interfaces.LivelyMapPlayerData.getPaths()[interfaces.LivelyMapPlayerData.playerName].paths
+    myPaths = interfaces.LivelyMapPlayerData.exteriorsOnly(
+        interfaces.LivelyMapPlayerData.getPaths()
+        [interfaces.LivelyMapPlayerData.playerName].paths)
+
 
     if settingCache.drawLimitNeravarinesJourney then
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
         local oldestTime = core.getGameTime() - oldDuration
-        minimumIndex = findOldestAfter(myPaths, oldestTime) or 1
+        minimumIndex = mutil.binarySearchFirst(myPaths, function(p) return p.t > oldestTime end) or 1
         --- hard limit to 1000
         if #myPaths - minimumIndex > 1000 then
             minimumIndex = #myPaths - 1000
@@ -173,21 +185,18 @@ local function makeIcons()
         return
     end
 
-    -- this gets has weird behavior if it goes over 16 pips.
-    -- something might be wrong with the pool.
-    local stepSize = (#myPaths - minimumIndex + 1) / 16
+    local totalPips = math.max(1, 10 * math.log(#myPaths - minimumIndex + 1))
+    local stepSize = (#myPaths - minimumIndex + 1) / totalPips
 
-    local made = 0
     for i = minimumIndex, #myPaths, stepSize do
         makeIcon(i)
-        made = made + 1
     end
 end
 
 local function freeIcons()
     for _, icon in ipairs(pathIcons) do
         icon.element.layout.props.visible = false
-        icon.freed = true
+        icon.cachedPos = nil
         icon.currentIdx = nil
         icon.pool:free(icon)
     end
@@ -201,9 +210,14 @@ interfaces.LivelyMapDraw.onMapMoved(function(mapData)
     mapUp = true
 end)
 
-interfaces.LivelyMapDraw.onMapHidden(function(_)
+interfaces.LivelyMapDraw.onMapHidden(function(mapData)
     print("map down")
-    mapUp = false
+    if not mapData.swapped then
+        print("map closed")
+        mapUp = false
+        displaying = false
+        freeIcons()
+    end
 end)
 
 

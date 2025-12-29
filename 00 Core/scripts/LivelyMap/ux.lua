@@ -37,6 +37,7 @@ local currentMapData  = nil
 local settingCache    = {
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
+    debug           = settings.debug,
 }
 local settingsChanged = false
 settings.subscribe(async:callback(function(_, key)
@@ -50,12 +51,13 @@ end))
 --- @field facing (fun(icon: Icon): util.vector2|util.vector3|nil)?
 --- @field onDraw fun(icon: Icon, posData : ViewportData)
 --- @field onHide fun(icon: Icon)
+--- @field priority number? The higher the priority, the higher the layer.
 
 ---@class RegisteredIcon
 --- @field onScreen boolean Exists so we don't call onHide every frame.
 --- @field remove boolean Remove is used to signal deletion.
 --- @field ref Icon
---- @name string
+--- @field name string Matches the layout name.
 
 ---@type RegisteredIcon[]
 local icons = {}
@@ -211,68 +213,88 @@ local function closeToCenter(viewportPos)
     return (viewportPos - (screenSize / 2)):length2() < radius2
 end
 
+local function purgeRemovedIcons()
+    --- check if remove is pending
+    local doRemoval = false
+    for _, icon in ipairs(icons) do
+        if icon.remove then
+            doRemoval = true
+            break
+        end
+    end
+
+    if not doRemoval then
+        return
+    end
+
+    local remainingIcons = {}
+    local remainingContent = {}
+
+    for _, icon in ipairs(icons) do
+        if not icon.remove then
+            table.insert(remainingIcons, icon)
+            table.insert(remainingContent, icon.ref.element)
+            -- icon is responsible for destroying the UI element
+        elseif settingCache.debug then
+            print("Removing icon '" .. icon.name .. "'.")
+        end
+    end
+
+    icons = remainingIcons
+    iconContainer.layout.content = ui.content(remainingContent)
+    if #remainingIcons ~= #remainingContent then
+        error("mismatch between icons list and icons container content")
+    end
+end
+
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
-        for i = #icons, 1, -1 do
-            if icons[i].remove then
-                --iconContainer.layout.content[icons[i].name]:destroy()
-                table.remove(icons, i)
-            else
-                hideIcon(icons[i])
-            end
+        for _, icon in ipairs(icons) do
+            hideIcon(icon)
         end
         return
     end
 
+    purgeRemovedIcons()
+
     local screenSize = ui.screenSize()
 
     -- Render all the icons.
-    for i = #icons, 1, -1 do
-        -- Remove if marked for removal.
-        if icons[i].remove then
-            table.remove(icons, i)
-            goto continue
-        end
-
+    for _, icon in ipairs(icons) do
         -- Get world position.
-        local iPos = icons[i].ref.pos(icons[i].ref)
+        local iPos = icon.ref.pos(icon.ref)
         -- Get optional world facing vector.
-        local iFacing = icons[i].ref.facing and icons[i].ref.facing(icons[i].ref) or nil
+        local iFacing = icon.ref.facing and icon.ref.facing(icon.ref) or nil
 
         if iPos then
             local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
             if pos and pos.viewportPos then
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
-                    icons[i].onScreen = true
-                    icons[i].ref.onDraw(icons[i].ref, pos)
-                elseif pos.viewportPos.pos and icons[i].ref.element.layout.props.size then
+                    icon.onScreen = true
+                    icon.ref.onDraw(icon.ref, pos)
+                    goto continue
+                elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
-                    local halfBox = icons[i].ref.element.layout.props.size / 2
+                    local halfBox = icon.ref.element.layout.props.size / 2
                     local min = pos.viewportPos.pos - halfBox
                     local max = pos.viewportPos.pos + halfBox
 
                     if max.x >= 0 and max.y >= 0 and
                         min.x <= screenSize.x and min.y <= screenSize.y then
-                        icons[i].onScreen = true
-                        icons[i].ref.onDraw(icons[i].ref, pos)
-                    else
-                        hideIcon(icons[i])
+                        icon.onScreen = true
+                        icon.ref.onDraw(icon.ref, pos)
+                        goto continue
                     end
-                else
-                    hideIcon(icons[i])
                 end
-            else
-                hideIcon(icons[i])
             end
-        else
-            hideIcon(icons[i])
         end
-
-        ::continue::
+        hideIcon(icon)
+        :: continue ::
     end
 
 
+    iconContainer:update()
     mainWindow:update()
 
     --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
@@ -307,10 +329,7 @@ local function onMapMoved(data)
     end
 
     if not data.swapped then
-        -- need to steal some interface and also turn off pausing during it.
-        -- this is because I want
         interfaces.UI.setMode('Interface', { windows = {} })
-        --interfaces.UI.setPauseOnMode('Travel', false)
         mainWindow.layout.props.visible = true
         mainWindow:update()
     end
@@ -428,7 +447,21 @@ local function registerIcon(icon)
 
     nextName = nextName + 1
     local name = "icon_" .. tostring(nextName)
-    table.insert(icons, {
+    icon.element.layout.name = name
+
+    if settingCache.debug then
+        print("Registering icon '" .. name .. "': " .. aux_util.deepToString(icon, 4))
+    end
+
+    --- Determine where to insert the icon
+    if icon.priority == nil then
+        icon.priority = 0
+    elseif type(icon.priority) ~= "number" then
+        error("icon.priority must be a number")
+    end
+    local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.priority end) or 1
+
+    table.insert(icons, insertIndex, {
         -- onScreen exists so we don't call onHide every frame.
         onScreen = false,
         -- remove is used to signal deletion
@@ -436,13 +469,11 @@ local function registerIcon(icon)
         ref = icon,
         name = name,
     })
-    icon.element.layout.name = name
-    icon.onHide()
-    if icon.front then
-        iconContainer.layout.content:insert(1, icon.element)
-    else
-        iconContainer.layout.content:add(icon.element)
-    end
+
+    icon.onHide(icon)
+    iconContainer.layout.content:insert(insertIndex, icon.element)
+
+    return name
 end
 
 
@@ -453,11 +484,21 @@ local function addHandler(fn, list)
     table.insert(list, fn)
 end
 
+local function getIcon(name)
+    for _, icon in ipairs(icons) do
+        if icon.name == name then
+            return icon
+        end
+    end
+    return nil
+end
+
 return {
     interfaceName = MOD_NAME .. "Draw",
     interface = {
         version = 1,
         registerIcon = registerIcon,
+        getIcon = getIcon,
         setHoverBoxContent = setHoverBoxContent,
         onMapMoved = function(fn)
             return addHandler(fn, onMapMovedHandlers)
