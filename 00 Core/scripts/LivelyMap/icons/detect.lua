@@ -148,13 +148,13 @@ end
 
 local iconPoolAnimal = pool.create(function()
     return newDetectIcon(animalPath, settingCache.palleteColor2)
-end)
+end, 0)
 local iconPoolEnchantment = pool.create(function()
     return newDetectIcon(enchantmentPath, settingCache.palleteColor3)
-end)
+end, 0)
 local iconPoolKey = pool.create(function()
     return newDetectIcon(keyPath, settingCache.palleteColor4)
-end)
+end, 0)
 
 local function makeIcon(iconPool, entity, pos)
     --print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))

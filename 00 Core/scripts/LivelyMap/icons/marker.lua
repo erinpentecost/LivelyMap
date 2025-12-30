@@ -364,6 +364,9 @@ updateGridLayout = function(idx, color)
             --size = util.vector2(400, 300),
             --autoSize = false,
         },
+        external = {
+            grow = 1
+        },
         content = ui.content {
             {
                 name = 'topH',
@@ -447,6 +450,7 @@ local buttonSize = util.vector2(60, 20)
 local cancelButtonElement = ui.create {}
 local function updateCancelButtonElement()
     local cancelFn = function()
+        print("cancel clicked")
         stampMakerWindow.layout.props.visible = false
         stampMakerWindow:update()
     end
@@ -454,7 +458,7 @@ local function updateCancelButtonElement()
         cancelButtonElement,
         localization("cancelButton", {}),
         "normal",
-        'pickButton',
+        "cancelButton",
         {},
         buttonSize,
         cancelFn)
@@ -465,6 +469,7 @@ updateCancelButtonElement()
 local saveButtonElement = ui.create {}
 local function updateSaveButtonElement()
     local saveFn = function()
+        print("save clicked")
         upsertMarker(editingMapData)
         stampMakerWindow.layout.props.visible = false
         stampMakerWindow:update()
@@ -473,7 +478,7 @@ local function updateSaveButtonElement()
         saveButtonElement,
         localization("saveButton", {}),
         "normal",
-        'pickButton',
+        "saveButton",
         {},
         buttonSize,
         saveFn)
@@ -484,15 +489,25 @@ updateSaveButtonElement()
 local deleteButtonElement = ui.create {}
 local function updateDeleteButtonElement()
     local deleteFn = function()
-        upsertMarker(editingMapData)
+        print("delete clicked")
+        if getMarkerByID(editingMapData.id) then
+            upsertMarker({
+                color = editingMapData.color,
+                hidden = true, -- This does the delete
+                iconPath = editingMapData.iconPath,
+                id = editingMapData.id,
+                note = editingMapData.note,
+                worldPos = editingMapData.worldPos,
+            })
+        end
         stampMakerWindow.layout.props.visible = false
         stampMakerWindow:update()
     end
     deleteButtonElement.layout = myui.createTextButton(
         deleteButtonElement,
         localization("deleteButton", {}),
-        "normal",
-        'pickButton',
+        (getMarkerByID(editingMapData.id) and "normal") or "disabled",
+        "deleteButton",
         {},
         buttonSize,
         deleteFn)
@@ -529,7 +544,7 @@ stampMakerWindow = ui.create {
             myui.padWidget(0, 4),
             gridElement,
             spacer,
-            myui.padWidget(0, 4),
+            myui.padWidget(0, 8),
             {
                 name = 'buttons',
                 type = ui.TYPE.Flex,
@@ -544,15 +559,17 @@ stampMakerWindow = ui.create {
                 },
                 content = ui.content {
                     spacer,
-                    saveButtonElement,
+                    deleteButtonElement,
                     spacer,
                     cancelButtonElement,
                     spacer,
-                    deleteButtonElement,
+                    saveButtonElement,
                     spacer,
+                },
+                external = {
+                    grow = 1,
                 }
             },
-            --myui.padWidget(0, 4),
         }
     } }
 }
@@ -601,6 +618,9 @@ local function editMarkerWindow(data)
 
     setActive(editingMapData.iconIdx, data.color or 1)
     resetNoteBox()
+    updateDeleteButtonElement()
+    updateCancelButtonElement()
+    updateSaveButtonElement()
     stampMakerWindow.layout.props.visible = true
     stampMakerWindow:update()
 end
