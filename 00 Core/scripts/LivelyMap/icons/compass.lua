@@ -34,7 +34,7 @@ local compassAtlas = imageAtlas.constructAtlas({
     totalTiles = 360,
     tilesPerRow = 18,
     atlasPath = "textures/LivelyMap/arrow_atlas.dds",
-    tileSize = util.vector2(100, 100),
+    tileSize = util.vector2(128, 128),
     create = true,
 })
 compassAtlas:spawn({
@@ -52,7 +52,7 @@ settings.subscribe(async:callback(function(_, key)
     end
 end))
 
-local baseSize = util.vector2(50, 50)
+local baseSize = util.vector2(64, 64)
 
 local function adjustedYaw(deg)
     local yaw = math.deg(deg)
@@ -76,7 +76,7 @@ local compassIcon = {
         compassAtlas:getElement().layout.props.visible = true
         compassAtlas:getElement().layout.props.position = posData.viewportPos.pos
 
-        if not posData.viewportFacing then
+        if not posData.viewportPos.onScreen then
             compassAtlas:getElement().layout.props.visible = false
             compassAtlas:getElement():update()
             return

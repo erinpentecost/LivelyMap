@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 
 # Copyright 2025 Dave Corley
+# Modified from original
 
 # Texture Atlas with Progressive White-to-Black Conversion
 # For doing health bars and shit.
 # Usage: ./atlas.sh input_image output_image rows cols
+
+# Example for compass:
+# "/home/ern/workspace/LivelyMap/cmd/h3/make_atlas.sh" -i  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow.png"  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow_atlas.dds" -r 20 -c 18
 
 MASK=false
 MASK_WIDTH=false
