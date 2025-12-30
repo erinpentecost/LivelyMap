@@ -269,33 +269,6 @@ local textColors = {
     count = configColor('count')
 }
 
-local queuedButton = nil
-local buttonCooldown = nil
-
----Processes one button press at a time with a cooldown
----@param dt number?
----@return boolean True if a button was processed.
-local function processButtonAction(dt)
-    if queuedButton then
-        queuedButton.buttonFunction(table.unpack(queuedButton.args))
-        queuedButton = nil
-        return true
-    elseif buttonCooldown then
-        buttonCooldown = buttonCooldown - 1
-        if buttonCooldown <= 0 then
-            buttonCooldown = nil
-        end
-    end
-    return false
-end
-
-local function queueButtonAction(buttonData, cooldown)
-    if not buttonCooldown then
-        queuedButton = buttonData
-        buttonCooldown = cooldown
-    end
-end
-
 -- Shared code for making button layouts
 local function createButton(parent, layout, updateColor, buttonFunction, args)
     args = args or {}
@@ -310,7 +283,8 @@ local function createButton(parent, layout, updateColor, buttonFunction, args)
         mouseRelease = async:callback(function(mouseEvent, data)
             if mouseEvent.button == 1 then
                 updateColor(layout, 'over')
-                queueButtonAction({ buttonFunction = buttonFunction, args = args }, 2)
+                print("clicked button")
+                buttonFunction()
                 parent:update()
             end
         end),
@@ -508,5 +482,4 @@ return {
     createImageButton = createImageButton,
     disableWidget = disableWidget,
     enableWidget = enableWidget,
-    processButtonAction = processButtonAction
 }

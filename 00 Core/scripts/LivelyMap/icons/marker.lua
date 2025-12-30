@@ -26,7 +26,7 @@ local mutil        = require("scripts.LivelyMap.mutil")
 local iutil        = require("scripts.LivelyMap.icons.iutil")
 local vfs          = require('openmw.vfs')
 local aux_util     = require('openmw_aux.util')
-local myui         = require('scripts.ErnPerkFramework.pcp.myui')
+local myui         = require('scripts.LivelyMap.pcp.myui')
 local core         = require("openmw.core")
 local pself        = require("openmw.self")
 local localization = core.l10n(MOD_NAME)
@@ -47,6 +47,14 @@ local markerData = storage.playerSection(MOD_NAME .. "_markerData")
 markerData:setLifeTime(storage.LIFE_TIME.Persistent)
 
 local baseSize = util.vector2(32, 32)
+
+---@class MarkerData
+---@field id string Unique internal ID.
+---@field hidden boolean Basically soft-delete.
+---@field worldPos util.vector3
+---@field iconName string Basename of the stamp.
+---@field note string This appears in the hover box. Empty is valid!
+---@field color number This corresponds to the pallete color number.
 
 ---@class RegisteredMarker : Icon
 ---@field marker MarkerData
@@ -70,13 +78,52 @@ local function resolveColor(colorID)
     end
 end
 
+---@class StampID
+---@field idx number
+---@field basename string
+
+local stampPathData = {
+    ---@type string[]
+    orderedFullPaths = {},
+    ---@type {[string]: string}
+    basenameToFullPathMap = {},
+    ---@type {[string]: StampID}
+    fullPathToIDMap = {}
+}
+--- stable list of all available stamps
+local function stampList()
+    for stampPath in vfs.pathsWithPrefix("textures\\LivelyMap\\stamps") do
+        table.insert(stampPathData.orderedFullPaths, stampPath)
+        local baseName = string.match(stampPath, '(%a+)[.]')
+        stampPathData.basenameToFullPathMap[baseName] = stampPath
+        stampPathData.fullPathToIDMap[stampPath] = {
+            idx = #stampPath,
+            basename = baseName,
+        }
+    end
+end
+stampList()
+local function resolveStampFullPath(id)
+    if type(id) == "number" then
+        local lookup = ((id - 1) % #stampPathData.orderedFullPaths) + 1
+        return stampPathData.orderedFullPaths[lookup]
+    end
+    if type(id) == "string" then
+        return stampPathData.basenameToFullPathMap[id]
+    end
+end
+local function stampIndexToBaseName(idx)
+    print("stampIndexToBaseName(" .. tostring(idx) .. "): ")
+    return stampPathData.fullPathToIDMap[resolveStampFullPath(idx)].basename
+end
+
 ---@param data MarkerData
 ---@return boolean
 local function validateMarker(data)
     if not data then
         return false
     end
-    return data.color and data.iconPath and data.id and data.note and data.worldPos and (type(data.id) == "string") and
+    return data.color and data.iconName and data.id and data.note and data.worldPos and (type(data.id) == "string") and
         true or false
 end
 
@@ -94,7 +141,7 @@ local function registerMarkerIcon(data)
             anchor = util.vector2(0.5, 0.5),
             size = baseSize,
             resource = ui.texture {
-                path = data.iconPath
+                path = resolveStampFullPath(data.iconName)
             },
             color = resolveColor(data.color),
         },
@@ -153,33 +200,35 @@ local function registerMarkerIcon(data)
         return nil
     end)
 
+    -- persist
+    markerData:set(data.id, data)
     -- register in map
     markerIcons[data.id] = registeredMarker
     interfaces.LivelyMapDraw.registerIcon(registeredMarker)
 end
 
 ---@param data MarkerData
-local function updateMarkerIcon(data)
+local function upsertMarkerIcon(data)
     print("updateMarkerIcon: " .. aux_util.deepToString(data, 3))
     if not validateMarker(data) then
-        error("updateMarker: bad data")
+        error("upsertMarkerIcon data invalid: " .. aux_util.deepToString(data, 3))
+    end
+    if not markerIcons[data.id] then
+        registerMarkerIcon(data)
+        return
     end
     markerIcons[data.id].marker = data
     --- update UI element, too
     markerIcons[data.id].element.layout.props.color = resolveColor(data.color)
     markerIcons[data.id].element.layout.props.resource = ui.texture {
-        path = data.iconPath
+        path = resolveStampFullPath(data.iconName)
     }
     markerIcons[data.id].element:update()
+    -- persist
+    markerData:set(data.id, data)
 end
 
----@class MarkerData
----@field id string Unique internal ID.
----@field hidden boolean Basically soft-delete.
----@field worldPos util.vector3
----@field iconPath string Full path to the image file.
----@field note string This appears in the hover box. Empty is valid!
----@field color number This corresponds to the pallete color number.
+
 
 ---@param id string
 ---@return MarkerData?
@@ -188,41 +237,23 @@ local function getMarkerByID(id)
         error("getMarkerByID(): id is bad")
         return
     end
-    return markerData:get(id)
+    local data = markerData:get(id)
+    if not data then
+        return nil
+    end
+    return {
+        id = data.id,
+        hidden = data.hidden,
+        worldPos = data.worldPos,
+        iconPath = resolveStampFullPath(data.iconName),
+        note = data.note,
+        color = data.color,
+    }
 end
 
 ---@return {[string]: MarkerData}
 local function getAllMarkers()
     return markerData:asTable()
-end
-
----Makes a new marker if it does not exist.
----@param data MarkerData
-local function newMarker(data)
-    print("newMarker: " .. aux_util.deepToString(data, 3))
-    if not validateMarker(data) then
-        error("newMarker: bad data")
-    end
-    if not getMarkerByID(data.id) then
-        markerData:set(data.id, data)
-        registerMarkerIcon(data)
-    end
-end
-
----@param data MarkerData
-local function upsertMarker(data)
-    print("upsertMarker: " .. aux_util.deepToString(data, 3))
-    if not validateMarker(data) then
-        error("upsertMarker: bad data")
-    end
-
-    local exists = getMarkerByID(data.id) ~= nil
-    markerData:set(data.id, data)
-    if exists then
-        updateMarkerIcon(data)
-    else
-        registerMarkerIcon(data)
-    end
 end
 
 
@@ -238,18 +269,8 @@ end
 
 local stampMakerWindow
 
---- stable list of all available stamps
-local function stampList()
-    local reverseLookup = {}
-    local out = {}
-    for stampPath in vfs.pathsWithPrefix("textures\\LivelyMap\\stamps") do
-        table.insert(out, stampPath)
-        local baseName = string.match(stampPath, '(%a+)[.]')
-        reverseLookup[baseName] = #stampPath
-    end
-    return out, reverseLookup
-end
-local stampPaths, reversePaths = stampList()
+
+
 
 
 --- must be odd and >= 3
@@ -263,7 +284,7 @@ local windowWidth = (previewIconSize.x) * numColumns
 ---@type EditingMarkerData
 local editingMapData = {
     color = 1,
-    iconPath = stampPaths[1],
+    iconName = stampIndexToBaseName(1),
     iconIdx = 1,
     worldPos = pself.position,
     id = "placeholder",
@@ -290,7 +311,7 @@ local gridElement = ui.create {
 local updateGridLayout
 local function setActive(idx, color)
     editingMapData.color = color
-    editingMapData.iconPath = stampPaths[idx]
+    editingMapData.iconName = stampIndexToBaseName(idx)
     editingMapData.iconIdx = idx
     gridElement.layout.content = ui.content { updateGridLayout(idx, color) }
     gridElement:update()
@@ -299,7 +320,7 @@ end
 ---@param idx number
 ---@param color number
 local function stampPreviewLayout(idx, color)
-    idx = ((idx - 1) % #stampPaths) + 1
+    idx = ((idx - 1) % #stampPathData.orderedFullPaths) + 1
     color = ((color - 1) % 5) + 1
 
     local widget = {
@@ -326,7 +347,7 @@ local function stampPreviewLayout(idx, color)
                 size = previewIconSize * 0.8,
                 relativePosition = util.vector2(0.5, 0.5),
                 resource = ui.texture {
-                    path = stampPaths[idx]
+                    path = resolveStampFullPath(idx)
                 },
                 color = resolveColor(color),
             }
@@ -436,7 +457,15 @@ local noteBox = ui.create {
     name = "noteBox",
     type = ui.TYPE.TextEdit,
     template = interfaces.MWUI.templates.textEditLine,
-    events = {},
+    events = {
+        textChanged = async:callback(function(text)
+            if text == defaultNote then
+                editingMapData.note = ""
+            else
+                editingMapData.note = text
+            end
+        end)
+    },
     props = {
         relativePosition = util.vector2(0.5, 0.5),
         anchor = util.vector2(0.5, 0.5),
@@ -484,17 +513,13 @@ updateCancelButtonElement()
 local saveButtonElement = ui.create {}
 local function updateSaveButtonElement()
     local saveFn = function()
-        print("save clicked")
-        local note = noteBox.layout.props.text
-        if note == defaultNote then
-            note = ""
-        end
-        upsertMarker({
+        print("save clicked.")
+        upsertMarkerIcon({
             color = editingMapData.color,
             hidden = false,
-            iconPath = editingMapData.iconPath,
+            iconName = editingMapData.iconName,
             id = editingMapData.id,
-            note = note,
+            note = editingMapData.note,
             worldPos = editingMapData.worldPos,
         })
         interfaces.LivelyMapMarker.editMarkerWindow(nil)
@@ -516,10 +541,10 @@ local function updateDeleteButtonElement()
     local deleteFn = function()
         print("delete clicked")
         if getMarkerByID(editingMapData.id) then
-            upsertMarker({
+            upsertMarkerIcon({
                 color = editingMapData.color,
                 hidden = true, -- This does the delete
-                iconPath = editingMapData.iconPath,
+                iconName = editingMapData.iconName,
                 id = editingMapData.id,
                 note = editingMapData.note,
                 worldPos = editingMapData.worldPos,
@@ -606,42 +631,55 @@ local function editMarkerWindow(data)
         return
     end
 
-    if not data.id then
-        error("editMarkerWindow missing id")
+    if data.id then
+        local found = getMarkerByID(data.id)
+        if found then
+            print("found existing marker: " .. aux_util.deepToString(data, 3))
+            data = found
+        end
     end
 
     editingMapData = data
 
     -- Keep paths valid.
-    if not data.iconIdx and not data.iconPath then
-        data.iconIdx = 1
-        data.iconPath = stampPaths[data.iconIdx]
-    elseif not data.iconIdx then
-        local baseName = string.match(data.iconPath, '(%a+)[.]')
-        editingMapData.iconIdx = reversePaths[baseName] or 1
-    elseif not data.iconPath then
-        data.iconPath = stampPaths[data.iconIdx]
+    local stampFullPath = resolveStampFullPath(editingMapData.iconName)
+    if not stampFullPath then
+        stampFullPath = resolveStampFullPath(editingMapData.iconIdx)
     end
+    if not stampFullPath then
+        stampFullPath = resolveStampFullPath(1)
+    end
+    local stampInfo = stampPathData.fullPathToIDMap[stampFullPath]
+    editingMapData.iconName = stampInfo.basename
+    editingMapData.iconIdx = stampInfo.idx
 
     -- Keep color valid.
-    if not data.color then
-        data.color = math.random(5)
+    if not editingMapData.color then
+        editingMapData.color = math.random(5)
     end
 
     -- Default position/note.
-    if not data.worldPos then
-        data.worldPos = pself.position
-        if not data.note then
-            data.note = pself.cell.name
+    if not editingMapData.worldPos then
+        editingMapData.worldPos = pself.position
+        if not editingMapData.note then
+            editingMapData.note = pself.cell.name
         end
     end
 
-    -- Note shouldn't be nil.
-    if not data.note then
-        data.note = ""
+    if not editingMapData.id then
+        error("editMarkerWindow missing id")
     end
 
-    setActive(editingMapData.iconIdx, data.color or 1)
+    -- Note shouldn't be nil.
+    if not editingMapData.note then
+        editingMapData.note = ""
+    end
+
+    if not validateMarker(editingMapData) then
+        error("failed to build map data: " .. aux_util.deepToString(editingMapData, 3))
+    end
+
+    setActive(editingMapData.iconIdx, editingMapData.color or 1)
     resetNoteBox()
     updateDeleteButtonElement()
     updateCancelButtonElement()
@@ -650,25 +688,19 @@ local function editMarkerWindow(data)
     stampMakerWindow:update()
 end
 
-
 --- debugging
 editMarkerWindow({ id = "334324" })
 
-local function onFrame(dt)
-    myui.processButtonAction(dt)
-end
 
 return {
     interfaceName = MOD_NAME .. "Marker",
     interface = {
         version = 1,
         getMarkerByID = getMarkerByID,
-        newMarker = newMarker,
-        upsertMarker = upsertMarker,
+        upsertMarkerIcon = upsertMarkerIcon,
         editMarkerWindow = editMarkerWindow,
     },
     engineHandlers = {
         onLoad = onLoad,
-        onFrame = onFrame,
     },
 }
