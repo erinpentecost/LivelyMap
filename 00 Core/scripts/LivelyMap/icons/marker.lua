@@ -214,13 +214,7 @@ local function onLoad()
 end
 
 
---- UI stuff
---- it'll be a 3x5 grid.
---- left/right will scan through icons
---- up/down will scan through colors
---- textbox below for optional note. defaults to name of cell.
---- then ok/cancel buttons
----
+---- UI STUFF ----
 
 --- stable list of all available stamps
 local function stampList()
@@ -234,8 +228,9 @@ local stampPaths = stampList()
 
 
 --- must be odd and >= 3
-local numColumns = 7
+local numColumns = 5
 local previewIconSize = util.vector2(64, 64)
+local windowWidth = (previewIconSize.x) * numColumns
 
 local activeColor = 1
 local activeIdx = 1
@@ -244,7 +239,7 @@ local gridElement = ui.create {
     type = ui.TYPE.Widget,
     props = {
         --relativeSize = util.vector2(1, 1),
-        size = util.vector2((previewIconSize.x) * numColumns, 300),
+        size = util.vector2(windowWidth, 300),
         autoSize = false,
     },
     content = ui.content {},
@@ -257,18 +252,11 @@ local function setActive(idx, color)
     gridElement:update()
 end
 
-
-
----comment
 ---@param idx number
 ---@param color number
----@param sizeFactor number?
-local function stampPreviewLayout(idx, color, sizeFactor)
+local function stampPreviewLayout(idx, color)
     idx = ((idx - 1) % #stampPaths) + 1
     color = ((color - 1) % 5) + 1
-    if sizeFactor == nil then
-        sizeFactor = 1
-    end
 
     local widget = {
         type = ui.TYPE.Widget,
@@ -277,8 +265,12 @@ local function stampPreviewLayout(idx, color, sizeFactor)
         },
         events = {
             mouseClick = async:callback(function()
-                print("click!")
-                setActive(idx, color)
+                if idx == activeIdx then
+                    --- cycle to next color
+                    setActive(idx, ((activeColor) % 5) + 1)
+                else
+                    setActive(idx, color)
+                end
             end)
         },
         content = ui.content { {
@@ -287,7 +279,7 @@ local function stampPreviewLayout(idx, color, sizeFactor)
             props = {
                 visible = true,
                 anchor = util.vector2(0.5, 0.5),
-                size = previewIconSize * sizeFactor,
+                size = previewIconSize * 0.8,
                 relativePosition = util.vector2(0.5, 0.5),
                 resource = ui.texture {
                     path = stampPaths[idx]
@@ -321,13 +313,14 @@ updateGridLayout = function(idx, color)
         }
     }
 
-    local makeRow = function(rowColor, altSize)
+    local wingSize = math.floor(numColumns / 2)
+    local makeRow = function(offset)
         local out = {}
-        local wingSize = math.floor(numColumns / 2)
         table.insert(out, spacer)
         for i = -wingSize, wingSize, 1 do
-            local preview = stampPreviewLayout(activeIdx + i, rowColor, altSize)
-            if i == 0 and rowColor == activeColor then
+            local thisIdx = i + offset + activeIdx
+            local preview = stampPreviewLayout(thisIdx, color, thisIdx == activeIdx)
+            if thisIdx == activeIdx then
                 table.insert(out, {
                     name = 'activeBox',
                     type = ui.TYPE.Container,
@@ -363,10 +356,10 @@ updateGridLayout = function(idx, color)
                     autoSize = true,
                 },
                 content = ui.content {
-                    unpack(makeRow(color - 1, altSize))
+                    unpack(makeRow(-numColumns))
                 },
                 external = {
-                    grow = altSize
+                    grow = 1
                 }
             },
             {
@@ -380,7 +373,7 @@ updateGridLayout = function(idx, color)
                     autoSize = true,
                 },
                 content = ui.content {
-                    unpack(makeRow(color, 0.9))
+                    unpack(makeRow(0))
                 },
                 external = {
                     grow = 1
@@ -397,16 +390,31 @@ updateGridLayout = function(idx, color)
                     autoSize = true,
                 },
                 content = ui.content {
-                    unpack(makeRow(color + 1, altSize))
+                    unpack(makeRow(numColumns))
                 },
                 external = {
-                    grow = altSize
+                    grow = 1
                 }
             }
         }
     }
     return main
 end
+
+local noteBox = ui.create {
+    name = "noteBox",
+    type = ui.TYPE.TextEdit,
+    props = {
+        relativePosition = util.vector2(0.5, 0.5),
+        anchor = util.vector2(0.5, 0.5),
+        size = util.vector2(windowWidth, 50),
+        textSize = 20,
+        textAlignH = ui.ALIGNMENT.Center,
+        textAlignV = ui.ALIGNMENT.Center,
+        text = "Note",
+        textColor = resolveColor(1),
+    }
+}
 
 local stampMakerWindow = ui.create {
     name = "stampMaker",
@@ -431,7 +439,8 @@ local stampMakerWindow = ui.create {
             autoSize = true
         },
         content = ui.content {
-            gridElement
+            gridElement,
+            noteBox,
         }
     } }
 }
