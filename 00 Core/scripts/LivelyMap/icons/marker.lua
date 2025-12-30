@@ -206,6 +206,7 @@ end
 
 
 local function onLoad()
+    print("Registering saved markers...")
     for _, marker in pairs(getAllMarkers()) do
         registerMarker(marker)
     end
@@ -230,42 +231,72 @@ local function stampList()
 end
 local stampPaths = stampList()
 
+
 local activeColor = 1
 local activeIdx = 1
-local iconGrid = ui.create {}
-local previewGridLayout
+
+local gridElement = ui.create {
+    type = ui.TYPE.Widget,
+    props = {
+        relativeSize = util.vector2(1, 1),
+    },
+    content = ui.content {},
+}
+local updateGridLayout
 local function setActive(idx, color)
     activeIdx = idx
     activeColor = color
-    iconGrid.layout = previewGridLayout(idx, color)
-    iconGrid:update()
+    gridElement.layout.content = ui.content { updateGridLayout(idx, color) }
+    gridElement:update()
 end
 
 ---comment
 ---@param idx number
 ---@param color number
-local function stampPreviewLayout(idx, color)
+---@param sizeFactor number?
+local function stampPreviewLayout(idx, color, sizeFactor)
     idx = ((idx - 1) % #stampPaths) + 1
     color = ((color - 1) % 5) + 1
+    if sizeFactor == nil then
+        sizeFactor = 1
+    end
+
     return {
-        type = ui.TYPE.Image,
+        type = ui.TYPE.Widget,
         props = {
-            visible = true,
-            anchor = util.vector2(0.5, 0.5),
             size = util.vector2(64, 64),
-            resource = ui.texture {
-                path = stampPaths[idx]
-            },
-            color = resolveColor(color),
         },
-        external = {
-            grow = 1
-        }
+        events = {
+            mouseClick = async:callback(function()
+                print("click!")
+                setActive(idx, color)
+            end)
+        },
+        content = ui.content { {
+            type = ui.TYPE.Image,
+            props = {
+                visible = true,
+                anchor = util.vector2(0.5, 0.5),
+                size = util.vector2(64, 64) * sizeFactor,
+                relativePosition = util.vector2(0.5, 0.5),
+                resource = ui.texture {
+                    path = stampPaths[idx]
+                },
+                color = resolveColor(color),
+            }
+        } }
     }
 end
 
 
-previewGridLayout = function(idx, color)
+updateGridLayout = function(idx, color)
+    local spacer = {
+        type = ui.TYPE.Widget,
+        external = {
+            grow = 1
+        }
+    }
+
     local main = {
         name = 'mainV',
         type = ui.TYPE.Flex,
@@ -279,16 +310,21 @@ previewGridLayout = function(idx, color)
                 name = 'topH',
                 type = ui.TYPE.Flex,
                 props = {
-                    horizontal = false,
-                    size = util.vector2(400, 100),
-                    autoSize = false,
+                    horizontal = true,
+                    --size = util.vector2(400, 100),
+                    --autoSize = false,
+                    relativeSize = util.vector2(1, 0.3),
                 },
                 content = ui.content {
-                    stampPreviewLayout(idx - 2, color - 1),
-                    stampPreviewLayout(idx - 1, color - 1),
-                    stampPreviewLayout(idx, color - 1),
-                    stampPreviewLayout(idx + 1, color - 1),
-                    stampPreviewLayout(idx + 2, color - 1),
+                    stampPreviewLayout(idx - 2, color - 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx - 1, color - 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx, color - 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx + 1, color - 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx + 2, color - 1, 0.5),
                 },
                 external = {
                     grow = 1
@@ -298,23 +334,25 @@ previewGridLayout = function(idx, color)
                 name = 'midH',
                 type = ui.TYPE.Flex,
                 props = {
-                    horizontal = false,
-                    size = util.vector2(400, 100),
-                    autoSize = false,
+                    horizontal = true,
+                    --size = util.vector2(400, 100),
+                    --autoSize = false,
+                    relativeSize = util.vector2(1, 0.3),
                 },
                 content = ui.content {
                     stampPreviewLayout(idx - 2, color),
+                    spacer,
                     stampPreviewLayout(idx - 1, color),
+                    spacer,
                     {
                         name = 'activeBox',
                         type = ui.TYPE.Container,
                         template = interfaces.MWUI.templates.boxSolid,
-                        content = ui.content { stampPreviewLayout(idx, color) },
-                        external = {
-                            grow = 1
-                        }
+                        content = ui.content { stampPreviewLayout(idx, color) }
                     },
+                    spacer,
                     stampPreviewLayout(idx + 1, color),
+                    spacer,
                     stampPreviewLayout(idx + 2, color),
                 },
                 external = {
@@ -325,16 +363,21 @@ previewGridLayout = function(idx, color)
                 name = 'botH',
                 type = ui.TYPE.Flex,
                 props = {
-                    horizontal = false,
-                    size = util.vector2(400, 100),
-                    autoSize = false,
+                    horizontal = true,
+                    --size = util.vector2(400, 100),
+                    --autoSize = false,
+                    relativeSize = util.vector2(1, 0.3),
                 },
                 content = ui.content {
-                    stampPreviewLayout(idx - 2, color + 1),
-                    stampPreviewLayout(idx - 1, color + 1),
-                    stampPreviewLayout(idx, color + 1),
-                    stampPreviewLayout(idx + 1, color + 1),
-                    stampPreviewLayout(idx + 2, color + 1),
+                    stampPreviewLayout(idx - 2, color + 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx - 1, color + 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx, color + 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx + 1, color + 1, 0.5),
+                    spacer,
+                    stampPreviewLayout(idx + 2, color + 1, 0.5),
                 },
                 external = {
                     grow = 1
@@ -345,7 +388,7 @@ previewGridLayout = function(idx, color)
     return main
 end
 
-local stampMaker = ui.create {
+local stampMakerWindow = ui.create {
     name = "stampMaker",
     layer = 'Windows',
     type = ui.TYPE.Container,
@@ -354,9 +397,9 @@ local stampMaker = ui.create {
         relativePosition = util.vector2(0.5, 0.5),
         anchor = util.vector2(0.5, 0.5),
         visible = true,
-        autoSize = false,
+        autoSize = true,
     },
-    content = ui.create {
+    content = ui.content { {
         name = 'mainV',
         type = ui.TYPE.Flex,
         props = {
@@ -365,9 +408,9 @@ local stampMaker = ui.create {
             autoSize = false,
         },
         content = ui.content {
-            iconGrid,
+            gridElement
         }
-    }
+    } }
 }
 
 setActive(1, 1)
