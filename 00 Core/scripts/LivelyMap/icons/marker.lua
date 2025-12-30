@@ -97,7 +97,7 @@ local function stampList()
         local baseName = string.match(stampPath, '(%a+)[.]')
         stampPathData.basenameToFullPathMap[baseName] = stampPath
         stampPathData.fullPathToIDMap[stampPath] = {
-            idx = #stampPath,
+            idx = #stampPathData.orderedFullPaths,
             basename = baseName,
         }
     end
@@ -241,11 +241,13 @@ local function getMarkerByID(id)
     if not data then
         return nil
     end
+    local stampData = stampPathData.fullPathToIDMap[resolveStampFullPath(data.iconName)]
     return {
         id = data.id,
         hidden = data.hidden,
         worldPos = data.worldPos,
-        iconPath = resolveStampFullPath(data.iconName),
+        iconName = stampData.basename,
+        iconIdx = stampData.idx,
         note = data.note,
         color = data.color,
     }
@@ -311,9 +313,12 @@ local gridElement = ui.create {
 local updateGridLayout
 local function setActive(idx, color)
     editingMapData.color = color
-    editingMapData.iconName = stampIndexToBaseName(idx)
-    editingMapData.iconIdx = idx
-    gridElement.layout.content = ui.content { updateGridLayout(idx, color) }
+    local fullPath = resolveStampFullPath(idx)
+    local iconInfo = stampPathData.fullPathToIDMap[fullPath]
+    editingMapData.iconName = iconInfo.basename
+    editingMapData.iconIdx = iconInfo.idx
+    --print("setting active: " .. aux_util.deepToString(iconInfo, 3) .. "(fullPath is " .. fullPath .. ")")
+    gridElement.layout.content = ui.content { updateGridLayout() }
     gridElement:update()
 end
 
@@ -330,10 +335,18 @@ local function stampPreviewLayout(idx, color)
         },
         events = {
             mouseClick = async:callback(function()
+                print("clicked icon with idx: " ..
+                    tostring(idx) ..
+                    ", color: " ..
+                    tostring(color) ..
+                    "(current idx:" ..
+                    tostring(editingMapData.iconIdx) .. ", current color: " .. tostring(editingMapData.color) .. ")")
                 if idx == editingMapData.iconIdx then
                     --- cycle to next color
+                    print("cycling color")
                     setActive(idx, ((editingMapData.color) % 5) + 1)
                 else
+                    print("changing idx")
                     setActive(idx, color)
                 end
             end)
@@ -356,6 +369,7 @@ local function stampPreviewLayout(idx, color)
 
 
     widget.events.focusGain = async:callback(function()
+        print("hovered icon with idx: " .. tostring(idx) .. ", color: " .. tostring(color))
         widget.content["icon"].props.color = mutil.lerpColor(resolveColor(color), util.color.rgb(1, 1, 1), 0.3)
         gridElement:update()
     end)
@@ -370,14 +384,14 @@ end
 
 
 
-updateGridLayout = function(idx, color)
+updateGridLayout = function()
     local wingSize = math.floor(numColumns / 2)
     local makeRow = function(offset)
         local out = {}
         table.insert(out, spacer)
         for i = -wingSize, wingSize, 1 do
             local thisIdx = i + offset + editingMapData.iconIdx
-            local preview = stampPreviewLayout(thisIdx, color)
+            local preview = stampPreviewLayout(thisIdx, editingMapData.color)
             if thisIdx == editingMapData.iconIdx then
                 table.insert(out, {
                     name = 'activeBox',
@@ -634,7 +648,7 @@ local function editMarkerWindow(data)
     if data.id then
         local found = getMarkerByID(data.id)
         if found then
-            print("found existing marker: " .. aux_util.deepToString(data, 3))
+            print("found existing marker: " .. aux_util.deepToString(found, 3))
             data = found
         end
     end
@@ -648,6 +662,8 @@ local function editMarkerWindow(data)
     end
     if not stampFullPath then
         stampFullPath = resolveStampFullPath(1)
+        --- TODO: this is busted
+        print("DEFAULT STAMP!!!!! " .. aux_util.deepToString(editingMapData, 3))
     end
     local stampInfo = stampPathData.fullPathToIDMap[stampFullPath]
     editingMapData.iconName = stampInfo.basename
