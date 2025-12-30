@@ -30,6 +30,7 @@ local myui         = require('scripts.LivelyMap.pcp.myui')
 local core         = require("openmw.core")
 local pself        = require("openmw.self")
 local localization = core.l10n(MOD_NAME)
+local ambient      = require('openmw.ambient')
 
 local settingCache = {
     palleteColor1 = settings.palleteColor1,
@@ -341,6 +342,7 @@ local function stampPreviewLayout(idx, color)
                 else
                     setActive(idx, color)
                 end
+                ambient.playSound('Menu Click')
             end)
         },
         content = ui.content { {
