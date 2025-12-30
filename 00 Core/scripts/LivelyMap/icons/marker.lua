@@ -23,6 +23,8 @@ local async        = require("openmw.async")
 local util         = require('openmw.util')
 local settings     = require("scripts.LivelyMap.settings")
 local iutil        = require("scripts.LivelyMap.icons.iutil")
+local vfs          = require('openmw.vfs')
+local aux_util     = require('openmw_aux.util')
 
 local settingCache = {
     palleteColor1 = settings.palleteColor1,
@@ -74,7 +76,7 @@ local function registerMarker(data)
             anchor = util.vector2(0.5, 0.5),
             size = baseSize,
             resource = ui.texture {
-                path = "textures/LivelyMap/stamps/" .. data.iconName .. ".png"
+                path = data.iconPath
             },
             color = resolveColor(data.color),
         },
@@ -85,10 +87,13 @@ local function registerMarker(data)
         pos = function(icon)
             return icon.marker.worldPos
         end,
+        ---@param posData ViewportData
         onDraw = function(icon, posData)
-            if not posData.viewportFacing or icon.marker.hidden then
-                icon.element.layout.props.visible = false
-                icon.element:update()
+            if not posData.viewportPos.onScreen or icon.marker.hidden then
+                if icon.element.layout.props.visible then
+                    icon.element.layout.props.visible = false
+                    icon.element:update()
+                end
                 return
             end
 
@@ -144,7 +149,7 @@ local function updateMarker(data)
     --- update UI element, too
     markerIcons[data.id].element.layout.props.color = resolveColor(data.color)
     markerIcons[data.id].element.layout.props.resource = ui.texture {
-        path = "textures/LivelyMap/stamps/" .. data.iconName .. ".png"
+        path = data.iconPath
     }
     markerIcons[data.id].element:update()
 end
@@ -153,7 +158,7 @@ end
 ---@field id string Unique internal ID.
 ---@field hidden boolean Basically soft-delete.
 ---@field worldPos util.vector3
----@field iconName string Base filename, including extension.
+---@field iconPath string Full path to the image file.
 ---@field note string? This appears in the hover box.
 ---@field color number This corresponds to the pallete color number.
 
@@ -206,6 +211,166 @@ local function onLoad()
     end
 end
 
+
+--- UI stuff
+--- it'll be a 3x5 grid.
+--- left/right will scan through icons
+--- up/down will scan through colors
+--- textbox below for optional note. defaults to name of cell.
+--- then ok/cancel buttons
+---
+
+--- stable list of all available stamps
+local function stampList()
+    local out = {}
+    for stampPath in vfs.pathsWithPrefix("textures\\LivelyMap\\stamps") do
+        table.insert(out, stampPath)
+    end
+    return out
+end
+local stampPaths = stampList()
+
+local activeColor = 1
+local activeIdx = 1
+local iconGrid = ui.create {}
+local previewGridLayout
+local function setActive(idx, color)
+    activeIdx = idx
+    activeColor = color
+    iconGrid.layout = previewGridLayout(idx, color)
+    iconGrid:update()
+end
+
+---comment
+---@param idx number
+---@param color number
+local function stampPreviewLayout(idx, color)
+    idx = ((idx - 1) % #stampPaths) + 1
+    color = ((color - 1) % 5) + 1
+    return {
+        type = ui.TYPE.Image,
+        props = {
+            visible = true,
+            anchor = util.vector2(0.5, 0.5),
+            size = util.vector2(64, 64),
+            resource = ui.texture {
+                path = stampPaths[idx]
+            },
+            color = resolveColor(color),
+        },
+        external = {
+            grow = 1
+        }
+    }
+end
+
+
+previewGridLayout = function(idx, color)
+    local main = {
+        name = 'mainV',
+        type = ui.TYPE.Flex,
+        props = {
+            horizontal = false,
+            size = util.vector2(400, 300),
+            autoSize = false,
+        },
+        content = ui.content {
+            {
+                name = 'topH',
+                type = ui.TYPE.Flex,
+                props = {
+                    horizontal = false,
+                    size = util.vector2(400, 100),
+                    autoSize = false,
+                },
+                content = ui.content {
+                    stampPreviewLayout(idx - 2, color - 1),
+                    stampPreviewLayout(idx - 1, color - 1),
+                    stampPreviewLayout(idx, color - 1),
+                    stampPreviewLayout(idx + 1, color - 1),
+                    stampPreviewLayout(idx + 2, color - 1),
+                },
+                external = {
+                    grow = 1
+                }
+            },
+            {
+                name = 'midH',
+                type = ui.TYPE.Flex,
+                props = {
+                    horizontal = false,
+                    size = util.vector2(400, 100),
+                    autoSize = false,
+                },
+                content = ui.content {
+                    stampPreviewLayout(idx - 2, color),
+                    stampPreviewLayout(idx - 1, color),
+                    {
+                        name = 'activeBox',
+                        type = ui.TYPE.Container,
+                        template = interfaces.MWUI.templates.boxSolid,
+                        content = ui.content { stampPreviewLayout(idx, color) },
+                        external = {
+                            grow = 1
+                        }
+                    },
+                    stampPreviewLayout(idx + 1, color),
+                    stampPreviewLayout(idx + 2, color),
+                },
+                external = {
+                    grow = 1
+                }
+            },
+            {
+                name = 'botH',
+                type = ui.TYPE.Flex,
+                props = {
+                    horizontal = false,
+                    size = util.vector2(400, 100),
+                    autoSize = false,
+                },
+                content = ui.content {
+                    stampPreviewLayout(idx - 2, color + 1),
+                    stampPreviewLayout(idx - 1, color + 1),
+                    stampPreviewLayout(idx, color + 1),
+                    stampPreviewLayout(idx + 1, color + 1),
+                    stampPreviewLayout(idx + 2, color + 1),
+                },
+                external = {
+                    grow = 1
+                }
+            }
+        }
+    }
+    return main
+end
+
+local stampMaker = ui.create {
+    name = "stampMaker",
+    layer = 'Windows',
+    type = ui.TYPE.Container,
+    template = interfaces.MWUI.templates.boxTransparentThick,
+    props = {
+        relativePosition = util.vector2(0.5, 0.5),
+        anchor = util.vector2(0.5, 0.5),
+        visible = true,
+        autoSize = false,
+    },
+    content = ui.create {
+        name = 'mainV',
+        type = ui.TYPE.Flex,
+        props = {
+            horizontal = false,
+            size = util.vector2(400, 400),
+            autoSize = false,
+        },
+        content = ui.content {
+            iconGrid,
+        }
+    }
+}
+
+setActive(1, 1)
 
 return {
     interfaceName = MOD_NAME .. "Marker",
