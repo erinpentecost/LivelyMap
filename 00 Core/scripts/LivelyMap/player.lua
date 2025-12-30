@@ -126,7 +126,7 @@ allData[playerName] = {
 
 local function onSave()
     -- debug
-    print("onSave:" .. aux_util.deepToString(fromSave, 3))
+    --print("onSave:" .. aux_util.deepToString(fromSave, 3))
     -- do the save. this needs to be in json
     -- so the Go code can unmarshal it.
     return { json = wrapInMagic(json.encode(fromSave)) }

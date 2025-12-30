@@ -412,8 +412,8 @@ local function onConsoleCommand(mode, command, selectedObject)
             return nil
         end
     end
-    local showMap = getSuffixForCmd("lua map")
 
+    local showMap = getSuffixForCmd("lua map")
     if showMap ~= nil then
         local id = splitString(showMap)
         print("Show Map: " .. aux_util.deepToString(id, 3))
@@ -423,6 +423,17 @@ local function onConsoleCommand(mode, command, selectedObject)
             summonMap(nil)
         else
             summonMap(id[1])
+        end
+    end
+
+    local editMarker = getSuffixForCmd("lua marker")
+    if editMarker ~= nil then
+        local id = splitString(editMarker)
+        print("Edit Marker: " .. aux_util.deepToString(id, 3))
+        if #id == 0 then
+            interfaces.LivelyMapMarker.editMarkerWindow({ id = "custom_" .. tostring(pself.cell.id) })
+        else
+            interfaces.LivelyMapMarker.editMarkerWindow({ id = tostring(id) })
         end
     end
 end

@@ -69,11 +69,10 @@ local function isEnchanted(record)
 end
 
 
-local animalPath      = "textures/LivelyMap/stamps/circle-stroked.png"
-local keyPath         = "textures/LivelyMap/stamps/square-stroked.png"
-local enchantmentPath = "textures/LivelyMap/stamps/triangle-stroked.png"
+local animalPath      = "textures/LivelyMap/detect-animal.png"
+local keyPath         = "textures/LivelyMap/detect-key.png"
+local enchantmentPath = "textures/LivelyMap/detect-enchantment.png"
 
-local color           = util.color.rgb(223 / 255, 201 / 255, 159 / 255)
 local baseSize        = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path, color)
@@ -121,18 +120,9 @@ local function newDetectIcon(path, color)
     local focusGain = function()
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         if icon.entity then
-            local hover = {
-                template = interfaces.MWUI.templates.textHeader,
-                type = ui.TYPE.Text,
-                alignment = ui.ALIGNMENT.End,
-                props = {
-                    textAlignV = ui.ALIGNMENT.Center,
-                    relativePosition = util.vector2(0, 0.5),
-                    text = getRecord(icon.entity).name,
-                    textColor = color,
-                }
-            }
-            interfaces.LivelyMapDraw.setHoverBoxContent(hover)
+            interfaces.LivelyMapDraw.setHoverBoxContent(
+                iutil.hoverTextLayout(getRecord(icon.entity).name, color)
+            )
         end
     end
 
@@ -149,13 +139,13 @@ end
 
 local iconPoolAnimal = pool.create(function()
     return newDetectIcon(animalPath, settingCache.palleteColor2)
-end)
+end, 0)
 local iconPoolEnchantment = pool.create(function()
     return newDetectIcon(enchantmentPath, settingCache.palleteColor3)
-end)
+end, 0)
 local iconPoolKey = pool.create(function()
     return newDetectIcon(keyPath, settingCache.palleteColor4)
-end)
+end, 0)
 
 local function makeIcon(iconPool, entity, pos)
     --print("makeIcon: " .. getRecord(entity).name .. ", " .. tostring(pos))

@@ -15,14 +15,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local util     = require('openmw.util')
-local pself    = require("openmw.self")
-local mutil    = require("scripts.LivelyMap.mutil")
-local nearby   = require('openmw.nearby')
-local settings = require("scripts.LivelyMap.settings")
-local async    = require("openmw.async")
-local camera   = require("openmw.camera")
-
+local util       = require('openmw.util')
+local pself      = require("openmw.self")
+local mutil      = require("scripts.LivelyMap.mutil")
+local nearby     = require('openmw.nearby')
+local settings   = require("scripts.LivelyMap.settings")
+local async      = require("openmw.async")
+local camera     = require("openmw.camera")
+local myui       = require('scripts.LivelyMap.pcp.myui')
+local interfaces = require('openmw.interfaces')
+local ui         = require('openmw.ui')
+local async      = require("openmw.async")
 
 local function distanceScale(posData)
     local dist = (camera.getPosition() - posData.mapWorldPos):length()
@@ -34,7 +37,22 @@ local function distanceScale(posData)
     return util.remap(dist, 100, 500, max, 0.5)
 end
 
+local function hoverTextLayout(text, color)
+    return {
+        template = interfaces.MWUI.templates.textHeader,
+        type = ui.TYPE.Text,
+        alignment = ui.ALIGNMENT.End,
+        props = {
+            textAlignV = ui.ALIGNMENT.Center,
+            relativePosition = util.vector2(0, 0.5),
+            text = text,
+            textSize = 20,
+            textColor = color or myui.interactiveTextColors.normal.default,
+        }
+    }
+end
+
 return {
     distanceScale = distanceScale,
-    layer = "Modal",
+    hoverTextLayout = hoverTextLayout,
 }

@@ -5,7 +5,7 @@ This is an OpenMW mod and tool.
 ## Install the mod
 
 There are *Data Folders* in this folder that you need to add to your `openmw.cfg`.
-These all have numbers as prefixes. At a minimum, you need to add `00 Core`.
+These all have numbers as prefixes. At a minimum, you need to add `00 Core`. Don't add more than one folder with the same number, they are exclusive.
 
 You also need to add `00 Core/LivelyMap.omwaddon` as a plugin to `openmw.cfg`.
 Don't add `LivelyMap.omwscripts` if you see it.
@@ -26,6 +26,12 @@ You can specify a custom ramp.bmp by placing it in this folder and then running 
 
 Make sure `cmd/lively/lively` or `cmd/lively/lively.exe` are deleted after you pull in the new files.
 
-## Showing the Map (debugging)
+## Debugging
+
+### Show the Map
 
 While in-game, bring up your console and type `lua map`. Optionally provide a number from 0 to 7, inclusive (ex: `lua map 6`).
+
+### Make a Marker
+
+While in-game, bring up your console and type `lua marker`. Optionally provide an id (ex: `lua marker mymarker`). Markers will appear in the map.
