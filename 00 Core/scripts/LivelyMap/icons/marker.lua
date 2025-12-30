@@ -705,10 +705,6 @@ local function editMarkerWindow(data)
     stampMakerWindow:update()
 end
 
---- debugging
-editMarkerWindow({ id = "334324" })
-
-
 return {
     interfaceName = MOD_NAME .. "Marker",
     interface = {
