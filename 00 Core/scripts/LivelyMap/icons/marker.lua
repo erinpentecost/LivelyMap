@@ -335,18 +335,16 @@ local function stampPreviewLayout(idx, color)
         },
         events = {
             mouseClick = async:callback(function()
-                print("clicked icon with idx: " ..
+                --[[print("clicked icon with idx: " ..
                     tostring(idx) ..
                     ", color: " ..
                     tostring(color) ..
                     "(current idx:" ..
-                    tostring(editingMapData.iconIdx) .. ", current color: " .. tostring(editingMapData.color) .. ")")
+                    tostring(editingMapData.iconIdx) .. ", current color: " .. tostring(editingMapData.color) .. ")")]]
                 if idx == editingMapData.iconIdx then
                     --- cycle to next color
-                    print("cycling color")
                     setActive(idx, ((editingMapData.color) % 5) + 1)
                 else
-                    print("changing idx")
                     setActive(idx, color)
                 end
             end)
@@ -369,9 +367,12 @@ local function stampPreviewLayout(idx, color)
 
 
     widget.events.focusGain = async:callback(function()
-        print("hovered icon with idx: " .. tostring(idx) .. ", color: " .. tostring(color))
-        widget.content["icon"].props.color = mutil.lerpColor(resolveColor(color), util.color.rgb(1, 1, 1), 0.3)
-        gridElement:update()
+        if idx == editingMapData.iconIdx then
+            widget.content["icon"].props.color = resolveColor(((editingMapData.color) % 5) + 1)
+        else
+            widget.content["icon"].props.color = mutil.lerpColor(resolveColor(color), util.color.rgb(1, 1, 1), 0.3)
+            gridElement:update()
+        end
     end)
 
     widget.events.focusLoss = async:callback(function()
