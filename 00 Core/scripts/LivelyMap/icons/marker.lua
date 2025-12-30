@@ -136,6 +136,7 @@ local function registerMarkerIcon(data)
     local element = ui.create {
         type = ui.TYPE.Image,
         props = {
+            propagateEvents = false,
             visible = true,
             position = util.vector2(100, 100),
             anchor = util.vector2(0.5, 0.5),
@@ -173,30 +174,26 @@ local function registerMarkerIcon(data)
         onHide = function(icon)
             icon.element.layout.props.visible = false
             icon.element:update()
-        end
+        end,
+        priority = 10,
     }
 
     local focusGain = function()
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         if registeredMarker.marker.note then
-            local hover = {
-                template = interfaces.MWUI.templates.textHeader,
-                type = ui.TYPE.Text,
-                alignment = ui.ALIGNMENT.End,
-                props = {
-                    textAlignV = ui.ALIGNMENT.Center,
-                    relativePosition = util.vector2(0, 0.5),
-                    text = registeredMarker.marker.note,
-                    textColor = resolveColor(registeredMarker.marker.color),
-                }
-            }
-            interfaces.LivelyMapDraw.setHoverBoxContent(hover)
+            interfaces.LivelyMapDraw.setHoverBoxContent(
+                iutil.hoverTextLayout(registeredMarker.marker.note, resolveColor(registeredMarker.marker.color))
+            )
         end
     end
 
     element.layout.events.focusGain = async:callback(focusGain)
     element.layout.events.focusLoss = async:callback(function()
         interfaces.LivelyMapDraw.setHoverBoxContent()
+        return nil
+    end)
+    element.layout.events.mouseClick = async:callback(function()
+        interfaces.LivelyMapMarker.editMarkerWindow(data)
         return nil
     end)
 
@@ -268,13 +265,10 @@ end
 
 
 ---- UI STUFF ----
+--- This is not the right way to do UI.
+--- Please don't use it as an example.
 
 local stampMakerWindow
-
-
-
-
-
 --- must be odd and >= 3
 local numColumns = 5
 local previewIconSize = util.vector2(64, 64)
@@ -581,7 +575,7 @@ updateDeleteButtonElement()
 
 stampMakerWindow = ui.create {
     name = "stampMaker",
-    layer = 'Windows',
+    layer = 'Modal',
     type = ui.TYPE.Container,
     template = interfaces.MWUI.templates.boxTransparentThick,
     props = {
@@ -644,6 +638,10 @@ local function editMarkerWindow(data)
         stampMakerWindow.layout.props.visible = false
         stampMakerWindow:update()
         return
+    end
+
+    if type(data) ~= "table" then
+        error("editMarkerWindow: data should be a table, not a " .. type(data))
     end
 
     if data.id then

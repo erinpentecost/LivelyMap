@@ -54,21 +54,13 @@ local baseSize     = util.vector2(16, 16)
 
 local function attachDebugEventsToIcon(icon)
     local focusGain = function()
-        local hover = {
-            template = interfaces.MWUI.templates.textHeader,
-            type = ui.TYPE.Text,
-            alignment = ui.ALIGNMENT.End,
-            props = {
-                textAlignV = ui.ALIGNMENT.Center,
-                relativePosition = util.vector2(0, 0.5),
-                text = icon.element.layout.name .. ", path index: " .. tostring(icon.currentIdx),
-            }
-        }
-        interfaces.LivelyMapDraw.setHoverBoxContent(hover)
+        interfaces.LivelyMapDraw.setHoverBoxContent(iutil.hoverTextLayout(
+            icon.element.layout.name .. ", path index: " .. tostring(icon.currentIdx))
+        )
 
         --- I think the issue is that "freed" is passed by value or something
-        local registered = interfaces.LivelyMapDraw.getIcon(icon.element.layout.name)
-        print(aux_util.deepToString(registered, 5))
+        --[[local registered = interfaces.LivelyMapDraw.getIcon(icon.element.layout.name)
+        print(aux_util.deepToString(registered, 5))]]
     end
 
     icon.element.layout.events.focusGain = async:callback(focusGain)

@@ -120,18 +120,9 @@ local function newDetectIcon(path, color)
     local focusGain = function()
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         if icon.entity then
-            local hover = {
-                template = interfaces.MWUI.templates.textHeader,
-                type = ui.TYPE.Text,
-                alignment = ui.ALIGNMENT.End,
-                props = {
-                    textAlignV = ui.ALIGNMENT.Center,
-                    relativePosition = util.vector2(0, 0.5),
-                    text = getRecord(icon.entity).name,
-                    textColor = color,
-                }
-            }
-            interfaces.LivelyMapDraw.setHoverBoxContent(hover)
+            interfaces.LivelyMapDraw.setHoverBoxContent(
+                iutil.hoverTextLayout(getRecord(icon.entity).name, color)
+            )
         end
     end
 
