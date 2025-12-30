@@ -233,13 +233,19 @@ end
 local stampPaths = stampList()
 
 
+--- must be odd and >= 3
+local numColumns = 7
+local previewIconSize = util.vector2(64, 64)
+
 local activeColor = 1
 local activeIdx = 1
 
 local gridElement = ui.create {
     type = ui.TYPE.Widget,
     props = {
-        relativeSize = util.vector2(1, 1),
+        --relativeSize = util.vector2(1, 1),
+        size = util.vector2((previewIconSize.x) * numColumns, 300),
+        autoSize = false,
     },
     content = ui.content {},
 }
@@ -250,6 +256,8 @@ local function setActive(idx, color)
     gridElement.layout.content = ui.content { updateGridLayout(idx, color) }
     gridElement:update()
 end
+
+
 
 ---comment
 ---@param idx number
@@ -265,7 +273,7 @@ local function stampPreviewLayout(idx, color, sizeFactor)
     local widget = {
         type = ui.TYPE.Widget,
         props = {
-            size = util.vector2(64, 64),
+            size = previewIconSize,
         },
         events = {
             mouseClick = async:callback(function()
@@ -279,7 +287,7 @@ local function stampPreviewLayout(idx, color, sizeFactor)
             props = {
                 visible = true,
                 anchor = util.vector2(0.5, 0.5),
-                size = util.vector2(64, 64) * sizeFactor,
+                size = previewIconSize * sizeFactor,
                 relativePosition = util.vector2(0.5, 0.5),
                 resource = ui.texture {
                     path = stampPaths[idx]
@@ -303,6 +311,8 @@ local function stampPreviewLayout(idx, color, sizeFactor)
 end
 
 
+
+
 updateGridLayout = function(idx, color)
     local spacer = {
         type = ui.TYPE.Widget,
@@ -311,13 +321,35 @@ updateGridLayout = function(idx, color)
         }
     }
 
+    local makeRow = function(rowColor, altSize)
+        local out = {}
+        local wingSize = math.floor(numColumns / 2)
+        table.insert(out, spacer)
+        for i = -wingSize, wingSize, 1 do
+            local preview = stampPreviewLayout(activeIdx + i, rowColor, altSize)
+            if i == 0 and rowColor == activeColor then
+                table.insert(out, {
+                    name = 'activeBox',
+                    type = ui.TYPE.Container,
+                    template = interfaces.MWUI.templates.boxSolid,
+                    content = ui.content { preview }
+                })
+            else
+                table.insert(out, preview)
+            end
+            table.insert(out, spacer)
+        end
+        return out
+    end
+
+    local altSize = 0.5
     local main = {
         name = 'mainV',
         type = ui.TYPE.Flex,
         props = {
             horizontal = false,
-            size = util.vector2(400, 300),
-            autoSize = false,
+            --size = util.vector2(400, 300),
+            --autoSize = false,
         },
         content = ui.content {
             {
@@ -327,21 +359,14 @@ updateGridLayout = function(idx, color)
                     horizontal = true,
                     --size = util.vector2(400, 100),
                     --autoSize = false,
-                    relativeSize = util.vector2(1, 0.3),
+                    --relativeSize = util.vector2(1, 0.3),
+                    autoSize = true,
                 },
                 content = ui.content {
-                    stampPreviewLayout(idx - 2, color - 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx - 1, color - 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx, color - 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx + 1, color - 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx + 2, color - 1, 0.5),
+                    unpack(makeRow(color - 1, altSize))
                 },
                 external = {
-                    grow = 1
+                    grow = altSize
                 }
             },
             {
@@ -351,23 +376,11 @@ updateGridLayout = function(idx, color)
                     horizontal = true,
                     --size = util.vector2(400, 100),
                     --autoSize = false,
-                    relativeSize = util.vector2(1, 0.3),
+                    --relativeSize = util.vector2(1, 0.3 * altSize),
+                    autoSize = true,
                 },
                 content = ui.content {
-                    stampPreviewLayout(idx - 2, color),
-                    spacer,
-                    stampPreviewLayout(idx - 1, color),
-                    spacer,
-                    {
-                        name = 'activeBox',
-                        type = ui.TYPE.Container,
-                        template = interfaces.MWUI.templates.boxSolid,
-                        content = ui.content { stampPreviewLayout(idx, color) }
-                    },
-                    spacer,
-                    stampPreviewLayout(idx + 1, color),
-                    spacer,
-                    stampPreviewLayout(idx + 2, color),
+                    unpack(makeRow(color, 0.9))
                 },
                 external = {
                     grow = 1
@@ -380,21 +393,14 @@ updateGridLayout = function(idx, color)
                     horizontal = true,
                     --size = util.vector2(400, 100),
                     --autoSize = false,
-                    relativeSize = util.vector2(1, 0.3),
+                    --relativeSize = util.vector2(1, 0.3 * altSize),
+                    autoSize = true,
                 },
                 content = ui.content {
-                    stampPreviewLayout(idx - 2, color + 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx - 1, color + 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx, color + 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx + 1, color + 1, 0.5),
-                    spacer,
-                    stampPreviewLayout(idx + 2, color + 1, 0.5),
+                    unpack(makeRow(color + 1, altSize))
                 },
                 external = {
-                    grow = 1
+                    grow = altSize
                 }
             }
         }
@@ -417,9 +423,12 @@ local stampMakerWindow = ui.create {
         name = 'mainV',
         type = ui.TYPE.Flex,
         props = {
+            relativePosition = util.vector2(0.5, 0),
+            --anchor = util.vector2(0.5, 0.5),
             horizontal = false,
-            size = util.vector2(400, 400),
-            autoSize = false,
+            --size = util.vector2(400, 400),
+            --autoSize = false,
+            autoSize = true
         },
         content = ui.content {
             gridElement

@@ -58,7 +58,7 @@ local function makeDebugPips()
                         anchor = util.vector2(0.5, 0.5),
                         size = baseSize,
                         resource = ui.texture {
-                            path = "textures/LivelyMap/stamps/cross.png"
+                            path = "textures/LivelyMap/debug.png"
                         }
                     }
                 }

@@ -47,7 +47,7 @@ local pathIcons    = {}
 local myPaths      = nil
 local minimumIndex = 1
 
-local pathIcon     = "textures/LivelyMap/stamps/circle.png"
+local pathIcon     = "textures/LivelyMap/journey.png"
 
 local baseSize     = util.vector2(16, 16)
 

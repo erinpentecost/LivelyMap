@@ -69,9 +69,9 @@ local function isEnchanted(record)
 end
 
 
-local animalPath      = "textures/LivelyMap/stamps/circle-stroked.png"
-local keyPath         = "textures/LivelyMap/stamps/square-stroked.png"
-local enchantmentPath = "textures/LivelyMap/stamps/triangle-stroked.png"
+local animalPath      = "textures/LivelyMap/detect-animal.png"
+local keyPath         = "textures/LivelyMap/detect-key.png"
+local enchantmentPath = "textures/LivelyMap/detect-enchantment.png"
 
 local baseSize        = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
