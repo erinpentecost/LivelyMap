@@ -272,17 +272,21 @@ local textColors = {
 local queuedButton = nil
 local buttonCooldown = nil
 
--- Processes one button press at a time with a cooldown
+---Processes one button press at a time with a cooldown
+---@param dt number?
+---@return boolean True if a button was processed.
 local function processButtonAction(dt)
     if queuedButton then
         queuedButton.buttonFunction(table.unpack(queuedButton.args))
         queuedButton = nil
+        return true
     elseif buttonCooldown then
         buttonCooldown = buttonCooldown - 1
         if buttonCooldown <= 0 then
             buttonCooldown = nil
         end
     end
+    return false
 end
 
 local function queueButtonAction(buttonData, cooldown)

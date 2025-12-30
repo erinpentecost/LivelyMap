@@ -70,9 +70,22 @@ local function resolveColor(colorID)
     end
 end
 
----comment
 ---@param data MarkerData
-local function registerMarker(data)
+---@return boolean
+local function validateMarker(data)
+    if not data then
+        return false
+    end
+    return data.color and data.iconPath and data.id and data.note and data.worldPos and (type(data.id) == "string") and
+        true or false
+end
+
+---@param data MarkerData
+local function registerMarkerIcon(data)
+    if not validateMarker(data) then
+        error("marker data invalid: " .. aux_util.deepToString(data, 3))
+    end
+    print("registerMarkerIcon: " .. aux_util.deepToString(data, 3))
     local element = ui.create {
         type = ui.TYPE.Image,
         props = {
@@ -85,6 +98,7 @@ local function registerMarker(data)
             },
             color = resolveColor(data.color),
         },
+        events = {},
     }
     local registeredMarker = {
         element = element,
@@ -145,10 +159,10 @@ local function registerMarker(data)
 end
 
 ---@param data MarkerData
-local function updateMarker(data)
-    if markerIcons[data.id] == nil then
-        error("updating marker that doesn't exist")
-        return
+local function updateMarkerIcon(data)
+    print("updateMarkerIcon: " .. aux_util.deepToString(data, 3))
+    if not validateMarker(data) then
+        error("updateMarker: bad data")
     end
     markerIcons[data.id].marker = data
     --- update UI element, too
@@ -185,27 +199,29 @@ end
 ---Makes a new marker if it does not exist.
 ---@param data MarkerData
 local function newMarker(data)
-    if not data or not data.id or not type(data.id) == "string" then
+    print("newMarker: " .. aux_util.deepToString(data, 3))
+    if not validateMarker(data) then
         error("newMarker: bad data")
     end
     if not getMarkerByID(data.id) then
         markerData:set(data.id, data)
-        registerMarker(data)
+        registerMarkerIcon(data)
     end
 end
 
 ---@param data MarkerData
 local function upsertMarker(data)
-    if not data or not data.id or not type(data.id) == "string" then
-        error("newMarker: bad data")
+    print("upsertMarker: " .. aux_util.deepToString(data, 3))
+    if not validateMarker(data) then
+        error("upsertMarker: bad data")
     end
 
     local exists = getMarkerByID(data.id) ~= nil
     markerData:set(data.id, data)
     if exists then
-        updateMarker(data)
+        updateMarkerIcon(data)
     else
-        registerMarker(data)
+        registerMarkerIcon(data)
     end
 end
 
@@ -213,7 +229,7 @@ end
 local function onLoad()
     print("Registering saved markers...")
     for _, marker in pairs(getAllMarkers()) do
-        registerMarker(marker)
+        registerMarkerIcon(marker)
     end
 end
 
@@ -451,8 +467,7 @@ local cancelButtonElement = ui.create {}
 local function updateCancelButtonElement()
     local cancelFn = function()
         print("cancel clicked")
-        stampMakerWindow.layout.props.visible = false
-        stampMakerWindow:update()
+        interfaces.LivelyMapMarker.editMarkerWindow(nil)
     end
     cancelButtonElement.layout = myui.createTextButton(
         cancelButtonElement,
@@ -470,9 +485,19 @@ local saveButtonElement = ui.create {}
 local function updateSaveButtonElement()
     local saveFn = function()
         print("save clicked")
-        upsertMarker(editingMapData)
-        stampMakerWindow.layout.props.visible = false
-        stampMakerWindow:update()
+        local note = noteBox.layout.props.text
+        if note == defaultNote then
+            note = ""
+        end
+        upsertMarker({
+            color = editingMapData.color,
+            hidden = false,
+            iconPath = editingMapData.iconPath,
+            id = editingMapData.id,
+            note = note,
+            worldPos = editingMapData.worldPos,
+        })
+        interfaces.LivelyMapMarker.editMarkerWindow(nil)
     end
     saveButtonElement.layout = myui.createTextButton(
         saveButtonElement,
@@ -500,8 +525,7 @@ local function updateDeleteButtonElement()
                 worldPos = editingMapData.worldPos,
             })
         end
-        stampMakerWindow.layout.props.visible = false
-        stampMakerWindow:update()
+        interfaces.LivelyMapMarker.editMarkerWindow(nil)
     end
     deleteButtonElement.layout = myui.createTextButton(
         deleteButtonElement,
@@ -579,6 +603,7 @@ local function editMarkerWindow(data)
     if not data then
         stampMakerWindow.layout.props.visible = false
         stampMakerWindow:update()
+        return
     end
 
     if not data.id then
@@ -629,6 +654,10 @@ end
 --- debugging
 editMarkerWindow({ id = "334324" })
 
+local function onFrame(dt)
+    myui.processButtonAction(dt)
+end
+
 return {
     interfaceName = MOD_NAME .. "Marker",
     interface = {
@@ -640,5 +669,6 @@ return {
     },
     engineHandlers = {
         onLoad = onLoad,
+        onFrame = onFrame,
     },
 }
