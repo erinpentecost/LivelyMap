@@ -26,6 +26,9 @@ local mutil        = require("scripts.LivelyMap.mutil")
 local iutil        = require("scripts.LivelyMap.icons.iutil")
 local vfs          = require('openmw.vfs')
 local aux_util     = require('openmw_aux.util')
+local myui         = require('scripts.ErnPerkFramework.pcp.myui')
+local core         = require("openmw.core")
+local localization = core.l10n(MOD_NAME)
 
 local settingCache = {
     palleteColor1 = settings.palleteColor1,
@@ -401,9 +404,12 @@ updateGridLayout = function(idx, color)
     return main
 end
 
+local defaultNote = localization("markerNote", {})
 local noteBox = ui.create {
     name = "noteBox",
     type = ui.TYPE.TextEdit,
+    template = interfaces.MWUI.templates.borders,
+    events = {},
     props = {
         relativePosition = util.vector2(0.5, 0.5),
         anchor = util.vector2(0.5, 0.5),
@@ -411,10 +417,17 @@ local noteBox = ui.create {
         textSize = 20,
         textAlignH = ui.ALIGNMENT.Center,
         textAlignV = ui.ALIGNMENT.Center,
-        text = "Note",
-        textColor = resolveColor(1),
+        text = defaultNote,
+        textColor = myui.textColors.header,
     }
 }
+
+noteBox.layout.events.focusGain = async:callback(function()
+    if noteBox.layout.props.text == defaultNote then
+        noteBox.layout.props.text = ""
+        noteBox:update()
+    end
+end)
 
 local stampMakerWindow = ui.create {
     name = "stampMaker",
@@ -439,8 +452,8 @@ local stampMakerWindow = ui.create {
             autoSize = true
         },
         content = ui.content {
-            gridElement,
             noteBox,
+            gridElement,
         }
     } }
 }
