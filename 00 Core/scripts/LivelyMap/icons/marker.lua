@@ -22,6 +22,7 @@ local ui           = require('openmw.ui')
 local async        = require("openmw.async")
 local util         = require('openmw.util')
 local settings     = require("scripts.LivelyMap.settings")
+local mutil        = require("scripts.LivelyMap.mutil")
 local iutil        = require("scripts.LivelyMap.icons.iutil")
 local vfs          = require('openmw.vfs')
 local aux_util     = require('openmw_aux.util')
@@ -261,7 +262,7 @@ local function stampPreviewLayout(idx, color, sizeFactor)
         sizeFactor = 1
     end
 
-    return {
+    local widget = {
         type = ui.TYPE.Widget,
         props = {
             size = util.vector2(64, 64),
@@ -273,6 +274,7 @@ local function stampPreviewLayout(idx, color, sizeFactor)
             end)
         },
         content = ui.content { {
+            name = "icon",
             type = ui.TYPE.Image,
             props = {
                 visible = true,
@@ -286,6 +288,18 @@ local function stampPreviewLayout(idx, color, sizeFactor)
             }
         } }
     }
+
+
+    widget.events.focusGain = async:callback(function()
+        widget.content["icon"].props.color = mutil.lerpColor(resolveColor(color), util.color.rgb(1, 1, 1), 0.3)
+        gridElement:update()
+    end)
+
+    widget.events.focusLoss = async:callback(function()
+        widget.content["icon"].props.color = resolveColor(color)
+        gridElement:update()
+    end)
+    return widget
 end
 
 
