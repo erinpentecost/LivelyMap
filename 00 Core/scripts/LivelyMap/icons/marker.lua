@@ -28,6 +28,7 @@ local vfs          = require('openmw.vfs')
 local aux_util     = require('openmw_aux.util')
 local myui         = require('scripts.ErnPerkFramework.pcp.myui')
 local core         = require("openmw.core")
+local pself        = require("openmw.self")
 local localization = core.l10n(MOD_NAME)
 
 local settingCache = {
@@ -163,7 +164,7 @@ end
 ---@field hidden boolean Basically soft-delete.
 ---@field worldPos util.vector3
 ---@field iconPath string Full path to the image file.
----@field note string? This appears in the hover box.
+---@field note string This appears in the hover box. Empty is valid!
 ---@field color number This corresponds to the pallete color number.
 
 ---@param id string
@@ -221,13 +222,16 @@ end
 
 --- stable list of all available stamps
 local function stampList()
+    local reverseLookup = {}
     local out = {}
     for stampPath in vfs.pathsWithPrefix("textures\\LivelyMap\\stamps") do
         table.insert(out, stampPath)
+        local baseName = string.match(stampPath, '(%a+)[.]')
+        reverseLookup[baseName] = #stampPath
     end
-    return out
+    return out, reverseLookup
 end
-local stampPaths = stampList()
+local stampPaths, reversePaths = stampList()
 
 
 --- must be odd and >= 3
@@ -235,8 +239,19 @@ local numColumns = 5
 local previewIconSize = util.vector2(64, 64)
 local windowWidth = (previewIconSize.x) * numColumns
 
-local activeColor = 1
-local activeIdx = 1
+---@class EditingMarkerData : MarkerData
+---@field iconIdx number Matches the icon path.
+
+---@type EditingMarkerData
+local editingMapData = {
+    color = 1,
+    iconPath = stampPaths[1],
+    iconIdx = 1,
+    worldPos = pself.position,
+    id = "placeholder",
+    hidden = false,
+    note = "",
+}
 
 local gridElement = ui.create {
     type = ui.TYPE.Widget,
@@ -249,8 +264,9 @@ local gridElement = ui.create {
 }
 local updateGridLayout
 local function setActive(idx, color)
-    activeIdx = idx
-    activeColor = color
+    editingMapData.color = color
+    editingMapData.iconPath = stampPaths[idx]
+    editingMapData.iconIdx = idx
     gridElement.layout.content = ui.content { updateGridLayout(idx, color) }
     gridElement:update()
 end
@@ -268,9 +284,9 @@ local function stampPreviewLayout(idx, color)
         },
         events = {
             mouseClick = async:callback(function()
-                if idx == activeIdx then
+                if idx == editingMapData.iconIdx then
                     --- cycle to next color
-                    setActive(idx, ((activeColor) % 5) + 1)
+                    setActive(idx, ((editingMapData.color) % 5) + 1)
                 else
                     setActive(idx, color)
                 end
@@ -321,9 +337,9 @@ updateGridLayout = function(idx, color)
         local out = {}
         table.insert(out, spacer)
         for i = -wingSize, wingSize, 1 do
-            local thisIdx = i + offset + activeIdx
-            local preview = stampPreviewLayout(thisIdx, color, thisIdx == activeIdx)
-            if thisIdx == activeIdx then
+            local thisIdx = i + offset + editingMapData.iconIdx
+            local preview = stampPreviewLayout(thisIdx, color)
+            if thisIdx == editingMapData.iconIdx then
                 table.insert(out, {
                     name = 'activeBox',
                     type = ui.TYPE.Container,
@@ -338,7 +354,6 @@ updateGridLayout = function(idx, color)
         return out
     end
 
-    local altSize = 0.5
     local main = {
         name = 'mainV',
         type = ui.TYPE.Flex,
@@ -353,9 +368,6 @@ updateGridLayout = function(idx, color)
                 type = ui.TYPE.Flex,
                 props = {
                     horizontal = true,
-                    --size = util.vector2(400, 100),
-                    --autoSize = false,
-                    --relativeSize = util.vector2(1, 0.3),
                     autoSize = true,
                 },
                 content = ui.content {
@@ -370,9 +382,6 @@ updateGridLayout = function(idx, color)
                 type = ui.TYPE.Flex,
                 props = {
                     horizontal = true,
-                    --size = util.vector2(400, 100),
-                    --autoSize = false,
-                    --relativeSize = util.vector2(1, 0.3 * altSize),
                     autoSize = true,
                 },
                 content = ui.content {
@@ -387,9 +396,6 @@ updateGridLayout = function(idx, color)
                 type = ui.TYPE.Flex,
                 props = {
                     horizontal = true,
-                    --size = util.vector2(400, 100),
-                    --autoSize = false,
-                    --relativeSize = util.vector2(1, 0.3 * altSize),
                     autoSize = true,
                 },
                 content = ui.content {
@@ -408,7 +414,7 @@ local defaultNote = localization("markerNote", {})
 local noteBox = ui.create {
     name = "noteBox",
     type = ui.TYPE.TextEdit,
-    template = interfaces.MWUI.templates.borders,
+    template = interfaces.MWUI.templates.textEditLine,
     events = {},
     props = {
         relativePosition = util.vector2(0.5, 0.5),
@@ -417,17 +423,22 @@ local noteBox = ui.create {
         textSize = 20,
         textAlignH = ui.ALIGNMENT.Center,
         textAlignV = ui.ALIGNMENT.Center,
-        text = defaultNote,
-        textColor = myui.textColors.header,
+        text = (editingMapData.note ~= "" and editingMapData.note) or defaultNote,
+        textColor = myui.interactiveTextColors.normal.default,
     }
 }
-
+--- Remove default on hover.
 noteBox.layout.events.focusGain = async:callback(function()
     if noteBox.layout.props.text == defaultNote then
         noteBox.layout.props.text = ""
         noteBox:update()
     end
 end)
+
+local function resetNoteBox()
+    noteBox.layout.props.text = (editingMapData.note ~= "" and editingMapData.note) or defaultNote
+    noteBox:update()
+end
 
 local stampMakerWindow = ui.create {
     name = "stampMaker",
@@ -437,7 +448,7 @@ local stampMakerWindow = ui.create {
     props = {
         relativePosition = util.vector2(0.5, 0.5),
         anchor = util.vector2(0.5, 0.5),
-        visible = true,
+        visible = false,
         autoSize = true,
     },
     content = ui.content { {
@@ -458,7 +469,57 @@ local stampMakerWindow = ui.create {
     } }
 }
 
-setActive(1, 1)
+---@param data EditingMarkerData
+local function editMarkerWindow(data)
+    if not data then
+        stampMakerWindow.layout.props.visible = false
+        stampMakerWindow:update()
+    end
+
+    if not data.id then
+        error("editMarkerWindow missing id")
+    end
+
+    editingMapData = data
+
+    -- Keep paths valid.
+    if not data.iconIdx and not data.iconPath then
+        data.iconIdx = 1
+        data.iconPath = stampPaths[data.iconIdx]
+    elseif not data.iconIdx then
+        local baseName = string.match(data.iconPath, '(%a+)[.]')
+        editingMapData.iconIdx = reversePaths[baseName] or 1
+    elseif not data.iconPath then
+        data.iconPath = stampPaths[data.iconIdx]
+    end
+
+    -- Keep color valid.
+    if not data.color then
+        data.color = 1
+    end
+
+    -- Default position/note.
+    if not data.worldPos then
+        data.worldPos = pself.position
+        if not data.note then
+            data.note = pself.cell.name
+        end
+    end
+
+    -- Note shouldn't be nil.
+    if not data.note then
+        data.note = ""
+    end
+
+    setActive(editingMapData.iconIdx, data.color or 1)
+    resetNoteBox()
+    stampMakerWindow.layout.props.visible = true
+    stampMakerWindow:update()
+end
+
+
+--- debugging
+editMarkerWindow({ id = "334324" })
 
 return {
     interfaceName = MOD_NAME .. "Marker",
@@ -467,6 +528,7 @@ return {
         getMarkerByID = getMarkerByID,
         newMarker = newMarker,
         upsertMarker = upsertMarker,
+        editMarkerWindow = editMarkerWindow,
     },
     engineHandlers = {
         onLoad = onLoad,
