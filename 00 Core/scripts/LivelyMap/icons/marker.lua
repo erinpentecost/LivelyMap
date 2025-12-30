@@ -648,7 +648,7 @@ local function editMarkerWindow(data)
 
     if data.id then
         local found = getMarkerByID(data.id)
-        if found then
+        if found and not found.hidden then
             print("found existing marker: " .. aux_util.deepToString(found, 3))
             data = found
         end
