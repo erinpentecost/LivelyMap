@@ -220,6 +220,8 @@ end
 
 ---- UI STUFF ----
 
+local stampMakerWindow
+
 --- stable list of all available stamps
 local function stampList()
     local reverseLookup = {}
@@ -253,11 +255,18 @@ local editingMapData = {
     note = "",
 }
 
+local spacer = {
+    type = ui.TYPE.Widget,
+    external = {
+        grow = 1
+    }
+}
+
 local gridElement = ui.create {
     type = ui.TYPE.Widget,
     props = {
         --relativeSize = util.vector2(1, 1),
-        size = util.vector2(windowWidth, 300),
+        size = util.vector2(windowWidth, (previewIconSize.y) * 3),
         autoSize = false,
     },
     content = ui.content {},
@@ -325,13 +334,6 @@ end
 
 
 updateGridLayout = function(idx, color)
-    local spacer = {
-        type = ui.TYPE.Widget,
-        external = {
-            grow = 1
-        }
-    }
-
     local wingSize = math.floor(numColumns / 2)
     local makeRow = function(offset)
         local out = {}
@@ -440,7 +442,65 @@ local function resetNoteBox()
     noteBox:update()
 end
 
-local stampMakerWindow = ui.create {
+local buttonSize = util.vector2(60, 20)
+
+local cancelButtonElement = ui.create {}
+local function updateCancelButtonElement()
+    local cancelFn = function()
+        stampMakerWindow.layout.props.visible = false
+        stampMakerWindow:update()
+    end
+    cancelButtonElement.layout = myui.createTextButton(
+        cancelButtonElement,
+        localization("cancelButton", {}),
+        "normal",
+        'pickButton',
+        {},
+        buttonSize,
+        cancelFn)
+    cancelButtonElement:update()
+end
+updateCancelButtonElement()
+
+local saveButtonElement = ui.create {}
+local function updateSaveButtonElement()
+    local saveFn = function()
+        upsertMarker(editingMapData)
+        stampMakerWindow.layout.props.visible = false
+        stampMakerWindow:update()
+    end
+    saveButtonElement.layout = myui.createTextButton(
+        saveButtonElement,
+        localization("saveButton", {}),
+        "normal",
+        'pickButton',
+        {},
+        buttonSize,
+        saveFn)
+    saveButtonElement:update()
+end
+updateSaveButtonElement()
+
+local deleteButtonElement = ui.create {}
+local function updateDeleteButtonElement()
+    local deleteFn = function()
+        upsertMarker(editingMapData)
+        stampMakerWindow.layout.props.visible = false
+        stampMakerWindow:update()
+    end
+    deleteButtonElement.layout = myui.createTextButton(
+        deleteButtonElement,
+        localization("deleteButton", {}),
+        "normal",
+        'pickButton',
+        {},
+        buttonSize,
+        deleteFn)
+    deleteButtonElement:update()
+end
+updateDeleteButtonElement()
+
+stampMakerWindow = ui.create {
     name = "stampMaker",
     layer = 'Windows',
     type = ui.TYPE.Container,
@@ -460,11 +520,39 @@ local stampMakerWindow = ui.create {
             horizontal = false,
             --size = util.vector2(400, 400),
             --autoSize = false,
-            autoSize = true
+            --autoSize = true
         },
         content = ui.content {
+            myui.padWidget(0, 4),
             noteBox,
+            spacer,
+            myui.padWidget(0, 4),
             gridElement,
+            spacer,
+            myui.padWidget(0, 4),
+            {
+                name = 'buttons',
+                type = ui.TYPE.Flex,
+                props = {
+                    relativePosition = util.vector2(0.5, 0),
+                    size = util.vector2(windowWidth, 40),
+                    --anchor = util.vector2(0.5, 0.5),
+                    horizontal = true,
+                    --size = util.vector2(400, 400),
+                    --autoSize = false,
+                    --autoSize = true
+                },
+                content = ui.content {
+                    spacer,
+                    saveButtonElement,
+                    spacer,
+                    cancelButtonElement,
+                    spacer,
+                    deleteButtonElement,
+                    spacer,
+                }
+            },
+            --myui.padWidget(0, 4),
         }
     } }
 }
@@ -495,7 +583,7 @@ local function editMarkerWindow(data)
 
     -- Keep color valid.
     if not data.color then
-        data.color = 1
+        data.color = math.random(5)
     end
 
     -- Default position/note.
