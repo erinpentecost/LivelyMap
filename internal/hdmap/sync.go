@@ -31,11 +31,11 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	rampPath := getRampFile(rootPath)
 
 	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
-	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures")
-	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures")
-	potatoTexturePath := filepath.Join(rootPath, "01 Potato Map", "textures")
-	normalsTexturePath := filepath.Join(rootPath, "02 Normals", "textures")
-	extremeNormalsTexturePath := filepath.Join(rootPath, "02 Extreme Normals", "textures")
+	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures", "LivelyMap")
+	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures", "LivelyMap")
+	potatoTexturePath := filepath.Join(rootPath, "01 Potato Map", "textures", "LivelyMap")
+	normalsTexturePath := filepath.Join(rootPath, "02 Normals", "textures", "LivelyMap")
+	extremeNormalsTexturePath := filepath.Join(rootPath, "02 Extreme Normals", "textures", "LivelyMap")
 
 	for _, texturePath := range []string{core00TexturePath, detailTexturePath, core00DataPath} {
 		if tdir, err := os.Stat(texturePath); err != nil {
@@ -107,12 +107,15 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 	for _, extents := range Partition(parsedLands.MapExtents) {
 		mapInfos[strconv.Itoa(int(extents.ID))] = extents
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory:      core00TexturePath,
-			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          classicColorCells,
-			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
-			Codec:          dds.Lossless,
+			Directory: core00TexturePath,
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     classicColorCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				&postprocessors.SMAA{},
+			},
+			Codec: dds.Lossless,
 		})
 		mapJobs = append(mapJobs, &mapRenderJob{
 			Directory: normalsTexturePath,
@@ -144,38 +147,50 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Codec: dds.DXT5,
 		})
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory:      core00TexturePath,
-			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          specularCells,
-			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
-			Codec:          dds.DXT5,
+			Directory: core00TexturePath,
+			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     specularCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				&postprocessors.SMAA{},
+			},
+			Codec: dds.DXT5,
 		})
 
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory:      potatoTexturePath,
-			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          classicColorCells,
-			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
-			Codec:          dds.DXT1,
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     classicColorCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+				&postprocessors.SMAA{},
+			},
+			Codec: dds.DXT1,
 		})
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory:      potatoTexturePath,
-			Name:           fmt.Sprintf("world_%d_spec.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          specularCells,
-			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8}},
-			Codec:          dds.DXT5,
+			Directory: potatoTexturePath,
+			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     specularCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+				&postprocessors.SMAA{},
+			},
+			Codec: dds.DXT5,
 		})
 
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory:      detailTexturePath,
-			Name:           fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:        extents.Extents,
-			Cells:          texturedCells,
-			PostProcessors: []PostProcessor{&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1}},
-			Codec:          dds.Lossless,
+			Directory: detailTexturePath,
+			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+			Extents:   extents.Extents,
+			Cells:     texturedCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				&postprocessors.SMAA{},
+			},
+			Codec: dds.Lossless,
 		})
 	}
 
@@ -185,6 +200,9 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 		Name:      "vanity.png",
 		Extents:   parsedLands.MapExtents,
 		Cells:     texturedCells,
+		PostProcessors: []PostProcessor{
+			&postprocessors.SMAA{},
+		},
 	})
 
 	g, gctx := errgroup.WithContext(ctx)
