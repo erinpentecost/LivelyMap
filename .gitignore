@@ -1,3 +1,5 @@
 *.prof
 **/textures/*.dds
+**/textures/LivelyMap/sky*.dds
+**/textures/LivelyMap/world_*.dds
 vanity.png
