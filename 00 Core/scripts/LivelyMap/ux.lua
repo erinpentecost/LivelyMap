@@ -219,7 +219,7 @@ local function markerButtonFn()
     print("markerbutton clicked")
     --- position is pretty accurate so converting it to a string
     --- is basically random
-    local newID = "custom_" .. tostring(pself.position.x) .. "_" .. tostring(pself.position.y)
+    local newID = "custom_" .. tostring(math.floor(pself.position.x)) .. "_" .. tostring(math.floor(pself.position.y))
     interfaces.LivelyMapMarker.editMarkerWindow({ id = newID })
 end
 local newMarkerButton = makeMenuButton("markerButton", "textures/LivelyMap/marker-button.png", markerButtonFn,

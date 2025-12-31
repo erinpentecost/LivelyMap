@@ -635,6 +635,20 @@ stampMakerWindow = ui.create {
     } }
 }
 
+--- cache exterior location if we are inside somewhere
+local cachedExtLocation = {}
+interfaces.LivelyMapDraw.onMapMoved(function(mapData)
+    if not mapData.swapped and not pself.cell.isExterior then
+        core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", { player = pself })
+    end
+end)
+local function onReceiveExteriorLocation(data)
+    cachedExtLocation = {
+        pos = util.vector3(data.pos.x, data.pos.y, data.pos.z),
+        facing = util.vector2(data.facing.x, data.facing.y)
+    }
+end
+
 ---@param data EditingMarkerData
 local function editMarkerWindow(data)
     if not data then
@@ -664,8 +678,6 @@ local function editMarkerWindow(data)
     end
     if not stampFullPath then
         stampFullPath = resolveStampFullPath(1)
-        --- TODO: this is busted
-        print("DEFAULT STAMP!!!!! " .. aux_util.deepToString(editingMapData, 3))
     end
     local stampInfo = stampPathData.fullPathToIDMap[stampFullPath]
     editingMapData.iconName = stampInfo.basename
@@ -678,7 +690,13 @@ local function editMarkerWindow(data)
 
     -- Default position/note.
     if not editingMapData.worldPos then
-        editingMapData.worldPos = pself.position
+        if pself.cell.isExterior then
+            editingMapData.worldPos = pself.position
+        elseif cachedExtLocation then
+            editingMapData.worldPos = cachedExtLocation.pos
+        else
+            error("can't get exterior position")
+        end
         if not editingMapData.note then
             editingMapData.note = pself.cell.name
         end
@@ -713,6 +731,9 @@ return {
         getMarkerByID = getMarkerByID,
         upsertMarkerIcon = upsertMarkerIcon,
         editMarkerWindow = editMarkerWindow,
+    },
+    eventHandlers = {
+        [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation
     },
     engineHandlers = {
         onLoad = onLoad,
