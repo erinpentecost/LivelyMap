@@ -466,7 +466,7 @@ local function onMapMoved(data)
     end
 
     if not data.swapped then
-        interfaces.UI.setMode('Interface', { windows = {} })
+        interfaces.UI.addMode('Interface', { windows = {} })
         mainWindow.layout.props.visible = true
         mainWindow:update()
     end
@@ -480,7 +480,7 @@ local function onMapHidden(data)
     end
 
     if not data.swapped then
-        interfaces.UI.setMode()
+        interfaces.UI.removeMode('Interface')
         mainWindow.layout.props.visible = false
         mainWindow:update()
     end
@@ -533,11 +533,15 @@ local function summonMap(id)
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 
-local function toggleMap()
-    if currentMapData then
-        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
-    else
+---@param open boolean? Nil to toggle. Otherwise, boolean indicating desired state.
+local function toggleMap(open)
+    if open == nil then
+        open = currentMapData == nil
+    end
+    if open and currentMapData == nil then
         summonMap()
+    elseif (not open) and (currentMapData ~= nil) then
+        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
     end
 end
 

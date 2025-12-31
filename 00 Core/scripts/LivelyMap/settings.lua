@@ -97,6 +97,13 @@ local function init()
                     type = 'action',
                 }
             },
+            {
+                key = "controllerButtons",
+                name = "controllerButtonsName",
+                description = "controllerButtonsDescription",
+                default = true,
+                renderer = "checkbox",
+            },
         }
     }
 

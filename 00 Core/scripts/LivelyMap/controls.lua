@@ -15,25 +15,24 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME        = require("scripts.LivelyMap.ns")
-local mutil           = require("scripts.LivelyMap.mutil")
-local putil           = require("scripts.LivelyMap.putil")
-local core            = require("openmw.core")
-local util            = require("openmw.util")
-local pself           = require("openmw.self")
-local aux_util        = require('openmw_aux.util')
-local camera          = require("openmw.camera")
-local ui              = require("openmw.ui")
-local settings        = require("scripts.LivelyMap.settings")
-local async           = require("openmw.async")
-local interfaces      = require('openmw.interfaces')
-local storage         = require('openmw.storage')
-local input           = require('openmw.input')
-local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
-local keytrack        = require("scripts.ErnOneStick.keytrack")
-local uiInterface     = require("openmw.interfaces").UI
-local h3cam           = require("scripts.LivelyMap.h3.cam")
-local input           = require("openmw.input")
+local MOD_NAME    = require("scripts.LivelyMap.ns")
+local mutil       = require("scripts.LivelyMap.mutil")
+local putil       = require("scripts.LivelyMap.putil")
+local core        = require("openmw.core")
+local util        = require("openmw.util")
+local pself       = require("openmw.self")
+local aux_util    = require('openmw_aux.util')
+local camera      = require("openmw.camera")
+local ui          = require("openmw.ui")
+local settings    = require("scripts.LivelyMap.settings")
+local async       = require("openmw.async")
+local interfaces  = require('openmw.interfaces')
+local storage     = require('openmw.storage')
+local input       = require('openmw.input')
+local heightData  = storage.globalSection(MOD_NAME .. "_heightData")
+local keytrack    = require("scripts.ErnOneStick.keytrack")
+local uiInterface = require("openmw.interfaces").UI
+
 
 local controls        = require('openmw.interfaces').Controls
 local cameraInterface = require("openmw.interfaces").Camera
@@ -43,34 +42,43 @@ local defaultPitch    = 1
 
 local stickDeadzone   = 0.3
 
+
+local settingCache = {
+    controllerButtons = settings.controls.controllerButtons,
+}
+settings.controls.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.controls[key]
+end))
+
 -- Track inputs we need for navigating the map.
-local keys            = {
+local keys = {
     forward  = keytrack.NewKey("forward", function(dt)
-        return input.isKeyPressed(input.KEY.UpArrow) or input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp)
+        return input.isKeyPressed(input.KEY.UpArrow) or
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
     end),
     backward = keytrack.NewKey("backward", function(dt)
         return input.isKeyPressed(input.KEY.DownArrow) or
-            input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
     end),
     left     = keytrack.NewKey("left", function(dt)
         return input.isKeyPressed(input.KEY.LeftArrow) or
-            input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft))
     end),
     right    = keytrack.NewKey("right", function(dt)
         return input.isKeyPressed(input.KEY.RightArrow) or
-            input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight))
     end),
 
     zoomIn   = keytrack.NewKey("zoomIn", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
     end),
 
     zoomOut  = keytrack.NewKey("zoomOut", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
     end)
 }
 
@@ -587,7 +595,7 @@ local newMapTileThisFrame = false
 local function onFrame(dt)
     -- Fake a duration if we're paused.
     if dt <= 0 then
-        dt = 1 / 60
+        dt = core.getRealFrameDuration()
     end
     -- Only track inputs while the map is up.
     if not originalCameraState then
@@ -631,12 +639,6 @@ local function onFrame(dt)
             vecUp * keys.zoomOut.analog +
             vecDown * keys.zoomIn.analog
         ):normalize() * moveSpeed * dt
-
-        if keys.zoomIn.pressed then
-            print("zooming in")
-        elseif keys.zoomOut.pressed then
-            print("zooming out")
-        end
 
         moveCamera({
             relativePosition = moveVec

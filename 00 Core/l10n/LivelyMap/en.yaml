@@ -16,6 +16,8 @@ psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
 controlsName: "Controls"
 controlsDescription: "Mess with the controls here. Consult the README for how to use the map."
 toggleMapWindowKeyBind: "Toggle Map Window"
+controllerButtonsName: "Enable Controller Buttons"
+controllerButtonsDescription: "D-Pad pans the map, right stick zooms."
 
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."

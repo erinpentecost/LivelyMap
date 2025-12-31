@@ -39,14 +39,14 @@ local function init()
     -- Exit the map when one of these triggers goes off:
     for _, exitTrigger in ipairs { "Journal", "Inventory", "GameMenu" } do
         input.registerTriggerHandler(exitTrigger, async:callback(function()
-            core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
+            interfaces.LivelyMapDraw.toggleMap(false)
         end))
     end
 
     --- Drop the map if the player is hit
     interfaces.Combat.addOnHitHandler(function(attackInfo)
         if attackInfo ~= nil then
-            core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
+            interfaces.LivelyMapDraw.toggleMap(false)
         end
     end)
 end
