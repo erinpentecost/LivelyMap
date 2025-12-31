@@ -129,12 +129,5 @@ return {
     },
     engineHandlers = {
         onInit = onStart,
-        onSave = onSave,
-        onLoad = function(initData)
-            onStart(initData)
-            if initData ~= nil then
-                initData.player:sendEvent(MOD_NAME .. "onMapMoved", initData)
-            end
-        end,
     }
 }

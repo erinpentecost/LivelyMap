@@ -221,11 +221,61 @@ local function onHideMap(data)
     end
 end
 
+-- cache of interior cell id to exterior position
+local cachedPos = {}
+--- Find the player's exterior location.
+--- If they are in an interior, find a door to an exit and use that position.
+local function getExteriorLocation(data)
+    local player = data.player
+    if player.cell.isExterior then
+        return player.position
+    end
+    if cachedPos[player.cell.id] then
+        return cachedPos[player.cell.id]
+    end
+    -- we need to recurse out until we find the exit door
+    local seenCells = {}
+    local searchForDoor
+    searchForDoor = function(cell)
+        if not cell then
+            return nil
+        end
+        if seenCells[cell.id] then
+            return nil
+        end
+        seenCells[cell.id] = true
+        for _, door in ipairs(cell:getAll(types.Door)) do
+            local destCell = types.Door.destCell(door)
+            if destCell then
+                -- If this door leads directly outside, we're done
+                if destCell.isExterior then
+                    return types.Door.destPosition(door)
+                end
+
+                -- Otherwise, recurse
+                local result = searchForDoor(destCell)
+                if result then
+                    return result
+                end
+            end
+        end
+        return nil
+    end
+    cachedPos[player.cell.id] = searchForDoor(player.cell)
+    return cachedPos[player.cell.id]
+end
+
+local function onGetExteriorLocation(data)
+    local result = getExteriorLocation(data)
+    data.player:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
+        { x = result.x, y = result.y, z = result.z })
+end
 
 return {
     eventHandlers = {
         [MOD_NAME .. "onShowMap"] = onShowMap,
         [MOD_NAME .. "onHideMap"] = onHideMap,
+        [MOD_NAME .. "onGetExteriorLocation"] = onGetExteriorLocation,
     },
     engineHandlers = {
         onSave = onSave,

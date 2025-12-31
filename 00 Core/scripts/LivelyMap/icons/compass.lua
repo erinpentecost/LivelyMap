@@ -15,6 +15,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
+local MOD_NAME     = require("scripts.LivelyMap.ns")
 local interfaces   = require('openmw.interfaces')
 local ui           = require('openmw.ui')
 local util         = require('openmw.util')
@@ -24,6 +25,8 @@ local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
 local iutil        = require("scripts.LivelyMap.icons.iutil")
 local async        = require("openmw.async")
 local settings     = require("scripts.LivelyMap.settings")
+local core         = require('openmw.core')
+local types        = require('openmw.types')
 
 local settingCache = {
     palleteColor1 = settings.palleteColor1,
@@ -40,7 +43,6 @@ compassAtlas:spawn({
     anchor = util.vector2(0.5, 0.5),
     color = settingCache.palleteColor1,
     events = {},
-    propagateEvents = false,
 })
 
 settings.subscribe(async:callback(function(_, key)
@@ -61,11 +63,25 @@ local function adjustedYaw(deg)
     return util.clamp(util.round(yaw), 1, 360)
 end
 
+local cachedPos = nil
+interfaces.LivelyMapDraw.onMapMoved(function(mapData)
+    if not mapData.swapped then
+        core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", { player = pself })
+    end
+end)
+local function onReceiveExteriorLocation(data)
+    cachedPos = util.vector3(data.x, data.y, data.z)
+end
+
+
 --- TODO: add an off-screen indicator for where you are
 local compassIcon = {
     element = compassAtlas:getElement(),
     pos = function()
-        return pself.position
+        if pself.cell.isExterior then
+            return pself.position
+        end
+        return cachedPos
     end,
     facing = function()
         return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
@@ -100,9 +116,11 @@ local compassIcon = {
     priority = 100,
 }
 
-compassAtlas:getElement().layout.events.mouseClick = async:callback(function()
-    --print("focusLoss: " .. aux_util.deepToString(icon.entity, 3))
-    interfaces.LivelyMapJourneyIcons.toggleJourney()
-end)
 
 interfaces.LivelyMapDraw.registerIcon(compassIcon)
+
+return {
+    eventHandlers = {
+        [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation
+    }
+}
