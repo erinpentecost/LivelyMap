@@ -33,6 +33,7 @@ local heightData      = storage.globalSection(MOD_NAME .. "_heightData")
 local keytrack        = require("scripts.ErnOneStick.keytrack")
 local uiInterface     = require("openmw.interfaces").UI
 local h3cam           = require("scripts.LivelyMap.h3.cam")
+local input           = require("openmw.input")
 
 local controls        = require('openmw.interfaces').Controls
 local cameraInterface = require("openmw.interfaces").Camera
@@ -50,16 +51,19 @@ end
 -- Track inputs we need for navigating the map.
 local keys = {
     forward  = keytrack.NewKey("forward", function(dt)
-        return input.getRangeActionValue("MoveForward")
+        return input.isKeyPressed(input.KEY.UpArrow) or input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp)
     end),
     backward = keytrack.NewKey("backward", function(dt)
-        return input.getRangeActionValue("MoveBackward")
+        return input.isKeyPressed(input.KEY.DownArrow) or
+        input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown)
     end),
     left     = keytrack.NewKey("left", function(dt)
-        return input.getRangeActionValue("MoveLeft")
+        return input.isKeyPressed(input.KEY.LeftArrow) or
+        input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft)
     end),
     right    = keytrack.NewKey("right", function(dt)
-        return input.getRangeActionValue("MoveRight")
+        return input.isKeyPressed(input.KEY.RightArrow) or
+        input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight)
     end)
 }
 
