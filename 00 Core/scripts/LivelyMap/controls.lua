@@ -606,11 +606,6 @@ local function onMapHidden(data)
     end
 end
 
-local function onTeleported()
-    print("TODO: teleported, map camera might break")
-    --endCamera()
-end
-
 local function onLoad(data)
     originalCameraState = data
 end
@@ -630,7 +625,6 @@ return {
         onFrame = onFrame,
         onSave = onSave,
         onLoad = onLoad,
-        onTeleported = onTeleported,
     },
     eventHandlers = {
         [MOD_NAME .. "onMapMoved"] = onMapMoved,
