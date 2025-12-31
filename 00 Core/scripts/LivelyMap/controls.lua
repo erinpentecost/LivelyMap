@@ -322,6 +322,11 @@ local function handleCollision(res)
 
         local absNewMapCenter = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, newMapCenter)
 
+        --- absNewMapCenter works great when there's sufficient overlap between the current tile and new tile.
+        --- But when there's basically no overlap, the camera is not really looking at anything.
+        --- This causes a lot of instability. So I need to slide the map tile over more so it's in view.
+        --- This will cause any current tracking to be offset, so I also need to cancel tracking.
+
         local showData = mutil.shallowMerge(newMap, {
             cellID = pself.cell.id,
             player = pself,
@@ -371,7 +376,7 @@ local function moveCamera(data)
 
 
         -- clamp camera height
-        if newPos.z ~= currentPosition.z then
+        if currentMapData and (newPos.z ~= currentPosition.z) then
             local relativeZ = newPos.z - currentMapData.object.position.z
             if relativeZ < defaultHeight / 2 then
                 relativeZ = defaultHeight / 2
@@ -566,6 +571,16 @@ local function trackToWorldPosition(worldPos, duration, onEnd)
     trackPosition(camPos, duration, onEnd)
 end
 
+local function haltTracking()
+    if trackInfo.tracking then
+        trackInfo.movesResult.success = false
+        if trackInfo.onEnd then
+            trackInfo.onEnd(trackInfo.movesResult)
+        end
+    end
+    trackInfo.tracking = false
+end
+
 local vecForward = util.vector3(0, 1, 0)
 local vecBackward = vecForward * -1
 local vecRight = util.vector3(1, 0, 0)
@@ -573,6 +588,8 @@ local vecLeft = vecRight * -1
 local vecUp = util.vector3(0, 0, 1)
 local vecDown = vecUp * -1
 local moveSpeed = 100
+
+local newMapTileThisFrame = false
 
 local function onFrame(dt)
     -- Fake a duration if we're paused.
@@ -597,6 +614,11 @@ local function onFrame(dt)
     keys.right:update(dt)
     keys.zoomIn:update(dt)
     keys.zoomOut:update(dt)
+
+    if newMapTileThisFrame then
+        newMapTileThisFrame = false
+        return
+    end
 
     -- If we have input, cancel trackPosition,
     -- then move the camera manually.
@@ -627,23 +649,71 @@ local function onFrame(dt)
             relativePosition = moveVec
         })
         -- Interrupt tracking
-        if trackInfo.tracking then
-            trackInfo.movesResult.success = false
-            if trackInfo.onEnd then
-                trackInfo.onEnd(trackInfo.movesResult)
-            end
-        end
-        trackInfo.tracking = false
+        haltTracking()
+        -- clear hoverbox
         interfaces.LivelyMapDraw.setHoverBoxContent()
     else
         advanceTracker()
     end
 end
 
+---@param hits ScreenHits
+---@param bounds any  -- currentMapData.safeBounds
+---@return util.vector3|nil
+local function computeVisibilityCorrection(hits, bounds)
+    local minX = bounds.bottomLeft.x
+    local maxX = bounds.bottomRight.x
+    local minY = bounds.bottomLeft.y
+    local maxY = bounds.topLeft.y
+
+    local cx = 0
+    local cy = 0
+    local count = 0
+
+    -- Compute center of viewport on the map plane
+    for _, h in pairs(hits) do
+        if h.worldSpace then
+            cx = cx + h.worldSpace.x
+            cy = cy + h.worldSpace.y
+            count = count + 1
+        end
+    end
+
+    -- No valid intersection at all → nothing we can do
+    if count == 0 then
+        return nil
+    end
+
+    cx = cx / count
+    cy = cy / count
+
+    local dx = 0
+    local dy = 0
+
+    if cx < minX then
+        dx = minX - cx
+    elseif cx > maxX then
+        dx = maxX - cx
+    end
+
+    if cy < minY then
+        dy = minY - cy
+    elseif cy > maxY then
+        dy = maxY - cy
+    end
+
+    if dx == 0 and dy == 0 then
+        return nil
+    end
+
+    return util.vector3(dx, dy, 0)
+end
+
 
 local function onMapMoved(data)
     print("controls.onMapMoved")
     currentMapData = data
+    newMapTileThisFrame = true
     -- If this is not a swap, then this is a brand new map session.
     if not data.swapped and data.startWorldPosition then
         -- Orient the camera so starting position is in the center.
@@ -652,6 +722,30 @@ local function onMapMoved(data)
         local camPos = worldPosToCameraPos(data.startWorldPosition)
         camPos.force = true
         moveCamera(camPos)
+    end
+
+    -- This is a tile swap. Let's make sure the map is visible.
+    if data.swapped then
+        local screenPositions = getScreenPositions()
+        local validPositions = screenPositionsValid(screenPositions)
+        if validPositions ~= 4 then
+            --- the map is not completely visible!
+            print("NEW MAP IS NOT TOTALLY VISIBLE!!!!!!")
+            haltTracking()
+            --- slide the camera over so the map is more visible
+            --- TODO: this jumps around like mad if you are zoomed out too much
+            local correction = computeVisibilityCorrection(
+                screenPositions,
+                currentMapData.safeBounds
+            )
+
+            if correction then
+                moveCamera({
+                    position = camera.getPosition() + correction,
+                    force = true
+                })
+            end
+        end
     end
 end
 
