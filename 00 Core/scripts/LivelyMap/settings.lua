@@ -37,7 +37,7 @@ local function init()
                 key = "psoDepth",
                 name = "psoDepthName",
                 description = "psoDepthDescription",
-                default = 30,
+                default = 0,
                 renderer = "number",
                 argument = {
                     integer = true,
