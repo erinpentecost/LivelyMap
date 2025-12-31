@@ -121,6 +121,8 @@ local lookupFuncTable = {
             return function(callback)
                 return table.section.subscribe(table.section, callback)
             end
+        elseif key == "section" then
+            return table.section
         end
         -- fall through to settings section
         local val = table.section:get(key)
