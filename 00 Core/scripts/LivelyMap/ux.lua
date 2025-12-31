@@ -36,6 +36,7 @@ local currentMapData  = nil
 
 -- psoDepth determines how much to offset icons on the map.
 local settingCache    = {
+    psoUnlock       = settings.psoUnlock,
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
     debug           = settings.debug,
@@ -247,6 +248,21 @@ local psoTogglePushdownButton = makeMenuButton("psoTogglePushdownButton", "textu
     psoButtonColors
 )
 
+local psoMenuButtons = ui.content {
+    name = 'psoMenuButtons',
+    type = ui.TYPE.Flex,
+    props = {
+        horizontal = true,
+        visible = settingCache.psoUnlock,
+    },
+    content = ui.content {
+        myui.padWidget(10, 10),
+        psoReduceDepthButton,
+        psoIncreaseDepthButton,
+        psoTogglePushdownButton,
+    }
+}
+
 local menuBar = ui.create {
     name = 'menuBar',
     type = ui.TYPE.Container,
@@ -271,6 +287,7 @@ local menuBar = ui.create {
                 newMarkerButton,
                 myui.padWidget(10, 10),
                 journeyButton,
+                psoMenuButtons
             }
         }
     }
