@@ -42,6 +42,13 @@ local function init()
             core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
         end))
     end
+
+    --- Drop the map if the player is hit
+    interfaces.Combat.addOnHitHandler(function(attackInfo)
+        if attackInfo ~= nil then
+            core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
+        end
+    end)
 end
 
 
