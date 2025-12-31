@@ -530,6 +530,14 @@ local function summonMap(id)
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 
+local function toggleMap()
+    if currentMapData then
+        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
+    else
+        summonMap()
+    end
+end
+
 local function splitString(str)
     local out = {}
     for item in str:gmatch("([^,%s]+)") do
@@ -655,7 +663,8 @@ return {
         end,
         onMapHidden = function(fn)
             return addHandler(fn, onMapHiddenHandlers)
-        end
+        end,
+        toggleMap = toggleMap,
     },
     eventHandlers = {
         [MOD_NAME .. "onMapMoved"] = onMapMoved,

@@ -1,5 +1,9 @@
 MENU: scripts/LivelyMap/colorpicker/register.lua
 
+# The ordering of these next two is critical.
+PLAYER: scripts/LivelyMap/register_actions.lua
+MENU: scripts/LivelyMap/menu_settings.lua
+
 GLOBAL: scripts/LivelyMap/mapdata.lua
 GLOBAL: scripts/LivelyMap/global.lua
 PLAYER: scripts/LivelyMap/player.lua
@@ -12,4 +16,3 @@ PLAYER: scripts/LivelyMap/icons/debug.lua
 PLAYER: scripts/LivelyMap/icons/detect.lua
 PLAYER: scripts/LivelyMap/icons/journey.lua
 PLAYER: scripts/LivelyMap/icons/marker.lua
-#PLAYER: scripts/LivelyMap/icons/redmountain.lua

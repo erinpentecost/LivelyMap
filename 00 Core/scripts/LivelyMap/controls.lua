@@ -41,17 +41,10 @@ local cameraInterface = require("openmw.interfaces").Camera
 local defaultHeight   = 200
 local defaultPitch    = 1
 
--- Exit the map when one of these triggers goes off:
-for _, exitTrigger in ipairs { "Journal", "Inventory", "GameMenu" } do
-    input.registerTriggerHandler(exitTrigger, async:callback(function()
-        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
-    end))
-end
-
-local stickDeadzone = 0.3
+local stickDeadzone   = 0.3
 
 -- Track inputs we need for navigating the map.
-local keys = {
+local keys            = {
     forward  = keytrack.NewKey("forward", function(dt)
         return input.isKeyPressed(input.KEY.UpArrow) or input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp)
     end),
