@@ -48,6 +48,8 @@ for _, exitTrigger in ipairs { "Journal", "Inventory", "GameMenu" } do
     end))
 end
 
+local stickDeadzone = 0.3
+
 -- Track inputs we need for navigating the map.
 local keys = {
     forward  = keytrack.NewKey("forward", function(dt)
@@ -55,15 +57,27 @@ local keys = {
     end),
     backward = keytrack.NewKey("backward", function(dt)
         return input.isKeyPressed(input.KEY.DownArrow) or
-        input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown)
+            input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown)
     end),
     left     = keytrack.NewKey("left", function(dt)
         return input.isKeyPressed(input.KEY.LeftArrow) or
-        input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft)
+            input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft)
     end),
     right    = keytrack.NewKey("right", function(dt)
         return input.isKeyPressed(input.KEY.RightArrow) or
-        input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight)
+            input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight)
+    end),
+
+    zoomIn   = keytrack.NewKey("zoomIn", function(dt)
+        return input.isKeyPressed(input.KEY.Equals) or
+            input.isKeyPressed(input.KEY.NP_Plus) or
+            input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone
+    end),
+
+    zoomOut  = keytrack.NewKey("zoomOUt", function(dt)
+        return input.isKeyPressed(input.KEY.Equals) or
+            input.isKeyPressed(input.KEY.NP_Plus) or
+            input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone
     end)
 }
 
@@ -551,23 +565,40 @@ local function onFrame(dt)
     end
     -- We lost the camera somehow.
     if camera.getMode() ~= camera.MODE.Static then
+        print("Lost camera control. Quitting map.")
         endCamera()
         return
     end
+
     -- Track inputs.
     keys.forward:update(dt)
     keys.backward:update(dt)
     keys.left:update(dt)
     keys.right:update(dt)
+    keys.zoomIn:update(dt)
+    keys.zoomOut:update(dt)
+
     -- If we have input, cancel trackPosition,
     -- then move the camera manually.
     -- Else, advance the camera toward tracked position.
-    local hasInput = keys.forward.pressed or keys.backward.pressed or keys.left.pressed or keys.right.pressed
+    local hasInput = false
+    for _, key in pairs(keys) do
+        if key.pressed then
+            hasInput = true
+            break
+        end
+    end
     if hasInput then
         local moveVec = (vecForward * keys.forward.analog +
             vecBackward * keys.backward.analog +
             vecRight * keys.right.analog +
             vecLeft * keys.left.analog):normalize() * moveSpeed * dt
+
+        if keys.zoomIn.pressed then
+            print("zooming in")
+        elseif keys.zoomOut.pressed then
+            print("zooming out")
+        end
 
         moveCamera({
             relativePosition = moveVec
