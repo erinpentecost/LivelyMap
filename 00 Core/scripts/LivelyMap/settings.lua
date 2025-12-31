@@ -34,6 +34,13 @@ local function init()
         permanentStorage = true,
         settings = {
             {
+                key = "psoUnlock",
+                name = "psoUnlockName",
+                description = "psoUnlockDescription",
+                default = false,
+                renderer = "checkbox",
+            },
+            {
                 key = "psoDepth",
                 name = "psoDepthName",
                 description = "psoDepthDescription",
@@ -50,13 +57,6 @@ local function init()
                 name = "psoPushdownOnlyName",
                 description = "psoPushdownOnlyDescription",
                 default = true,
-                renderer = "checkbox",
-            },
-            {
-                key = "psoUnlock",
-                name = "psoUnlockName",
-                description = "psoUnlockDescription",
-                default = false,
                 renderer = "checkbox",
             },
             {

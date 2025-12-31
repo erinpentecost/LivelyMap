@@ -34,8 +34,6 @@ settings.subscribe(async:callback(function(_, key)
 end))
 debugEnabled = settings.psoUnlock or settings.debug
 
-
-
 local debugIcons = {}
 local baseSize = util.vector2(32, 32)
 

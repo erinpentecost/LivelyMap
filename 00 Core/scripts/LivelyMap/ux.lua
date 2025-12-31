@@ -288,11 +288,26 @@ local menuBar = ui.create {
                 newMarkerButton,
                 myui.padWidget(10, 10),
                 journeyButton,
-                psoMenuButtons
+                settingCache.psoUnlock and psoMenuButtons or nil,
             }
         }
     }
 }
+
+settings.subscribe(async:callback(function(_, key)
+    if key == "psoUnlock" then
+        local idx = menuBar.layout.content["mainV"].content:indexOf(psoMenuButtons)
+        if settings[key] and not idx then
+            print("adding pso buttons. idx=" .. tostring(idx))
+            menuBar.layout.content["mainV"].content:add(psoMenuButtons)
+            menuBar:update()
+        elseif (not settings[key]) and idx then
+            print("removing pso buttons. idx=" .. tostring(idx))
+            menuBar.layout.content["mainV"].content[idx] = nil
+            menuBar:update()
+        end
+    end
+end))
 
 local mainWindow = ui.create {
     name = "worldmaproot",
