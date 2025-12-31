@@ -15,37 +15,38 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME        = require("scripts.LivelyMap.ns")
-local mutil           = require("scripts.LivelyMap.mutil")
-local putil           = require("scripts.LivelyMap.putil")
-local core            = require("openmw.core")
-local util            = require("openmw.util")
-local pself           = require("openmw.self")
-local aux_util        = require('openmw_aux.util')
-local myui            = require('scripts.LivelyMap.pcp.myui')
-local camera          = require("openmw.camera")
-local ui              = require("openmw.ui")
-local settings        = require("scripts.LivelyMap.settings")
-local async           = require("openmw.async")
-local interfaces      = require('openmw.interfaces')
-local storage         = require('openmw.storage')
-local h3cam           = require("scripts.LivelyMap.h3.cam")
+local MOD_NAME       = require("scripts.LivelyMap.ns")
+local mutil          = require("scripts.LivelyMap.mutil")
+local putil          = require("scripts.LivelyMap.putil")
+local core           = require("openmw.core")
+local util           = require("openmw.util")
+local pself          = require("openmw.self")
+local aux_util       = require('openmw_aux.util')
+local myui           = require('scripts.LivelyMap.pcp.myui')
+local camera         = require("openmw.camera")
+local ui             = require("openmw.ui")
+local settings       = require("scripts.LivelyMap.settings")
+local async          = require("openmw.async")
+local interfaces     = require('openmw.interfaces')
+local storage        = require('openmw.storage')
+local h3cam          = require("scripts.LivelyMap.h3.cam")
 
 ---@type MeshAnnotatedMapData?
-local currentMapData  = nil
+local currentMapData = nil
 
-local settingCache    = {
-    psoUnlock       = settings.psoUnlock,
-    psoDepth        = settings.psoDepth,
-    psoPushdownOnly = settings.psoPushdownOnly,
-    debug           = settings.debug,
-    palleteColor4   = settings.palleteColor4,
-    palleteColor5   = settings.palleteColor5,
+local settingCache   = {
+    psoUnlock       = settings.pso.psoUnlock,
+    psoDepth        = settings.pso.psoDepth,
+    psoPushdownOnly = settings.pso.psoPushdownOnly,
+    debug           = settings.main.debug,
+    palleteColor4   = settings.main.palleteColor4,
+    palleteColor5   = settings.main.palleteColor5,
 }
-local settingsChanged = false
-settings.subscribe(async:callback(function(_, key)
+settings.main.subscribe(async:callback(function(_, key)
     settingCache[key] = settings[key]
-    settingsChanged = true
+end))
+settings.pso.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings[key]
 end))
 
 ---@class Icon
@@ -233,19 +234,19 @@ local journeyButton = makeMenuButton("journeyButton", "textures/LivelyMap/journe
 
 local psoReduceDepthButton = makeMenuButton("psoReduceDepthButton", "textures/LivelyMap/minus-button.png",
     function()
-        settings.section:set("psoDepth", math.max(0, settingCache.psoDepth - 1))
+        settings.pso.section:set("psoDepth", math.max(0, settingCache.psoDepth - 1))
     end,
     psoButtonColors
 )
 local psoIncreaseDepthButton = makeMenuButton("psoIncreaseDepthButton", "textures/LivelyMap/plus-button.png",
     function()
-        settings.section:set("psoDepth", math.min(300, settingCache.psoDepth + 1))
+        settings.pso.section:set("psoDepth", math.min(300, settingCache.psoDepth + 1))
     end,
     psoButtonColors
 )
 local psoTogglePushdownButton = makeMenuButton("psoTogglePushdownButton", "textures/LivelyMap/pushdown-button.png",
     function()
-        settings.section:set("psoPushdownOnly", not settingCache.psoPushdownOnly)
+        settings.pso.section:set("psoPushdownOnly", not settingCache.psoPushdownOnly)
     end,
     psoButtonColors
 )
@@ -294,7 +295,7 @@ local menuBar = ui.create {
     }
 }
 
-settings.subscribe(async:callback(function(_, key)
+settings.pso.subscribe(async:callback(function(_, key)
     if key == "psoUnlock" then
         local idx = menuBar.layout.content["mainV"].content:indexOf(psoMenuButtons)
         if settings[key] and not idx then

@@ -26,13 +26,19 @@ local async      = require("openmw.async")
 local iutil      = require("scripts.LivelyMap.icons.iutil")
 
 
-local debugEnabled = false
-settings.subscribe(async:callback(function(_, key)
-    if key == "psoUnlock" or key == "debug" then
-        debugEnabled = settings.psoUnlock or settings.debug
+local debugEnabled = settings.main.debug
+settings.main.subscribe(async:callback(function(_, key)
+    if key == "debug" then
+        debugEnabled = settings.main.debug
     end
 end))
-debugEnabled = settings.psoUnlock or settings.debug
+
+local psoUnlocked = settings.pso.psoUnlock
+settings.main.subscribe(async:callback(function(_, key)
+    if key == "psoUnlock" then
+        psoUnlocked = settings.pso.psoUnlock
+    end
+end))
 
 local debugIcons = {}
 local baseSize = util.vector2(32, 32)
@@ -61,7 +67,7 @@ local function makeDebugPips()
                     }
                 }
                 local worldPos = function()
-                    if not debugEnabled then
+                    if not (debugEnabled or psoUnlocked) then
                         return nil
                     end
                     local origin = pself.position + offset
@@ -79,7 +85,7 @@ local function makeDebugPips()
                     pos = worldPos,
                     ---@param posData ViewportData
                     onDraw = function(_, posData)
-                        if not debugEnabled then
+                        if not (debugEnabled or psoUnlocked) then
                             element.layout.props.visible = false
                             return
                         end

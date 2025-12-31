@@ -169,6 +169,14 @@ local psoContainer = {
 }
 setmetatable(psoContainer, lookupFuncTable)
 
+---@alias SettingContainer table
+
+---@class Settings
+---@field init fun()
+---@field main SettingContainer
+---@field pso SettingContainer
+
+---@type Settings
 return {
     init = init,
     main = mainContainer,
