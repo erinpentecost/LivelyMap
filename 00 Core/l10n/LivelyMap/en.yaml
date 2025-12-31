@@ -4,12 +4,12 @@ settings: "Settings"
 
 map: "Map"
 
+psoUnlockName: "Parallax Calibration Mode"
+psoUnlockDescription: "Turn this on to enable parallax calibration mode. You MUST CALIBRATE your settingss if you are using a parallax shader, or the icons will seem floaty and not glued to the ground. This will add some buttons to the map that let you adjust Parallax Depth and Parallax Pushdown Only instantly. It also adds some debug pips so you can see the effect of your changes."
 psoDepthName: "Parallax Depth"
-psoDepthDescription: "How deep to offset icons on the world map. Relates to you parallax shader. If the icons on the map seem 'floaty', or not glued to the ground, try adjusting this value."
+psoDepthDescription: "How deep to offset icons on the world map. Relates to your parallax shader and screen size."
 psoPushdownOnlyName: "Parallax Pushdown Only"
 psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
-psoUnlockName: "Unlock Parallax"
-psoUnlockDescription: "TODO: mouse wheel changes parallax depth instead of zooming"
 
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."

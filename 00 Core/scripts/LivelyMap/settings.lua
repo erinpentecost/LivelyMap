@@ -34,10 +34,17 @@ local function init()
         permanentStorage = true,
         settings = {
             {
+                key = "psoUnlock",
+                name = "psoUnlockName",
+                description = "psoUnlockDescription",
+                default = false,
+                renderer = "checkbox",
+            },
+            {
                 key = "psoDepth",
                 name = "psoDepthName",
                 description = "psoDepthDescription",
-                default = 30,
+                default = 0,
                 renderer = "number",
                 argument = {
                     integer = true,
@@ -50,13 +57,6 @@ local function init()
                 name = "psoPushdownOnlyName",
                 description = "psoPushdownOnlyDescription",
                 default = true,
-                renderer = "checkbox",
-            },
-            {
-                key = "psoUnlock",
-                name = "psoUnlockName",
-                description = "psoUnlockDescription",
-                default = false,
                 renderer = "checkbox",
             },
             {
@@ -121,6 +121,8 @@ local lookupFuncTable = {
             return function(callback)
                 return table.section.subscribe(table.section, callback)
             end
+        elseif key == "section" then
+            return table.section
         end
         -- fall through to settings section
         local val = table.section:get(key)

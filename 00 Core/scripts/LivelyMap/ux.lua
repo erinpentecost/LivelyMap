@@ -34,11 +34,12 @@ local h3cam           = require("scripts.LivelyMap.h3.cam")
 ---@type MeshAnnotatedMapData?
 local currentMapData  = nil
 
--- psoDepth determines how much to offset icons on the map.
 local settingCache    = {
+    psoUnlock       = settings.psoUnlock,
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
     debug           = settings.debug,
+    palleteColor4   = settings.palleteColor4,
     palleteColor5   = settings.palleteColor5,
 }
 local settingsChanged = false
@@ -177,15 +178,43 @@ local iconContainer = ui.create {
     content = ui.content {},
 }
 
-local buttonColors = {
+local normalButtonColors = {
     default = settingCache.palleteColor5,
     over = mutil.lerpColor(settingCache.palleteColor5, util.color.rgb(1, 1, 1), 0.3),
     pressed = mutil.lerpColor(settingCache.palleteColor5, util.color.rgb(1, 1, 1), 0.5),
 }
+local psoButtonColors = {
+    default = settingCache.palleteColor4,
+    over = mutil.lerpColor(settingCache.palleteColor4, util.color.rgb(1, 1, 1), 0.3),
+    pressed = mutil.lerpColor(settingCache.palleteColor4, util.color.rgb(1, 1, 1), 0.5),
+}
 
 local menuBarButtonSize = util.vector2(32, 32)
 
-local newMarkerButton = ui.create {}
+local function makeMenuButton(name, path, fn, buttonColors)
+    local newButton = ui.create {}
+    newButton.layout = myui.createButton(newButton,
+        {
+            name = name,
+            type = ui.TYPE.Image,
+            props = {
+                anchor = util.vector2(0.5, 0.5),
+                size = menuBarButtonSize,
+                resource = ui.texture {
+                    path = path,
+                },
+                color = buttonColors.default
+            },
+            userData = {}
+        },
+        function(layout, state)
+            layout.props.color = buttonColors[state]
+        end,
+        fn, nil)
+    newButton:update()
+    return newButton
+end
+
 local function markerButtonFn()
     print("markerbutton clicked")
     --- position is pretty accurate so converting it to a string
@@ -193,50 +222,47 @@ local function markerButtonFn()
     local newID = "custom_" .. tostring(pself.position.x) .. "_" .. tostring(pself.position.y)
     interfaces.LivelyMapMarker.editMarkerWindow({ id = newID })
 end
-newMarkerButton.layout = myui.createButton(newMarkerButton,
-    {
-        name = "markerButton",
-        type = ui.TYPE.Image,
-        props = {
-            anchor = util.vector2(0.5, 0.5),
-            size = menuBarButtonSize,
-            resource = ui.texture {
-                path = "textures/LivelyMap/marker-button.png",
-            },
-            color = buttonColors.default
-        },
-        userData = {}
-    },
-    function(layout, state)
-        layout.props.color = buttonColors[state]
-    end,
-    markerButtonFn, nil)
-newMarkerButton:update()
-
-local journeyButton = ui.create {}
+local newMarkerButton = makeMenuButton("markerButton", "textures/LivelyMap/marker-button.png", markerButtonFn,
+    normalButtonColors)
 local function journeyButtonFn()
     print("journeybutton clicked")
     interfaces.LivelyMapJourneyIcons.toggleJourney()
 end
-journeyButton.layout = myui.createButton(journeyButton,
-    {
-        name = "journeyButton",
-        type = ui.TYPE.Image,
-        props = {
-            anchor = util.vector2(0.5, 0.5),
-            size = menuBarButtonSize,
-            resource = ui.texture {
-                path = "textures/LivelyMap/journey-button.png",
-            },
-            color = buttonColors.default
-        },
-        userData = {}
-    },
-    function(layout, state)
-        layout.props.color = buttonColors[state]
+local journeyButton = makeMenuButton("journeyButton", "textures/LivelyMap/journey-button.png", journeyButtonFn,
+    normalButtonColors)
+
+local psoReduceDepthButton = makeMenuButton("psoReduceDepthButton", "textures/LivelyMap/minus-button.png",
+    function()
+        settings.section:set("psoDepth", math.max(0, settingCache.psoDepth - 1))
     end,
-    journeyButtonFn, nil)
-journeyButton:update()
+    psoButtonColors
+)
+local psoIncreaseDepthButton = makeMenuButton("psoIncreaseDepthButton", "textures/LivelyMap/plus-button.png",
+    function()
+        settings.section:set("psoDepth", math.min(300, settingCache.psoDepth + 1))
+    end,
+    psoButtonColors
+)
+local psoTogglePushdownButton = makeMenuButton("psoTogglePushdownButton", "textures/LivelyMap/pushdown-button.png",
+    function()
+        settings.section:set("psoPushdownOnly", not settingCache.psoPushdownOnly)
+    end,
+    psoButtonColors
+)
+
+local psoMenuButtons = ui.create {
+    name = 'psoMenuButtons',
+    type = ui.TYPE.Flex,
+    props = {
+        horizontal = true,
+    },
+    content = ui.content {
+        myui.padWidget(10, 10),
+        psoReduceDepthButton,
+        psoIncreaseDepthButton,
+        psoTogglePushdownButton,
+    }
+}
 
 local menuBar = ui.create {
     name = 'menuBar',
@@ -262,10 +288,26 @@ local menuBar = ui.create {
                 newMarkerButton,
                 myui.padWidget(10, 10),
                 journeyButton,
+                settingCache.psoUnlock and psoMenuButtons or nil,
             }
         }
     }
 }
+
+settings.subscribe(async:callback(function(_, key)
+    if key == "psoUnlock" then
+        local idx = menuBar.layout.content["mainV"].content:indexOf(psoMenuButtons)
+        if settings[key] and not idx then
+            print("adding pso buttons. idx=" .. tostring(idx))
+            menuBar.layout.content["mainV"].content:add(psoMenuButtons)
+            menuBar:update()
+        elseif (not settings[key]) and idx then
+            print("removing pso buttons. idx=" .. tostring(idx))
+            menuBar.layout.content["mainV"].content[idx] = nil
+            menuBar:update()
+        end
+    end
+end))
 
 local mainWindow = ui.create {
     name = "worldmaproot",
