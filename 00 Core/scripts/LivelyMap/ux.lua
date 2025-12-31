@@ -22,6 +22,7 @@ local core            = require("openmw.core")
 local util            = require("openmw.util")
 local pself           = require("openmw.self")
 local aux_util        = require('openmw_aux.util')
+local myui            = require('scripts.LivelyMap.pcp.myui')
 local camera          = require("openmw.camera")
 local ui              = require("openmw.ui")
 local settings        = require("scripts.LivelyMap.settings")
@@ -38,6 +39,7 @@ local settingCache    = {
     psoDepth        = settings.psoDepth,
     psoPushdownOnly = settings.psoPushdownOnly,
     debug           = settings.debug,
+    palleteColor5   = settings.palleteColor5,
 }
 local settingsChanged = false
 settings.subscribe(async:callback(function(_, key)
@@ -72,7 +74,7 @@ end
 local hoverBox = ui.create {
     name = 'hoverBox',
     type = ui.TYPE.Container,
-    template = interfaces.MWUI.templates.boxSolid,
+    template = interfaces.MWUI.templates.boxTransparent,
     props = {
         --relativePosition = util.vector2(0.5, 0.5),
         --size = util.vector2(200, 50),
@@ -175,6 +177,96 @@ local iconContainer = ui.create {
     content = ui.content {},
 }
 
+local buttonColors = {
+    default = settingCache.palleteColor5,
+    over = mutil.lerpColor(settingCache.palleteColor5, util.color.rgb(1, 1, 1), 0.3),
+    pressed = mutil.lerpColor(settingCache.palleteColor5, util.color.rgb(1, 1, 1), 0.5),
+}
+
+local menuBarButtonSize = util.vector2(32, 32)
+
+local newMarkerButton = ui.create {}
+local function markerButtonFn()
+    print("markerbutton clicked")
+    --- position is pretty accurate so converting it to a string
+    --- is basically random
+    local newID = "custom_" .. tostring(pself.position.x) .. "_" .. tostring(pself.position.y)
+    interfaces.LivelyMapMarker.editMarkerWindow({ id = newID })
+end
+newMarkerButton.layout = myui.createButton(newMarkerButton,
+    {
+        name = "markerButton",
+        type = ui.TYPE.Image,
+        props = {
+            anchor = util.vector2(0.5, 0.5),
+            size = menuBarButtonSize,
+            resource = ui.texture {
+                path = "textures/LivelyMap/marker-button.png",
+            },
+            color = buttonColors.default
+        },
+        userData = {}
+    },
+    function(layout, state)
+        layout.props.color = buttonColors[state]
+    end,
+    markerButtonFn, nil)
+newMarkerButton:update()
+
+local journeyButton = ui.create {}
+local function journeyButtonFn()
+    print("journeybutton clicked")
+    interfaces.LivelyMapJourneyIcons.toggleJourney()
+end
+journeyButton.layout = myui.createButton(journeyButton,
+    {
+        name = "journeyButton",
+        type = ui.TYPE.Image,
+        props = {
+            anchor = util.vector2(0.5, 0.5),
+            size = menuBarButtonSize,
+            resource = ui.texture {
+                path = "textures/LivelyMap/journey-button.png",
+            },
+            color = buttonColors.default
+        },
+        userData = {}
+    },
+    function(layout, state)
+        layout.props.color = buttonColors[state]
+    end,
+    journeyButtonFn, nil)
+journeyButton:update()
+
+local menuBar = ui.create {
+    name = 'menuBar',
+    type = ui.TYPE.Container,
+    template = interfaces.MWUI.templates.boxTransparent,
+    props = {
+        --relativePosition = util.vector2(0.5, 0.5),
+        --size = util.vector2(200, 50),
+        --anchor = util.vector2(0.5, 0.5),
+        relativePosition = util.vector2(0.5, 0.0),
+        anchor = util.vector2(0.5, 0),
+        visible = true,
+        propagateEvents = false,
+    },
+    content = ui.content {
+        {
+            name = 'mainV',
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+            },
+            content = ui.content {
+                newMarkerButton,
+                myui.padWidget(10, 10),
+                journeyButton,
+            }
+        }
+    }
+}
+
 local mainWindow = ui.create {
     name = "worldmaproot",
     layer = 'Windows',
@@ -188,7 +280,7 @@ local mainWindow = ui.create {
         mouseRelease = async:callback(mapClickRelease),
         mouseMove = async:callback(mapMouseMove),
     },
-    content = ui.content { iconContainer, hoverBox },
+    content = ui.content { iconContainer, hoverBox, menuBar },
 }
 
 --- Change hover box content.
@@ -470,7 +562,11 @@ local function registerIcon(icon)
     elseif type(icon.priority) ~= "number" then
         error("icon.priority must be a number")
     end
-    local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.priority end) or 1
+    local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.priority end)
+
+    if settingCache.debug then
+        print("Inserted at index " .. tostring(insertIndex) .. " of " .. tostring(#icons) .. ".")
+    end
 
     table.insert(icons, insertIndex, {
         -- onScreen exists so we don't call onHide every frame.
@@ -483,6 +579,7 @@ local function registerIcon(icon)
 
     icon.onHide(icon)
     iconContainer.layout.content:insert(insertIndex, icon.element)
+    iconContainer:update()
 
     return name
 end
@@ -524,6 +621,6 @@ return {
     },
     engineHandlers = {
         onUpdate = onUpdate,
-        onConsoleCommand = onConsoleCommand,
+        onConsoleCommand = onConsoleCommand
     }
 }

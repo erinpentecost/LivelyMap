@@ -479,7 +479,7 @@ return {
     textColors = textColors,
     createTextButton = createTextButton,
     createTextButtonBorderless = createTextButtonBorderless,
-    createImageButton = createImageButton,
+    createButton = createButton,
     disableWidget = disableWidget,
     enableWidget = enableWidget,
 }

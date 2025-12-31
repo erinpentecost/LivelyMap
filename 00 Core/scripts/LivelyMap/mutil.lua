@@ -205,13 +205,13 @@ end
 --- Returns true if the element satisfies the search condition.
 --- This function will find the *first* index for which predicate(item) == true.
 ---
----@return integer? index
+---@return integer index
 --- The lowest index i such that predicate(arr[i]) is true.
---- Returns nil if the predicate is false for all elements.
+--- Returns #arr+1 if the predicate is false for all elements.
 local function binarySearchFirst(arr, predicate)
     local lo = 1
     local hi = #arr
-    local result = nil
+    local result = #arr + 1
 
     -- Standard binary search over a monotonic predicate.
     -- Invariant:
@@ -229,6 +229,10 @@ local function binarySearchFirst(arr, predicate)
             -- mid does not satisfy the predicate; discard left half
             lo = mid + 1
         end
+    end
+
+    if result == 0 then
+        error("binarySearchFirst returned 0")
     end
 
     return result
