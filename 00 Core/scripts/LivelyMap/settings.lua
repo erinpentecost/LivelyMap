@@ -15,14 +15,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces   = require("openmw.interfaces")
-local storage      = require("openmw.storage")
-local MOD_NAME     = require("scripts.LivelyMap.ns")
-local util         = require('openmw.util')
-local input        = require('openmw.input')
+local interfaces               = require("openmw.interfaces")
+local storage                  = require("openmw.storage")
+local MOD_NAME                 = require("scripts.LivelyMap.ns")
+local util                     = require('openmw.util')
+local input                    = require('openmw.input')
 
-local psoGroupKey  = "Settings/" .. MOD_NAME .. "/pso"
-local mainGroupKey = "Settings/" .. MOD_NAME
+local psoGroupKey              = "Settings/" .. MOD_NAME .. "/pso"
+local controlsGroupKey         = "Settings/" .. MOD_NAME .. "/controls"
+local mainGroupKey             = "Settings/" .. MOD_NAME
+
+local toggleMapWindowActionKey = MOD_NAME .. "_ToggleMapWindow"
 
 local function init()
     interfaces.Settings.registerPage {
@@ -33,7 +36,7 @@ local function init()
     }
 
     input.registerAction {
-        key = MOD_NAME .. "_ToggleMapWindow",
+        key = toggleMapWindowActionKey,
         type = input.ACTION_TYPE.Boolean,
         l10n = MOD_NAME,
         defaultValue = false,
@@ -72,6 +75,27 @@ local function init()
                 description = "psoPushdownOnlyDescription",
                 default = true,
                 renderer = "checkbox",
+            },
+        }
+    }
+
+    interfaces.Settings.registerGroup {
+        key = controlsGroupKey,
+        page = MOD_NAME,
+        l10n = MOD_NAME,
+        name = "controlsName",
+        description = "controlsDescription",
+        permanentStorage = true,
+        settings = {
+            {
+                key = "k_" .. toggleMapWindowActionKey,
+                renderer = 'inputBinding',
+                name = 'toggleMapWindowKeyBind',
+                default = 'None1',
+                argument = {
+                    key = toggleMapWindowActionKey,
+                    type = 'action',
+                }
             },
         }
     }
@@ -171,6 +195,13 @@ local psoContainer = {
 }
 setmetatable(psoContainer, lookupFuncTable)
 
+local controlsContainer = {
+    groupKey = controlsGroupKey,
+    section = storage.playerSection(controlsGroupKey)
+}
+setmetatable(controlsContainer, lookupFuncTable)
+
+
 ---@alias SettingContainer table
 
 ---@class Settings
@@ -183,4 +214,5 @@ return {
     init = init,
     main = mainContainer,
     pso = psoContainer,
+    controls = controlsContainer,
 }

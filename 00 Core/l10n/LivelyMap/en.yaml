@@ -13,6 +13,10 @@ psoDepthDescription: "How deep to offset icons on the world map. Relates to your
 psoPushdownOnlyName: "Parallax Pushdown Only"
 psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
 
+controlsName: "Controls"
+controlsDescription: "Mess with the controls here. Consult the README for how to use the map."
+toggleMapWindowKeyBind: "Toggle Map Window"
+
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."
 
