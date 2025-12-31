@@ -322,6 +322,11 @@ local function handleCollision(res)
 
         local absNewMapCenter = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, newMapCenter)
 
+        --- absNewMapCenter works great when there's sufficient overlap between the current tile and new tile.
+        --- But when there's basically no overlap, the camera is not really looking at anything.
+        --- This causes a lot of instability. So I need to slide the map tile over more so it's in view.
+        --- This will cause any current tracking to be offset, so I also need to cancel tracking.
+
         local showData = mutil.shallowMerge(newMap, {
             cellID = pself.cell.id,
             player = pself,
@@ -566,6 +571,16 @@ local function trackToWorldPosition(worldPos, duration, onEnd)
     trackPosition(camPos, duration, onEnd)
 end
 
+local function haltTracking()
+    if trackInfo.tracking then
+        trackInfo.movesResult.success = false
+        if trackInfo.onEnd then
+            trackInfo.onEnd(trackInfo.movesResult)
+        end
+    end
+    trackInfo.tracking = false
+end
+
 local vecForward = util.vector3(0, 1, 0)
 local vecBackward = vecForward * -1
 local vecRight = util.vector3(1, 0, 0)
@@ -627,13 +642,8 @@ local function onFrame(dt)
             relativePosition = moveVec
         })
         -- Interrupt tracking
-        if trackInfo.tracking then
-            trackInfo.movesResult.success = false
-            if trackInfo.onEnd then
-                trackInfo.onEnd(trackInfo.movesResult)
-            end
-        end
-        trackInfo.tracking = false
+        haltTracking()
+        -- clear hoverbox
         interfaces.LivelyMapDraw.setHoverBoxContent()
     else
         advanceTracker()
@@ -652,6 +662,18 @@ local function onMapMoved(data)
         local camPos = worldPosToCameraPos(data.startWorldPosition)
         camPos.force = true
         moveCamera(camPos)
+    end
+
+    -- This is a tile swap. Let's make sure the map is visible.
+    if data.swapped then
+        local screenPositions = getScreenPositions()
+        local validPositions = screenPositionsValid(screenPositions)
+        if validPositions ~= 4 then
+            --- the map is not completely visible!
+            print("NEW MAP IS NOT TOTALLY VISIBLE!!!!!!")
+            haltTracking()
+            --- TODO: slide the camera over so the map is more visible
+        end
     end
 end
 
