@@ -225,8 +225,7 @@ end
 local cachedPos = {}
 --- Find the player's exterior location.
 --- If they are in an interior, find a door to an exit and use that position.
-local function getExteriorLocation(data)
-    local player = data.player
+local function getExteriorLocation(player)
     if player.cell.isExterior then
         return player.position
     end
@@ -265,10 +264,67 @@ local function getExteriorLocation(data)
     return cachedPos[player.cell.id]
 end
 
+
+local cachedMarkers = {}
+local markerRecords = {
+    northmarker = true,
+    templemarker = true,
+    divinemarker = true,
+    prisonmarker = true,
+    travelmarker = true,
+}
+local function onObjectActive(object)
+    if (not object.type) or (markerRecords[object.record]) then
+        -- openmw hack to get a NorthMarker reference.
+        -- NorthMarkers aren't available with cell:getAll().
+        -- Thanks S3ctor for the workaround. :)
+        if not cachedMarkers[object.cell.id] then
+            cachedMarkers[object.cell.id] = {}
+        end
+        table.insert(cachedMarkers[object.cell.id], object)
+    end
+end
+local function getMarkers(cell)
+    if cachedMarkers[cell.id] then
+        return cachedMarkers[cell.id]
+    else
+        return {}
+    end
+end
+
+local exteriorNorth = util.transform.identity
+local function getFacing(player)
+    -- Player forward vector
+    local forward = player.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
+    local northMarker = exteriorNorth
+    for _, o in ipairs(getMarkers(player.cell)) do
+        --print(o)
+        --print(o.recordId)
+        if o.recordId == "northmarker" then
+            northMarker = o.rotation:inverse()
+        end
+    end
+
+    -- Rotate into cardinal space
+    local cardinal = northMarker * forward
+    --print("northMarker: " .. aux_util.deepToString(northMarker, 3) .. ", forward: " .. tostring(forward))
+
+    -- Project to 2D
+    local v = util.vector2(cardinal.x, cardinal.y)
+    return v:length() > 0 and v:normalize() or v
+end
+
+
+--- This is a helper to get cell information for the player,
+--- since cell:getAll isn't available on local scripts.
 local function onGetExteriorLocation(data)
-    local result = getExteriorLocation(data)
+    local pos = getExteriorLocation(data.player)
+    local facing = getFacing(data.player)
     data.player:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
-        { x = result.x, y = result.y, z = result.z })
+        {
+            pos = { x = pos.x, y = pos.y, z = pos.z },
+            facing = { x = facing.x, y = facing.y, z = facing.z },
+        })
 end
 
 return {
@@ -281,5 +337,6 @@ return {
         onSave = onSave,
         onLoad = start,
         onInit = start,
+        onObjectActive = onObjectActive,
     }
 }

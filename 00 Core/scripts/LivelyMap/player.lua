@@ -219,7 +219,7 @@ local function addEntry()
         return
     end
     local tail = allData[playerName].paths[#(allData[playerName].paths)]
-    if pself.cell.isExterior then
+    if pself.cell.isExterior and tail.x and tail.y then
         -- also don't do anything if the distance is too close
         -- 7456540 is a third of cell length, squared
         if (util.vector2(entry.x, entry.y) - util.vector2(tail.x, tail.y)):length2() < 7456540 then
