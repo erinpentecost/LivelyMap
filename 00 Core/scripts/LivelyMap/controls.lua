@@ -589,6 +589,8 @@ local vecUp = util.vector3(0, 0, 1)
 local vecDown = vecUp * -1
 local moveSpeed = 100
 
+local newMapTileThisFrame = false
+
 local function onFrame(dt)
     -- Fake a duration if we're paused.
     if dt <= 0 then
@@ -612,6 +614,11 @@ local function onFrame(dt)
     keys.right:update(dt)
     keys.zoomIn:update(dt)
     keys.zoomOut:update(dt)
+
+    if newMapTileThisFrame then
+        newMapTileThisFrame = false
+        return
+    end
 
     -- If we have input, cancel trackPosition,
     -- then move the camera manually.
@@ -659,32 +666,41 @@ local function computeVisibilityCorrection(hits, bounds)
     local minY = bounds.bottomLeft.y
     local maxY = bounds.topLeft.y
 
-    local dxMin = 0
-    local dxMax = 0
-    local dyMin = 0
-    local dyMax = 0
+    local cx = 0
+    local cy = 0
+    local count = 0
 
+    -- Compute center of viewport on the map plane
     for _, h in pairs(hits) do
         if h.worldSpace then
-            local x = h.worldSpace.x
-            local y = h.worldSpace.y
-
-            if x < minX then
-                dxMin = math.max(dxMin, minX - x)
-            elseif x > maxX then
-                dxMax = math.min(dxMax, maxX - x)
-            end
-
-            if y < minY then
-                dyMin = math.max(dyMin, minY - y)
-            elseif y > maxY then
-                dyMax = math.min(dyMax, maxY - y)
-            end
+            cx = cx + h.worldSpace.x
+            cy = cy + h.worldSpace.y
+            count = count + 1
         end
     end
 
-    local dx = dxMin ~= 0 and dxMin or dxMax
-    local dy = dyMin ~= 0 and dyMin or dyMax
+    -- No valid intersection at all → nothing we can do
+    if count == 0 then
+        return nil
+    end
+
+    cx = cx / count
+    cy = cy / count
+
+    local dx = 0
+    local dy = 0
+
+    if cx < minX then
+        dx = minX - cx
+    elseif cx > maxX then
+        dx = maxX - cx
+    end
+
+    if cy < minY then
+        dy = minY - cy
+    elseif cy > maxY then
+        dy = maxY - cy
+    end
 
     if dx == 0 and dy == 0 then
         return nil
@@ -697,6 +713,7 @@ end
 local function onMapMoved(data)
     print("controls.onMapMoved")
     currentMapData = data
+    newMapTileThisFrame = true
     -- If this is not a swap, then this is a brand new map session.
     if not data.swapped and data.startWorldPosition then
         -- Orient the camera so starting position is in the center.
