@@ -376,7 +376,7 @@ local function moveCamera(data)
 
 
         -- clamp camera height
-        if newPos.z ~= currentPosition.z then
+        if currentMapData and (newPos.z ~= currentPosition.z) then
             local relativeZ = newPos.z - currentMapData.object.position.z
             if relativeZ < defaultHeight / 2 then
                 relativeZ = defaultHeight / 2
@@ -650,6 +650,49 @@ local function onFrame(dt)
     end
 end
 
+---@param hits ScreenHits
+---@param bounds any  -- currentMapData.safeBounds
+---@return util.vector3|nil
+local function computeVisibilityCorrection(hits, bounds)
+    local minX = bounds.bottomLeft.x
+    local maxX = bounds.bottomRight.x
+    local minY = bounds.bottomLeft.y
+    local maxY = bounds.topLeft.y
+
+    local dxMin = 0
+    local dxMax = 0
+    local dyMin = 0
+    local dyMax = 0
+
+    for _, h in pairs(hits) do
+        if h.worldSpace then
+            local x = h.worldSpace.x
+            local y = h.worldSpace.y
+
+            if x < minX then
+                dxMin = math.max(dxMin, minX - x)
+            elseif x > maxX then
+                dxMax = math.min(dxMax, maxX - x)
+            end
+
+            if y < minY then
+                dyMin = math.max(dyMin, minY - y)
+            elseif y > maxY then
+                dyMax = math.min(dyMax, maxY - y)
+            end
+        end
+    end
+
+    local dx = dxMin ~= 0 and dxMin or dxMax
+    local dy = dyMin ~= 0 and dyMin or dyMax
+
+    if dx == 0 and dy == 0 then
+        return nil
+    end
+
+    return util.vector3(dx, dy, 0)
+end
+
 
 local function onMapMoved(data)
     print("controls.onMapMoved")
@@ -672,7 +715,19 @@ local function onMapMoved(data)
             --- the map is not completely visible!
             print("NEW MAP IS NOT TOTALLY VISIBLE!!!!!!")
             haltTracking()
-            --- TODO: slide the camera over so the map is more visible
+            --- slide the camera over so the map is more visible
+            --- TODO: this jumps around like mad if you are zoomed out too much
+            local correction = computeVisibilityCorrection(
+                screenPositions,
+                currentMapData.safeBounds
+            )
+
+            if correction then
+                moveCamera({
+                    position = camera.getPosition() + correction,
+                    force = true
+                })
+            end
         end
     end
 end
