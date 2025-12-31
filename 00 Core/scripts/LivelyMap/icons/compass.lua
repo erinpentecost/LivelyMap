@@ -29,7 +29,6 @@ local settingCache = {
     palleteColor1 = settings.palleteColor1,
 }
 
--- "/home/ern/workspace/LivelyMap/cmd/h3/make_atlas.sh" -i  "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow.png" -o "/home/ern/workspace/LivelyMap/00 Core/textures/LivelyMap/arrow_atlas.dds" -r 20 -c 18
 local compassAtlas = imageAtlas.constructAtlas({
     totalTiles = 360,
     tilesPerRow = 18,
@@ -98,7 +97,7 @@ local compassIcon = {
         compassAtlas:getElement().layout.props.visible = false
         compassAtlas:getElement():update()
     end,
-    priority = 1000,
+    priority = 100,
 }
 
 compassAtlas:getElement().layout.events.mouseClick = async:callback(function()

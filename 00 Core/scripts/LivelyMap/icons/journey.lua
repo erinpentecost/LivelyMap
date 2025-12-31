@@ -159,7 +159,7 @@ local function makeIcons()
     if settingCache.drawLimitNeravarinesJourney then
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
         local oldestTime = core.getGameTime() - oldDuration
-        minimumIndex = mutil.binarySearchFirst(myPaths, function(p) return p.t > oldestTime end) or 1
+        minimumIndex = mutil.binarySearchFirst(myPaths, function(p) return p.t > oldestTime end)
         --- hard limit to 1000
         if #myPaths - minimumIndex > 1000 then
             minimumIndex = #myPaths - 1000

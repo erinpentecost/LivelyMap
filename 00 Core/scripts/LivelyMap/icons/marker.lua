@@ -176,14 +176,15 @@ local function registerMarkerIcon(data)
             icon.element.layout.props.visible = false
             icon.element:update()
         end,
-        priority = 10,
+        priority = 200,
     }
 
     local focusGain = function()
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
-        if registeredMarker.marker.note then
+        local note = registeredMarker.marker.note
+        if note and note ~= "" then
             interfaces.LivelyMapDraw.setHoverBoxContent(
-                iutil.hoverTextLayout(registeredMarker.marker.note, resolveColor(registeredMarker.marker.color))
+                iutil.hoverTextLayout(note, resolveColor(registeredMarker.marker.color))
             )
         end
     end
