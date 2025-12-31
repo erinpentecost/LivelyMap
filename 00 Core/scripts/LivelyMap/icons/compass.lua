@@ -107,13 +107,15 @@ local compassIcon = {
 
         compassAtlas:getElement().layout.props.size = baseSize * iutil.distanceScale(posData)
 
-        local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)
+        if posData.viewportFacing then
+            local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)
 
-        -- Convert to degrees, where 0° = East, 90° = North.
-        local deg = adjustedYaw(angle)
-        --print(deg .. " - " .. tostring(posData.viewportFacing))
+            -- Convert to degrees, where 0° = East, 90° = North.
+            local deg = adjustedYaw(angle)
+            --print(deg .. " - " .. tostring(posData.viewportFacing))
 
-        compassAtlas:setTile(deg)
+            compassAtlas:setTile(deg)
+        end
         compassAtlas:getElement():update()
         --print("compass onDraw done: " .. aux_util.deepToString(compassAtlas:getElement().layout.props))
     end,

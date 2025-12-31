@@ -74,7 +74,7 @@ local keys = {
             input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone
     end),
 
-    zoomOut  = keytrack.NewKey("zoomOUt", function(dt)
+    zoomOut  = keytrack.NewKey("zoomOut", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
             input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone
@@ -369,12 +369,29 @@ local function moveCamera(data)
         local screenPositions = getScreenPositions()
         local validPositions = screenPositionsValid(screenPositions)
 
+
+        -- clamp camera height
+        if newPos.z ~= currentPosition.z then
+            local relativeZ = newPos.z - currentMapData.object.position.z
+            if relativeZ < defaultHeight / 2 then
+                relativeZ = defaultHeight / 2
+            elseif relativeZ > defaultHeight * 3 then
+                relativeZ = defaultHeight * 3
+            end
+            newPos = util.vector3(newPos.x, newPos.y, relativeZ + currentMapData.object.position.z)
+        end
+
         if validPositions ~= 4 then
             --print("Map collision failure.")
+            -- Forbid zooming out on any collision.
+            if newPos.z > currentPosition.z then
+                newPos = util.vector3(newPos.x, newPos.y, currentPosition.z)
+            end
+
             if (not screenPositions.topLeft.hitMap) and (not screenPositions.topRight.hitMap) then
                 -- we are too far up.
                 if currentPosition.y <= newPos.y then
-                    newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+                    newPos = util.vector3(newPos.x, currentPosition.y, currentPosition.z)
                     out.success = false
                     out.northCollision = true
                 end
@@ -382,7 +399,7 @@ local function moveCamera(data)
             if (not screenPositions.bottomLeft.hitMap) and (not screenPositions.bottomRight.hitMap) then
                 -- we are too far down.
                 if currentPosition.y >= newPos.y then
-                    newPos = util.vector3(newPos.x, currentPosition.y, newPos.z)
+                    newPos = util.vector3(newPos.x, currentPosition.y, currentPosition.z)
                     out.success = false
                     out.southCollision = true
                 end
@@ -390,7 +407,7 @@ local function moveCamera(data)
             if (not screenPositions.topLeft.hitMap) and (not screenPositions.bottomLeft.hitMap) then
                 -- we are too far to the left
                 if currentPosition.x >= newPos.x then
-                    newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+                    newPos = util.vector3(currentPosition.x, newPos.y, currentPosition.z)
                     out.success = false
                     out.westCollision = true
                 end
@@ -398,7 +415,7 @@ local function moveCamera(data)
             if (not screenPositions.topRight.hitMap) and (not screenPositions.bottomRight.hitMap) then
                 -- we are too far to the right
                 if currentPosition.x <= newPos.x then
-                    newPos = util.vector3(currentPosition.x, newPos.y, newPos.z)
+                    newPos = util.vector3(currentPosition.x, newPos.y, currentPosition.z)
                     out.success = false
                     out.eastCollision = true
                 end
@@ -413,6 +430,7 @@ local function moveCamera(data)
     if data.yaw then
         camera.setYaw(util.clamp(data.yaw, 0.785, 1.4))
     end
+
     if newPos then
         camera.setStaticPosition(newPos)
     end
@@ -552,6 +570,8 @@ local vecForward = util.vector3(0, 1, 0)
 local vecBackward = vecForward * -1
 local vecRight = util.vector3(1, 0, 0)
 local vecLeft = vecRight * -1
+local vecUp = util.vector3(0, 0, 1)
+local vecDown = vecUp * -1
 local moveSpeed = 100
 
 local function onFrame(dt)
@@ -592,7 +612,10 @@ local function onFrame(dt)
         local moveVec = (vecForward * keys.forward.analog +
             vecBackward * keys.backward.analog +
             vecRight * keys.right.analog +
-            vecLeft * keys.left.analog):normalize() * moveSpeed * dt
+            vecLeft * keys.left.analog +
+            vecUp * keys.zoomOut.analog +
+            vecDown * keys.zoomIn.analog
+        ):normalize() * moveSpeed * dt
 
         if keys.zoomIn.pressed then
             print("zooming in")
