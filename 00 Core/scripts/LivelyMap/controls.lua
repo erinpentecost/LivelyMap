@@ -640,12 +640,6 @@ local function onFrame(dt)
             vecDown * keys.zoomIn.analog
         ):normalize() * moveSpeed * dt
 
-        if keys.zoomIn.pressed then
-            print("zooming in")
-        elseif keys.zoomOut.pressed then
-            print("zooming out")
-        end
-
         moveCamera({
             relativePosition = moveVec
         })

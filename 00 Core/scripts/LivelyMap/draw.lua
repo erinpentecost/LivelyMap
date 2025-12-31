@@ -466,7 +466,7 @@ local function onMapMoved(data)
     end
 
     if not data.swapped then
-        interfaces.UI.setMode('Interface', { windows = {} })
+        interfaces.UI.addMode('Interface', { windows = {} })
         mainWindow.layout.props.visible = true
         mainWindow:update()
     end
@@ -480,7 +480,7 @@ local function onMapHidden(data)
     end
 
     if not data.swapped then
-        interfaces.UI.setMode()
+        interfaces.UI.removeMode('Interface')
         mainWindow.layout.props.visible = false
         mainWindow:update()
     end
