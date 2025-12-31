@@ -219,15 +219,19 @@ local function addEntry()
         return
     end
     local tail = allData[playerName].paths[#(allData[playerName].paths)]
-    -- otherwise, don't do anything if the interior cell is the same.
-    if entry.c ~= nil and tail.c == entry.c then
-        return
+    if pself.cell.isExterior then
+        -- also don't do anything if the distance is too close
+        -- 7456540 is a third of cell length, squared
+        if (util.vector2(entry.x, entry.y) - util.vector2(tail.x, tail.y)):length2() < 7456540 then
+            return
+        end
+    else
+        -- otherwise, don't do anything if the interior cell is the same.
+        if entry.c ~= nil and tail.c == entry.c then
+            return
+        end
     end
-    -- also don't do anything if the distance is too close
-    -- 7456540 is a third of cell length, squared
-    if (util.vector2(entry.x, entry.y) - util.vector2(tail.x, tail.y)):length2() < 7456540 then
-        return
-    end
+
     -- ok, now add to the end of the list.
     table.insert(allData[playerName].paths, entry)
     table.insert(fromSave.paths, entry)

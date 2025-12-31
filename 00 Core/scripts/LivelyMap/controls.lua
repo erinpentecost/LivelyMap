@@ -545,6 +545,11 @@ local function onFrame(dt)
     if not originalCameraState then
         return
     end
+    -- We lost the camera somehow.
+    if camera.getMode() ~= camera.MODE.Static then
+        endCamera()
+        return
+    end
     -- Track inputs.
     keys.forward:update(dt)
     keys.backward:update(dt)
@@ -602,7 +607,8 @@ local function onMapHidden(data)
 end
 
 local function onTeleported()
-    endCamera()
+    print("TODO: teleported, map camera might break")
+    --endCamera()
 end
 
 local function onLoad(data)
