@@ -15,22 +15,39 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces = require("openmw.interfaces")
-local storage    = require("openmw.storage")
-local MOD_NAME   = require("scripts.LivelyMap.ns")
-local util       = require('openmw.util')
+local interfaces               = require("openmw.interfaces")
+local storage                  = require("openmw.storage")
+local MOD_NAME                 = require("scripts.LivelyMap.ns")
+local util                     = require('openmw.util')
+local input                    = require('openmw.input')
+
+local psoGroupKey              = "Settings/" .. MOD_NAME .. "/pso"
+local controlsGroupKey         = "Settings/" .. MOD_NAME .. "/controls"
+local mainGroupKey             = "Settings/" .. MOD_NAME
+
+local toggleMapWindowActionKey = MOD_NAME .. "_ToggleMapWindow"
 
 local function init()
     interfaces.Settings.registerPage {
         key = MOD_NAME,
         l10n = MOD_NAME,
         name = "name",
+        description = "description",
     }
+
+    input.registerAction {
+        key = toggleMapWindowActionKey,
+        type = input.ACTION_TYPE.Boolean,
+        l10n = MOD_NAME,
+        defaultValue = false,
+    }
+
     interfaces.Settings.registerGroup {
-        key = "Settings" .. MOD_NAME,
+        key = psoGroupKey,
         page = MOD_NAME,
         l10n = MOD_NAME,
-        name = "settings",
+        name = "psoName",
+        description = "psoDescription",
         permanentStorage = true,
         settings = {
             {
@@ -59,6 +76,37 @@ local function init()
                 default = true,
                 renderer = "checkbox",
             },
+        }
+    }
+
+    interfaces.Settings.registerGroup {
+        key = controlsGroupKey,
+        page = MOD_NAME,
+        l10n = MOD_NAME,
+        name = "controlsName",
+        description = "controlsDescription",
+        permanentStorage = true,
+        settings = {
+            {
+                key = "k_" .. toggleMapWindowActionKey,
+                renderer = 'inputBinding',
+                name = 'toggleMapWindowKeyBind',
+                default = 'None1',
+                argument = {
+                    key = toggleMapWindowActionKey,
+                    type = 'action',
+                }
+            },
+        }
+    }
+
+    interfaces.Settings.registerGroup {
+        key = mainGroupKey,
+        page = MOD_NAME,
+        l10n = MOD_NAME,
+        name = "settings",
+        permanentStorage = true,
+        settings = {
             {
                 key = "extendDetectRange",
                 name = "extendDetectRangeName",
@@ -115,14 +163,15 @@ end
 
 local lookupFuncTable = {
     __index = function(table, key)
-        if key == "init" then
-            return init
-        elseif key == "subscribe" then
+        if key == "subscribe" then
             return function(callback)
+                print("Subscribed to " .. tostring(table.groupKey) .. ".")
                 return table.section.subscribe(table.section, callback)
             end
         elseif key == "section" then
             return table.section
+        elseif key == "groupKey" then
+            return table.groupKey
         end
         -- fall through to settings section
         local val = table.section:get(key)
@@ -134,10 +183,36 @@ local lookupFuncTable = {
     end,
 }
 
-local container = {
-    section = storage.playerSection("Settings" .. MOD_NAME)
+local mainContainer = {
+    groupKey = mainGroupKey,
+    section = storage.playerSection(mainGroupKey)
 }
---container.section:reset()
-setmetatable(container, lookupFuncTable)
+setmetatable(mainContainer, lookupFuncTable)
 
-return container
+local psoContainer = {
+    groupKey = psoGroupKey,
+    section = storage.playerSection(psoGroupKey)
+}
+setmetatable(psoContainer, lookupFuncTable)
+
+local controlsContainer = {
+    groupKey = controlsGroupKey,
+    section = storage.playerSection(controlsGroupKey)
+}
+setmetatable(controlsContainer, lookupFuncTable)
+
+
+---@alias SettingContainer table
+
+---@class Settings
+---@field init fun()
+---@field main SettingContainer
+---@field pso SettingContainer
+
+---@type Settings
+return {
+    init = init,
+    main = mainContainer,
+    pso = psoContainer,
+    controls = controlsContainer,
+}

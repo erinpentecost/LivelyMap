@@ -29,7 +29,7 @@ local core         = require('openmw.core')
 local types        = require('openmw.types')
 
 local settingCache = {
-    palleteColor1 = settings.palleteColor1,
+    palleteColor1 = settings.main.palleteColor1,
 }
 
 local compassAtlas = imageAtlas.constructAtlas({
@@ -45,8 +45,8 @@ compassAtlas:spawn({
     events = {},
 })
 
-settings.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+settings.main.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.main[key]
     if key == "palleteColor1" then
         compassAtlas:getElement().layout.props.color = settingCache.palleteColor1
         compassAtlas:getElement():update()

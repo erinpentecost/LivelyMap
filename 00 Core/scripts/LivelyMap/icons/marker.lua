@@ -33,15 +33,15 @@ local localization = core.l10n(MOD_NAME)
 local ambient      = require('openmw.ambient')
 
 local settingCache = {
-    palleteColor1 = settings.palleteColor1,
-    palleteColor2 = settings.palleteColor2,
-    palleteColor3 = settings.palleteColor3,
-    palleteColor4 = settings.palleteColor4,
-    palleteColor5 = settings.palleteColor5,
-    debug = settings.debug,
+    palleteColor1 = settings.main.palleteColor1,
+    palleteColor2 = settings.main.palleteColor2,
+    palleteColor3 = settings.main.palleteColor3,
+    palleteColor4 = settings.main.palleteColor4,
+    palleteColor5 = settings.main.palleteColor5,
+    debug = settings.main.debug,
 }
-settings.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+settings.main.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.main[key]
 end))
 
 local markerData = storage.playerSection(MOD_NAME .. "_markerData")

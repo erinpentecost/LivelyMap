@@ -64,7 +64,6 @@ function KeyFunctions.update(self, dt)
     end
 
     if newBooleanState ~= self.pressed then
-        --settings.debugPrint("key " .. self.name .. ": " .. tostring(self.pressed) .. "->" .. tostring(newBooleanState))
         self.pressed = newBooleanState
         if newBooleanState then
             self.rise = true
@@ -74,9 +73,6 @@ function KeyFunctions.update(self, dt)
             self.fall = true
         end
     else
-        --[[if self.rise or self.fall then
-            settings.debugPrint("key " .. self.name .. ": reset rise and fall")
-            end]]
         self.rise = false
         self.fall = false
     end

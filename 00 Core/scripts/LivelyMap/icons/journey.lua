@@ -31,13 +31,13 @@ local aux_util     = require('openmw_aux.util')
 local MOD_NAME     = require("scripts.LivelyMap.ns")
 
 local settingCache = {
-    palleteColor1 = settings.palleteColor1,
-    palleteColor2 = settings.palleteColor2,
-    drawLimitNeravarinesJourney = settings.drawLimitNeravarinesJourney,
-    debug = settings.debug,
+    palleteColor1 = settings.main.palleteColor1,
+    palleteColor2 = settings.main.palleteColor2,
+    drawLimitNeravarinesJourney = settings.main.drawLimitNeravarinesJourney,
+    debug = settings.main.debug,
 }
-settings.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+settings.main.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.main[key]
 end))
 
 
@@ -143,7 +143,7 @@ local function makeIcon(startIdx)
     icon.pool = iconPool
     table.insert(pathIcons, icon)
 
-    if settings.debug then
+    if settings.main.debug then
         local registered = interfaces.LivelyMapDraw.getIcon(name)
         print("post-register: " .. aux_util.deepToString(registered, 2))
         print(aux_util.deepToString(registered.ref.element.layout, 3))

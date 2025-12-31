@@ -31,15 +31,15 @@ local aux_util     = require('openmw_aux.util')
 local settings     = require("scripts.LivelyMap.settings")
 
 local settingCache = {
-    palleteColor2 = settings.palleteColor2,
-    palleteColor3 = settings.palleteColor3,
-    palleteColor4 = settings.palleteColor4,
-    extendDetectRange = settings.extendDetectRange,
-    debug = settings.debug,
+    palleteColor2 = settings.main.palleteColor2,
+    palleteColor3 = settings.main.palleteColor3,
+    palleteColor4 = settings.main.palleteColor4,
+    extendDetectRange = settings.main.extendDetectRange,
+    debug = settings.main.debug,
 }
 
-settings.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+settings.main.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.main[key]
 end))
 
 

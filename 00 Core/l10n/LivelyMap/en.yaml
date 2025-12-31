@@ -1,15 +1,21 @@
 name: "Lively Map"
-description: "Overworld map replacer."
+description: "Overworld map replacer. If your maps are pink, consult the README."
 settings: "Settings"
 
 map: "Map"
 
+psoName: "Parallax Shader Options"
+psoDescription: "You MUST CALIBRATE your settingss if you are using a parallax shader, or the icons will seem floaty and not glued to the ground."
 psoUnlockName: "Parallax Calibration Mode"
-psoUnlockDescription: "Turn this on to enable parallax calibration mode. You MUST CALIBRATE your settingss if you are using a parallax shader, or the icons will seem floaty and not glued to the ground. This will add some buttons to the map that let you adjust Parallax Depth and Parallax Pushdown Only instantly. It also adds some debug pips so you can see the effect of your changes."
+psoUnlockDescription: "This will add some buttons to the map that let you adjust Parallax Depth and Parallax Pushdown Only instantly. It also adds some debug pips so you can see the effect of your changes."
 psoDepthName: "Parallax Depth"
-psoDepthDescription: "How deep to offset icons on the world map. Relates to your parallax shader and screen size."
+psoDepthDescription: "How deep to offset icons on the world map. Relates to your parallax shader and screen size. I personally set this to 50 when using Liam Mello's."
 psoPushdownOnlyName: "Parallax Pushdown Only"
 psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
+
+controlsName: "Controls"
+controlsDescription: "Mess with the controls here. Consult the README for how to use the map."
+toggleMapWindowKeyBind: "Toggle Map Window"
 
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."
