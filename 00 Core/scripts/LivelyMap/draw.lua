@@ -42,11 +42,12 @@ local settingCache   = {
     palleteColor4   = settings.main.palleteColor4,
     palleteColor5   = settings.main.palleteColor5,
 }
+print("first run settings:" .. aux_util.deepToString(settingCache, 5))
 settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+    settingCache[key] = settings.main[key]
 end))
 settings.pso.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+    settingCache[key] = settings.pso[key]
 end))
 
 ---@class Icon
@@ -297,12 +298,13 @@ local menuBar = ui.create {
 
 settings.pso.subscribe(async:callback(function(_, key)
     if key == "psoUnlock" then
+        print("psoUnlock changed")
         local idx = menuBar.layout.content["mainV"].content:indexOf(psoMenuButtons)
-        if settings[key] and not idx then
+        if settings.pso[key] and not idx then
             print("adding pso buttons. idx=" .. tostring(idx))
             menuBar.layout.content["mainV"].content:add(psoMenuButtons)
             menuBar:update()
-        elseif (not settings[key]) and idx then
+        elseif (not settings.pso[key]) and idx then
             print("removing pso buttons. idx=" .. tostring(idx))
             menuBar.layout.content["mainV"].content[idx] = nil
             menuBar:update()

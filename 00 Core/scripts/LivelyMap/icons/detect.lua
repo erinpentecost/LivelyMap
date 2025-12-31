@@ -39,7 +39,7 @@ local settingCache = {
 }
 
 settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+    settingCache[key] = settings.main[key]
 end))
 
 

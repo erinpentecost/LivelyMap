@@ -46,7 +46,7 @@ compassAtlas:spawn({
 })
 
 settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+    settingCache[key] = settings.main[key]
     if key == "palleteColor1" then
         compassAtlas:getElement().layout.props.color = settingCache.palleteColor1
         compassAtlas:getElement():update()

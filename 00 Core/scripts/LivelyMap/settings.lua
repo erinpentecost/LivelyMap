@@ -29,6 +29,7 @@ local function init()
         key = MOD_NAME,
         l10n = MOD_NAME,
         name = "name",
+        description = "description",
     }
 
     input.registerAction {
@@ -140,6 +141,7 @@ local lookupFuncTable = {
     __index = function(table, key)
         if key == "subscribe" then
             return function(callback)
+                print("Subscribed to " .. tostring(table.groupKey) .. ".")
                 return table.section.subscribe(table.section, callback)
             end
         elseif key == "section" then

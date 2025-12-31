@@ -1,5 +1,5 @@
 name: "Lively Map"
-description: "Overworld map replacer."
+description: "Overworld map replacer. If your maps are pink, consult the README."
 settings: "Settings"
 
 map: "Map"
@@ -9,7 +9,7 @@ psoDescription: "You MUST CALIBRATE your settingss if you are using a parallax s
 psoUnlockName: "Parallax Calibration Mode"
 psoUnlockDescription: "This will add some buttons to the map that let you adjust Parallax Depth and Parallax Pushdown Only instantly. It also adds some debug pips so you can see the effect of your changes."
 psoDepthName: "Parallax Depth"
-psoDepthDescription: "How deep to offset icons on the world map. Relates to your parallax shader and screen size."
+psoDepthDescription: "How deep to offset icons on the world map. Relates to your parallax shader and screen size. I personally set this to 50 when using Liam Mello's."
 psoPushdownOnlyName: "Parallax Pushdown Only"
 psoPushdownOnlyDescription: "True for Liam Mello's shader. False for Wareya's."
 

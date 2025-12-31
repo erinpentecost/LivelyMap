@@ -41,7 +41,7 @@ local settingCache = {
     debug = settings.main.debug,
 }
 settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings[key]
+    settingCache[key] = settings.main[key]
 end))
 
 local markerData = storage.playerSection(MOD_NAME .. "_markerData")
