@@ -261,6 +261,7 @@ local function onUpdate(dt)
     end
 
     -- Only run about every second.
+    -- Don't run if we're paused, since nothing would move anyway.
     delay = delay - dt
     if delay > 0 then
         return

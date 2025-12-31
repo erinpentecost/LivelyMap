@@ -229,7 +229,7 @@ local function onUpdate(dt)
 
     -- Fake a duration if we're paused.
     if dt <= 0 then
-        dt = 1 / 60
+        dt = core.getRealFrameDuration()
     end
 
     for _, icon in ipairs(pathIcons) do
