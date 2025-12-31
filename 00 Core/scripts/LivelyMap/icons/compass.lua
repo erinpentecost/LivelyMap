@@ -63,28 +63,36 @@ local function adjustedYaw(deg)
     return util.clamp(util.round(yaw), 1, 360)
 end
 
-local cachedPos = nil
+local cached = {}
 interfaces.LivelyMapDraw.onMapMoved(function(mapData)
-    if not mapData.swapped then
+    if not mapData.swapped and not pself.cell.isExterior then
         core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", { player = pself })
     end
 end)
 local function onReceiveExteriorLocation(data)
-    cachedPos = util.vector3(data.x, data.y, data.z)
+    cached = {
+        pos = util.vector3(data.pos.x, data.pos.y, data.pos.z),
+        facing = util.vector2(data.facing.x, data.facing.y)
+    }
+    --print("onReceiveExteriorLocation: " .. aux_util.deepToString(cached, 3))
+    compassAtlas:getElement():update()
 end
-
 
 --- TODO: add an off-screen indicator for where you are
 local compassIcon = {
     element = compassAtlas:getElement(),
+    cached = {},
     pos = function()
         if pself.cell.isExterior then
             return pself.position
         end
-        return cachedPos
+        return cached.pos
     end,
     facing = function()
-        return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
+        if pself.cell.isExterior then
+            return pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
+        end
+        return cached.facing
     end,
     ---@param posData ViewportData
     onDraw = function(_, posData)
