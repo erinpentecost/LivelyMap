@@ -26,6 +26,40 @@ local core       = require("openmw.core")
 local util       = require("openmw.util")
 local pself      = require("openmw.self")
 
+local function splitString(str)
+    local out = {}
+    for item in str:gmatch("([^,%s]+)") do
+        table.insert(out, item)
+    end
+    return out
+end
+
+local function onConsoleCommand(mode, command, selectedObject)
+    local function getSuffixForCmd(prefix)
+        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
+            return string.sub(command, string.len(prefix) + 1)
+        else
+            return nil
+        end
+    end
+
+    local showMap = getSuffixForCmd("lua map")
+    if showMap ~= nil then
+        interfaces.LivelyMapDraw.toggleMap(true)
+    end
+
+    local editMarker = getSuffixForCmd("lua marker")
+    if editMarker ~= nil then
+        local id = splitString(editMarker)
+        print("Edit Marker: " .. aux_util.deepToString(id, 3))
+        if #id == 0 then
+            interfaces.LivelyMapMarker.editMarkerWindow({ id = "custom_" .. tostring(pself.cell.id) })
+        else
+            interfaces.LivelyMapMarker.editMarkerWindow({ id = tostring(id) })
+        end
+    end
+end
+
 local function init()
     local actionName = MOD_NAME .. "_ToggleMapWindow"
 
@@ -56,5 +90,6 @@ return {
     engineHandlers = {
         onInit = init,
         onLoad = init,
+        onConsoleCommand = onConsoleCommand,
     },
 }

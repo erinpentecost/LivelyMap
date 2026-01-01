@@ -115,13 +115,17 @@ local function newDetectIcon(path, color)
             element.layout.props.visible = false
             element:update()
         end,
+        groupable = true,
     }
 
     local focusGain = function()
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         if icon.entity then
             interfaces.LivelyMapDraw.setHoverBoxContent(
-                iutil.hoverTextLayout(getRecord(icon.entity).name, color)
+                iutil.hoverTextLayout(
+                    getRecord(icon.entity).name,
+                    color,
+                    path)
             )
         end
     end

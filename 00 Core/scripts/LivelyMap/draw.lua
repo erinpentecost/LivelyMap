@@ -30,6 +30,7 @@ local async          = require("openmw.async")
 local interfaces     = require('openmw.interfaces')
 local storage        = require('openmw.storage')
 local h3cam          = require("scripts.LivelyMap.h3.cam")
+local overlapfinder  = require("scripts.LivelyMap.overlapfinder")
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -54,9 +55,16 @@ end))
 --- @field element any UI element.
 --- @field pos fun(icon: Icon): util.vector3?
 --- @field facing (fun(icon: Icon): util.vector2|util.vector3|nil)?
+--- This function should always set the size of the icon if it's visible.
+--- Additionally, the layout is expected to have:
+--- * an anchor value of (0.5,0.5)
+--- * position (not relativePosition)
+--- * size (not relativeSize)
 --- @field onDraw fun(icon: Icon, posData : ViewportData)
 --- @field onHide fun(icon: Icon)
 --- @field priority number? The higher the priority, the higher the layer.
+--- @field groupable boolean? If true, the icon may be grouped or adjusted if it collides with other icons.
+--- @field [string] any Other stuff might be crammed into this object. It's ok.
 
 ---@class RegisteredIcon
 --- @field onScreen boolean Exists so we don't call onHide every frame.
@@ -86,7 +94,20 @@ local hoverBox = ui.create {
         anchor = util.vector2(0.5, 1),
         visible = false
     },
-    content = ui.content {}
+    content = ui.content { {
+        name = 'padding',
+        type = ui.TYPE.Container,
+        template = interfaces.MWUI.templates.padding,
+        props = {
+            --relativePosition = util.vector2(0.5, 0.5),
+            --size = util.vector2(200, 50),
+            --anchor = util.vector2(0.5, 0.5),
+            --relativePosition = util.vector2(0.5, 0.9),
+            --anchor = util.vector2(0.5, 1),
+            --visible = false
+        },
+        content = ui.content {}
+    } }
 }
 
 local mouseData = {
@@ -332,13 +353,15 @@ local mainWindow = ui.create {
 ---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
 local function setHoverBoxContent(layout)
     if layout then
-        hoverBox.layout.content = ui.content { layout }
+        hoverBox.layout.content["padding"].content = ui.content { layout }
         hoverBox.layout.props.visible = true
     else
-        hoverBox.layout.content = ui.content {}
+        hoverBox.layout.content["padding"].content = ui.content {}
         hoverBox.layout.props.visible = false
     end
-    hoverBox:update()
+    if currentMapData then
+        hoverBox:update()
+    end
 end
 
 local function closeToCenter(viewportPos)
@@ -384,6 +407,49 @@ local function purgeRemovedIcons()
     end
 end
 
+
+---@param icon RegisteredIcon
+---@return RectExtent
+local function getIconExtent(icon)
+    -- assumes anchor is 0.5,0.5
+    local halfSize = icon.ref.element.layout.props.size / 2
+    return {
+        topLeft = icon.ref.element.layout.props.position - halfSize,
+        bottomRight = icon.ref.element.layout.props.position + halfSize,
+    }
+end
+
+---Modify the icon locations so they don't overlap so much.
+---@param iconList RegisteredIcon[]
+local function pushOverlappingIcons(iconList)
+    -- first, get center point of all icons
+    local firstPos = iconList[1].ref.element.layout.props.position
+    local centerX = firstPos.x
+    local centerY = firstPos.y
+    for i = 2, #iconList, 1 do
+        local pos = iconList[i].ref.element.layout.props.position
+        centerX = centerX + pos.x
+        centerY = centerY + pos.y
+    end
+    centerX = centerX / #iconList
+    centerY = centerY / #iconList
+    local center = util.vector2(centerX, centerY)
+    -- now I need direction vectors to slide each icon away from the others
+    -- if I just do (pos - center) it will get a pretty good result,
+    -- but for full overlaps this won't detangle them.
+    -- whatever I do, it needs to be deterministic so the icons
+    -- won't flicker
+    for _, icon in ipairs(iconList) do
+        if icon.ref.groupable then
+            local pos = icon.ref.element.layout.props.position
+            icon.ref.element.layout.props.position = pos +
+                ((pos - center):normalize() * icon.ref.element.layout.props.size.x * 0.3)
+            icon.ref.element.layout.props.size = icon.ref.element.layout.props.size * 0.8
+            icon.ref.element:update()
+        end
+    end
+end
+
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
@@ -396,6 +462,8 @@ local function renderIcons()
     purgeRemovedIcons()
 
     local screenSize = ui.screenSize()
+
+    local collisionFinder = overlapfinder.NewOverlapFinder(getIconExtent)
 
     -- Render all the icons.
     for _, icon in ipairs(icons) do
@@ -410,6 +478,7 @@ local function renderIcons()
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
                     icon.ref.onDraw(icon.ref, pos)
+                    collisionFinder:AddElement(icon)
                     goto continue
                 elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
@@ -421,6 +490,7 @@ local function renderIcons()
                         min.x <= screenSize.x and min.y <= screenSize.y then
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos)
+                        collisionFinder:AddElement(icon)
                         goto continue
                     end
                 end
@@ -430,6 +500,21 @@ local function renderIcons()
         :: continue ::
     end
 
+
+    --- do we need to combine any?
+    ---@type RegisteredIcon[][]
+    local overlaps = collisionFinder:GetOverlappingSubsets()
+    for _, subset in ipairs(overlaps) do
+        if #subset > 1 then
+            -- this is a set of atleast 2
+            --[[print("Colliding icons: ")
+            for _, elem in ipairs(subset) do
+                print("- " .. elem.name .. " " .. aux_util.deepToString(getIconExtent(elem), 3))
+            end]]
+            --- Now I have a list of all the icons that I need to combine.
+            pushOverlappingIcons(subset)
+        end
+    end
 
     iconContainer:update()
     mainWindow:update()
@@ -542,52 +627,14 @@ local function toggleMap(open)
         summonMap()
     elseif (not open) and (currentMapData ~= nil) then
         core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
-    end
-end
-
-local function splitString(str)
-    local out = {}
-    for item in str:gmatch("([^,%s]+)") do
-        table.insert(out, item)
-    end
-    return out
-end
-
-local function onConsoleCommand(mode, command, selectedObject)
-    local function getSuffixForCmd(prefix)
-        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
-            return string.sub(command, string.len(prefix) + 1)
-        else
-            return nil
-        end
-    end
-
-    local showMap = getSuffixForCmd("lua map")
-    if showMap ~= nil then
-        local id = splitString(showMap)
-        print("Show Map: " .. aux_util.deepToString(id, 3))
-
-        if #id == 0 then
-            id = nil
-            summonMap(nil)
-        else
-            summonMap(id[1])
-        end
-    end
-
-    local editMarker = getSuffixForCmd("lua marker")
-    if editMarker ~= nil then
-        local id = splitString(editMarker)
-        print("Edit Marker: " .. aux_util.deepToString(id, 3))
-        if #id == 0 then
-            interfaces.LivelyMapMarker.editMarkerWindow({ id = "custom_" .. tostring(pself.cell.id) })
-        else
-            interfaces.LivelyMapMarker.editMarkerWindow({ id = tostring(id) })
-        end
+        interfaces.LivelyMapMarker.editMarkerWindow(nil)
     end
 end
 
 local nextName = 0
+---comment
+---@param icon Icon
+---@return string The name of the icon.
 local function registerIcon(icon)
     if not icon then
         error("registerIcon icon is nil")
@@ -679,6 +726,5 @@ return {
     },
     engineHandlers = {
         onUpdate = onUpdate,
-        onConsoleCommand = onConsoleCommand
     }
 }

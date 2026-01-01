@@ -40,10 +40,6 @@ If you are using a parallax shader, the map will appear 3-dimensional! This is c
 
 ## Debugging
 
-### Show the Map
+To bring up the map, open your console and type `lua map`.
 
-While in-game, bring up your console and type `lua map`. Optionally provide a number from 0 to 7, inclusive (ex: `lua map 6`).
-
-### Make a Marker
-
-While in-game, bring up your console and type `lua marker`. Optionally provide an id (ex: `lua marker mymarker`). Markers will appear in the map.
+To bring up the map marker window, open your console and type `lua marker`. Optionally provide an id (ex: `lua marker mymarker`). Markers will appear in the map.

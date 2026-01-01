@@ -149,6 +149,7 @@ local function registerMarkerIcon(data)
         },
         events = {},
     }
+    ---@type RegisteredMarker
     local registeredMarker = {
         element = element,
         marker = data,
@@ -177,16 +178,19 @@ local function registerMarkerIcon(data)
             icon.element:update()
         end,
         priority = 200,
+        groupable = true,
     }
 
     local focusGain = function()
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         local note = registeredMarker.marker.note
-        if note and note ~= "" then
-            interfaces.LivelyMapDraw.setHoverBoxContent(
-                iutil.hoverTextLayout(note, resolveColor(registeredMarker.marker.color))
+        interfaces.LivelyMapDraw.setHoverBoxContent(
+            iutil.hoverTextLayout(
+                note,
+                resolveColor(registeredMarker.marker.color),
+                resolveStampFullPath(registeredMarker.marker.iconName)
             )
-        end
+        )
     end
 
     element.layout.events.focusGain = async:callback(focusGain)

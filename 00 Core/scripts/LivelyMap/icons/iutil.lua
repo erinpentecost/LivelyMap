@@ -37,17 +37,39 @@ local function distanceScale(posData)
     return util.remap(dist, 100, 500, max, 0.5)
 end
 
-local function hoverTextLayout(text, color)
+local function hoverTextLayout(text, color, path)
     return {
-        template = interfaces.MWUI.templates.textHeader,
-        type = ui.TYPE.Text,
-        alignment = ui.ALIGNMENT.End,
+        name = 'mainV',
+        type = ui.TYPE.Flex,
         props = {
-            textAlignV = ui.ALIGNMENT.Center,
-            relativePosition = util.vector2(0, 0.5),
-            text = text,
-            textSize = 20,
-            textColor = color or myui.interactiveTextColors.normal.default,
+            horizontal = true,
+        },
+        content = ui.content {
+            {
+                type = ui.TYPE.Image,
+                props = {
+                    relativePosition = util.vector2(0, 0.5),
+                    anchor = util.vector2(0.5, 0.5),
+                    size = util.vector2(20, 20),
+                    resource = ui.texture {
+                        path = path,
+                    },
+                    color = color,
+                }
+            },
+            text ~= "" and myui.padWidget(10, 0) or nil,
+            text ~= "" and {
+                template = interfaces.MWUI.templates.textHeader,
+                type = ui.TYPE.Text,
+                alignment = ui.ALIGNMENT.End,
+                props = {
+                    textAlignV = ui.ALIGNMENT.Center,
+                    relativePosition = util.vector2(0, 0.5),
+                    text = text,
+                    textSize = 20,
+                    textColor = color or myui.interactiveTextColors.normal.default,
+                }
+            } or nil,
         }
     }
 end

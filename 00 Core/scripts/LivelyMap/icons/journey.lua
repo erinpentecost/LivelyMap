@@ -51,25 +51,6 @@ local pathIcon     = "textures/LivelyMap/journey.png"
 
 local baseSize     = util.vector2(16, 16)
 
-
-local function attachDebugEventsToIcon(icon)
-    local focusGain = function()
-        interfaces.LivelyMapDraw.setHoverBoxContent(iutil.hoverTextLayout(
-            icon.element.layout.name .. ", path index: " .. tostring(icon.currentIdx))
-        )
-
-        --- I think the issue is that "freed" is passed by value or something
-        --[[local registered = interfaces.LivelyMapDraw.getIcon(icon.element.layout.name)
-        print(aux_util.deepToString(registered, 5))]]
-    end
-
-    icon.element.layout.events.focusGain = async:callback(focusGain)
-    icon.element.layout.events.focusLoss = async:callback(function()
-        interfaces.LivelyMapDraw.setHoverBoxContent()
-        return nil
-    end)
-end
-
 -- creates an unattached icon and registers it.
 local function newIcon()
     local element = ui.create {
@@ -116,9 +97,6 @@ local function newIcon()
         end,
         priority = -900,
     }
-    if settingCache.debug then
-        attachDebugEventsToIcon(icon)
-    end
     icon.element:update()
     interfaces.LivelyMapDraw.registerIcon(icon)
     return icon
