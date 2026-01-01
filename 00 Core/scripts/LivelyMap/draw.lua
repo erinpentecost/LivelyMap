@@ -545,48 +545,6 @@ local function toggleMap(open)
     end
 end
 
-local function splitString(str)
-    local out = {}
-    for item in str:gmatch("([^,%s]+)") do
-        table.insert(out, item)
-    end
-    return out
-end
-
-local function onConsoleCommand(mode, command, selectedObject)
-    local function getSuffixForCmd(prefix)
-        if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
-            return string.sub(command, string.len(prefix) + 1)
-        else
-            return nil
-        end
-    end
-
-    local showMap = getSuffixForCmd("lua map")
-    if showMap ~= nil then
-        local id = splitString(showMap)
-        print("Show Map: " .. aux_util.deepToString(id, 3))
-
-        if #id == 0 then
-            id = nil
-            summonMap(nil)
-        else
-            summonMap(id[1])
-        end
-    end
-
-    local editMarker = getSuffixForCmd("lua marker")
-    if editMarker ~= nil then
-        local id = splitString(editMarker)
-        print("Edit Marker: " .. aux_util.deepToString(id, 3))
-        if #id == 0 then
-            interfaces.LivelyMapMarker.editMarkerWindow({ id = "custom_" .. tostring(pself.cell.id) })
-        else
-            interfaces.LivelyMapMarker.editMarkerWindow({ id = tostring(id) })
-        end
-    end
-end
-
 local nextName = 0
 local function registerIcon(icon)
     if not icon then
@@ -679,6 +637,5 @@ return {
     },
     engineHandlers = {
         onUpdate = onUpdate,
-        onConsoleCommand = onConsoleCommand
     }
 }
