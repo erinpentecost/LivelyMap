@@ -55,6 +55,11 @@ end))
 --- @field element any UI element.
 --- @field pos fun(icon: Icon): util.vector3?
 --- @field facing (fun(icon: Icon): util.vector2|util.vector3|nil)?
+--- This function should always set the size of the icon if it's visible.
+--- Additionally, the layout is expected to have:
+--- * an anchor value of (0.5,0.5)
+--- * position (not relativePosition)
+--- * size (not relativeSize)
 --- @field onDraw fun(icon: Icon, posData : ViewportData)
 --- @field onHide fun(icon: Icon)
 --- @field priority number? The higher the priority, the higher the layer.
@@ -399,10 +404,24 @@ local function getIconExtent(icon)
     }
 end
 
----comment
+---Modify the icon locations so they don't overlap so much.
 ---@param icons RegisteredIcon[]
----@return any -- This is a UI element that represents a group of cramped icons.
-local function makeGroupedIconLayout(icons)
+local function pushOverlappingIcons(icons)
+    -- first, get center point of all icons
+    local firstPos = icons[1].ref.element.layout.props.position
+    local centerX = firstPos.x
+    local centerY = firstPos.y
+    for i = 2, #icons, 1 do
+        local pos = icons[1].ref.element.layout.props.position
+        centerX = centerX + pos.x
+        centerY = centerY + pos.y
+    end
+    centerX = centerX / #icons
+    centerY = centerY / #icons
+    -- now, shrink and push away all the groupable icons.
+    for _, icon in ipairs(icons) do
+
+    end
 end
 
 local function renderIcons()
@@ -585,6 +604,9 @@ local function toggleMap(open)
 end
 
 local nextName = 0
+---comment
+---@param icon Icon
+---@return string The name of the icon.
 local function registerIcon(icon)
     if not icon then
         error("registerIcon icon is nil")
