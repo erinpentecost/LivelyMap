@@ -558,6 +558,9 @@ local function onMapMoved(data)
             mainWindow:update()
         end
     end
+
+    setHoverBoxContent(nil)
+
     renderIcons()
 end
 
