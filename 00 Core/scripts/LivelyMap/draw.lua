@@ -478,7 +478,9 @@ local function renderIcons()
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
                     icon.ref.onDraw(icon.ref, pos)
-                    collisionFinder:AddElement(icon)
+                    if icon.ref.groupable then
+                        collisionFinder:AddElement(icon)
+                    end
                     goto continue
                 elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
@@ -490,7 +492,9 @@ local function renderIcons()
                         min.x <= screenSize.x and min.y <= screenSize.y then
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos)
-                        collisionFinder:AddElement(icon)
+                        if icon.ref.groupable then
+                            collisionFinder:AddElement(icon)
+                        end
                         goto continue
                     end
                 end
@@ -553,7 +557,9 @@ local function onMapMoved(data)
     if not data.swapped then
         interfaces.UI.addMode('Interface', { windows = {} })
         mainWindow.layout.props.visible = true
-        mainWindow:update()
+        if currentMapData then
+            mainWindow:update()
+        end
     end
     renderIcons()
 end
@@ -606,13 +612,15 @@ local function summonMap(id)
         mapData = mutil.getMap(id)
     end
 
+    local pos = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
+
     local showData = mutil.shallowMerge(mapData, {
         cellID = pself.cell.id,
         player = pself,
         startWorldPosition = {
-            x = pself.position.x,
-            y = pself.position.y,
-            z = pself.position.z,
+            x = pos.x,
+            y = pos.y,
+            z = pos.z,
         },
     })
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)

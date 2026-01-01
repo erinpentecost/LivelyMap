@@ -330,6 +330,7 @@ local function onGetExteriorLocation(data)
         {
             pos = { x = pos.x, y = pos.y, z = pos.z },
             facing = { x = facing.x, y = facing.y, z = facing.z },
+            args = data,
         })
 end
 

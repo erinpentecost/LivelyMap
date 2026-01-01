@@ -31,6 +31,8 @@ palleteColor3Name: "Pallete Color 3"
 palleteColor4Name: "Pallete Color 4"
 palleteColor5Name: "Pallete Color 5"
 
+markerNotAllowedMessage: "Can't place a marker here."
+
 marker: "Marker"
 markerNote: "Marker Note"
 saveButton: "Save"

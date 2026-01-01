@@ -639,23 +639,15 @@ stampMakerWindow = ui.create {
     } }
 }
 
---- cache exterior location if we are inside somewhere
-local cachedExtLocation = {}
-interfaces.LivelyMapDraw.onMapMoved(function(mapData)
-    if not mapData.swapped and not pself.cell.isExterior then
-        core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", { player = pself })
-    end
-end)
-local function onReceiveExteriorLocation(data)
-    cachedExtLocation = {
-        pos = util.vector3(data.pos.x, data.pos.y, data.pos.z),
-        facing = util.vector2(data.facing.x, data.facing.y)
-    }
-end
 
+local addedMode = false
 ---@param data EditingMarkerData
 local function editMarkerWindow(data)
     if not data then
+        if addedMode then
+            interfaces.UI.removeMode('Interface')
+            addedMode = false
+        end
         stampMakerWindow.layout.props.visible = false
         stampMakerWindow:update()
         return
@@ -694,10 +686,9 @@ local function editMarkerWindow(data)
 
     -- Default position/note.
     if not editingMapData.worldPos then
-        if pself.cell.isExterior then
-            editingMapData.worldPos = pself.position
-        elseif cachedExtLocation then
-            editingMapData.worldPos = cachedExtLocation.pos
+        local ext = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing()
+        if ext and ext.pos then
+            editingMapData.worldPos = ext.pos
         else
             error("can't get exterior position")
         end
@@ -716,7 +707,9 @@ local function editMarkerWindow(data)
     end
 
     if not validateMarker(editingMapData) then
-        error("failed to build map data: " .. aux_util.deepToString(editingMapData, 3))
+        ui.showMessage(localization("markerNotAllowedMessage"))
+        print("failed to build map data: " .. aux_util.deepToString(editingMapData, 3))
+        return
     end
 
     setActive(editingMapData.iconIdx, editingMapData.color or 1)
@@ -725,6 +718,14 @@ local function editMarkerWindow(data)
     updateCancelButtonElement()
     updateSaveButtonElement()
     stampMakerWindow.layout.props.visible = true
+
+    if interfaces.UI.getMode() ~= 'Interface' then
+        addedMode = true
+        interfaces.UI.addMode('Interface', { windows = {} })
+    else
+        addedMode = false
+    end
+
     stampMakerWindow:update()
 end
 
@@ -735,9 +736,6 @@ return {
         getMarkerByID = getMarkerByID,
         upsertMarkerIcon = upsertMarkerIcon,
         editMarkerWindow = editMarkerWindow,
-    },
-    eventHandlers = {
-        [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation
     },
     engineHandlers = {
         onLoad = onLoad,

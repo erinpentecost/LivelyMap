@@ -194,15 +194,13 @@ end
 local function newEntry()
     return {
         t = math.ceil(core.getGameTime()),
-        x = pself.cell.isExterior and pself.position.x or nil,
-        y = pself.cell.isExterior and pself.position.y or nil,
-        z = pself.cell.isExterior and pself.position.z or nil,
-        c = (not pself.cell.isExterior) and pself.cell.id or nil
+        x = pself.position.x or nil,
+        y = pself.position.y or nil,
+        z = pself.position.z or nil,
     }
 end
-local entry = nil
-local function addEntry()
-    entry = newEntry()
+
+local function addEntry(entry)
     -- make a new list and add the entry to it
     if allData[playerName] == nil then
         allData[playerName] = {
@@ -217,15 +215,10 @@ local function addEntry()
         return
     end
     local tail = allData[playerName].paths[#(allData[playerName].paths)]
-    if pself.cell.isExterior and tail.x and tail.y then
+    if tail.x and tail.y then
         -- also don't do anything if the distance is too close
         -- 7456540 is a third of cell length, squared
         if (util.vector2(entry.x, entry.y) - util.vector2(tail.x, tail.y)):length2() < 7456540 then
-            return
-        end
-    else
-        -- otherwise, don't do anything if the interior cell is the same.
-        if entry.c ~= nil and tail.c == entry.c then
             return
         end
     end
@@ -239,34 +232,71 @@ local function addEntry()
         "] = " .. tostring(#(allData[playerName].paths)) .. ", #fromSave.paths = " .. tostring(#fromSave.paths))
 end
 
+
+local lastExteriorPosition = nil
+local function onReceiveExteriorLocation(data)
+    if not data then
+        return
+    end
+    lastExteriorPosition = {
+        pos = util.vector3(data.pos.x, data.pos.y, data.pos.z),
+        facing = util.vector2(data.facing.x, data.facing.y),
+    }
+    addEntry({
+        t = math.ceil(core.getGameTime()),
+        x = data.pos.x,
+        y = data.pos.y,
+        z = data.pos.z,
+    })
+end
+
+
+local lastInteriorCell = nil
 local function onUpdate(dt)
     if dt == 0 then
         -- don't do anything if paused.
         return
     end
-    addEntry()
+    if pself.cell.isExterior then
+        lastInteriorCell = nil
+        addEntry(newEntry())
+    elseif lastInteriorCell == pself.cell then
+        return
+    else
+        lastInteriorCell = pself.cell
+        core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", {
+            player = pself,
+        })
+    end
 end
 
----comment
----@param paths PathEntry[]
----@return PathEntry[]
-local function exteriorsOnly(paths)
-    local out = {}
-    for _, path in ipairs(paths) do
-        if not path.c then
-            table.insert(out, path)
-        end
+---@class PositionAndFacing
+---@field pos util.vector3
+---@field facing util.vector2
+
+---@return PositionAndFacing?
+local function getExteriorPositionAndFacing()
+    if pself.cell.isExterior then
+        local forward = pself.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
+        return {
+            pos = pself.position,
+            facing = util.vector2(forward.x, forward.y):normalize(),
+        }
+    elseif lastExteriorPosition then
+        return lastExteriorPosition
     end
-    return out
 end
 
 return {
-    interfaceName = MOD_NAME .. "PlayerData",
+    interfaceName = MOD_NAME .. "Player",
     interface = {
         version = 1,
         getPaths = function() return allData end,
-        exteriorsOnly = exteriorsOnly,
         playerName = playerName,
+        getExteriorPositionAndFacing = getExteriorPositionAndFacing,
+    },
+    eventHandlers = {
+        [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation,
     },
     engineHandlers = {
         onUpdate = onUpdate,
