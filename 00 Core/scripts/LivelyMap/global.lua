@@ -324,9 +324,9 @@ end
 --- This is a helper to get cell information for the player,
 --- since cell:getAll isn't available on local scripts.
 local function onGetExteriorLocation(data)
-    local pos = getExteriorLocation(data.player)
-    local facing = getFacing(data.player)
-    data.player:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
+    local pos = getExteriorLocation(data.object)
+    local facing = getFacing(data.object)
+    data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
         {
             pos = { x = pos.x, y = pos.y, z = pos.z },
             facing = { x = facing.x, y = facing.y, z = facing.z },

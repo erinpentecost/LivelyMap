@@ -613,7 +613,6 @@ local function summonMap(id)
     end
 
     local pos = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
-
     local showData = mutil.shallowMerge(mapData, {
         cellID = pself.cell.id,
         player = pself,

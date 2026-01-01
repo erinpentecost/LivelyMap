@@ -238,6 +238,9 @@ local function onReceiveExteriorLocation(data)
     if not data then
         return
     end
+    if data.args.source ~= MOD_NAME .. "_player.lua" then
+        return
+    end
     lastExteriorPosition = {
         pos = util.vector3(data.pos.x, data.pos.y, data.pos.z),
         facing = util.vector2(data.facing.x, data.facing.y),
@@ -265,7 +268,9 @@ local function onUpdate(dt)
     else
         lastInteriorCell = pself.cell
         core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", {
-            player = pself,
+            object = pself,
+            callbackObject = pself,
+            source = MOD_NAME .. "_player.lua",
         })
     end
 end

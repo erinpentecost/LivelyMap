@@ -30,7 +30,7 @@ local interfaces  = require('openmw.interfaces')
 local storage     = require('openmw.storage')
 local input       = require('openmw.input')
 local heightData  = storage.globalSection(MOD_NAME .. "_heightData")
-local keytrack    = require("scripts.ErnOneStick.keytrack")
+local keytrack    = require("scripts.LivelyMap.keytrack")
 local uiInterface = require("openmw.interfaces").UI
 
 
