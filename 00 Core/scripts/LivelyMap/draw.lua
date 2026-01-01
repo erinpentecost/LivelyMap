@@ -241,7 +241,7 @@ local function markerButtonFn()
     print("markerbutton clicked")
     --- position is pretty accurate so converting it to a string
     --- is basically random
-    local newID = "custom_" .. tostring(math.floor(pself.position.x)) .. "_" .. tostring(math.floor(pself.position.y))
+    local newID = tostring(math.floor(pself.position.x)) .. "_" .. tostring(math.floor(pself.position.y)) .. "_custom"
     interfaces.LivelyMapMarker.editMarkerWindow({ id = newID })
 end
 local newMarkerButton = makeMenuButton("markerButton", "textures/LivelyMap/marker-button.png", markerButtonFn,
@@ -422,17 +422,13 @@ end
 ---@param iconList RegisteredIcon[]
 local function pushOverlappingIcons(iconList)
     -- first, get center point of all icons
-    local firstPos = iconList[1].ref.element.layout.props.position
-    local centerX = firstPos.x
-    local centerY = firstPos.y
-    for i = 2, #iconList, 1 do
-        local pos = iconList[i].ref.element.layout.props.position
-        centerX = centerX + pos.x
-        centerY = centerY + pos.y
+    local center = mutil.averageVector3s(iconList, function(e)
+        return e.ref.element.layout.props.position
+    end)
+    if not center then
+        return
     end
-    centerX = centerX / #iconList
-    centerY = centerY / #iconList
-    local center = util.vector2(centerX, centerY)
+    center = util.vector2(center.x, center.y)
     -- now I need direction vectors to slide each icon away from the others
     -- if I just do (pos - center) it will get a pretty good result,
     -- but for full overlaps this won't detangle them.
@@ -562,6 +558,8 @@ local function onMapMoved(data)
     end
 
     setHoverBoxContent(nil)
+
+    interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
 
     renderIcons()
 end

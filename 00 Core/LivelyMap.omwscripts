@@ -4,6 +4,8 @@ MENU: scripts/LivelyMap/colorpicker/register.lua
 PLAYER: scripts/LivelyMap/register_actions.lua
 MENU: scripts/LivelyMap/menu_settings.lua
 
+# Core stuff
+GLOBAL: scripts/LivelyMap/cellnames.lua
 GLOBAL: scripts/LivelyMap/mapdata.lua
 GLOBAL: scripts/LivelyMap/global.lua
 PLAYER: scripts/LivelyMap/player.lua
@@ -11,11 +13,13 @@ PLAYER: scripts/LivelyMap/controls.lua
 PLAYER: scripts/LivelyMap/draw.lua
 CUSTOM: scripts/LivelyMap/mapnif.lua
 
+# Icon providers
 PLAYER: scripts/LivelyMap/icons/compass.lua
 PLAYER: scripts/LivelyMap/icons/debug.lua
 PLAYER: scripts/LivelyMap/icons/detect.lua
 PLAYER: scripts/LivelyMap/icons/journey.lua
 PLAYER: scripts/LivelyMap/icons/marker.lua
 
-
+# Systems that require icon providers
 PLAYER: scripts/LivelyMap/automarker.lua
+PLAYER: scripts/LivelyMap/areamarker.lua

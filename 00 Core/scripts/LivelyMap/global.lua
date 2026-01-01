@@ -221,19 +221,68 @@ local function onHideMap(data)
     end
 end
 
--- cache of interior cell id to exterior position
+---@class AugmentedPos
+---@field pos util.vector3
+---@field exteriorCellId string? id for the exterior cell
+
+---comment
+---@param cell any cell
+---@return AugmentedPos
+local function getRepresentiveForCell(cell)
+    local center = mutil.averageVector3s(cell:getAll(types.Door), function(e)
+        return e.position
+    end)
+    if center then
+        return { pos = center, exteriorCellId = cell.id }
+    end
+
+    center = mutil.averageVector3s(cell:getAll(types.Static), function(e)
+        return e.position
+    end)
+    if center then
+        return { pos = center, exteriorCellId = cell.id }
+    end
+
+    return {
+        pos = util.vector3(
+            (cell.gridX + 0.5) * mutil.CELL_SIZE,
+            (cell.gridY + 0.5) * mutil.CELL_SIZE,
+            0
+        ),
+        exteriorCellId = cell.id
+    }
+end
+
+--- cache of interior cell id to exterior position
+---@type {[string]: AugmentedPos}
 local cachedPos = {}
+
 --- Find the player's exterior location.
 --- If they are in an interior, find a door to an exit and use that position.
-local function getExteriorLocation(player)
-    if player.cell.isExterior then
-        return player.position
+---@param data any player or cell
+---@return AugmentedPos?
+local function getExteriorLocation(data)
+    local inputCell = data.cell or data
+    if inputCell.isExterior then
+        if data.position then
+            --- don't cache the easy case.
+            return { pos = data.position, exteriorCellId = inputCell.id }
+        elseif cachedPos[inputCell.id] then
+            -- return previously-cached computed position
+            return cachedPos[inputCell.id]
+        else
+            --- we were passed in an exterior cell, which doesn't have a high-def
+            --- world position
+            cachedPos[inputCell.id] = getRepresentiveForCell(inputCell)
+            return cachedPos[inputCell.id]
+        end
     end
-    if cachedPos[player.cell.id] then
-        return cachedPos[player.cell.id]
+    if cachedPos[inputCell.id] then
+        return cachedPos[inputCell.id]
     end
     -- we need to recurse out until we find the exit door
     local seenCells = {}
+    ---@type fun(cell : any): AugmentedPos?
     local searchForDoor
     searchForDoor = function(cell)
         if not cell then
@@ -248,7 +297,10 @@ local function getExteriorLocation(player)
             if destCell then
                 -- If this door leads directly outside, we're done
                 if destCell.isExterior then
-                    return types.Door.destPosition(door)
+                    return {
+                        pos = types.Door.destPosition(door),
+                        exteriorCellId = types.Door.destCell(door).id,
+                    }
                 end
 
                 -- Otherwise, recurse
@@ -260,8 +312,8 @@ local function getExteriorLocation(player)
         end
         return nil
     end
-    cachedPos[player.cell.id] = searchForDoor(player.cell)
-    return cachedPos[player.cell.id]
+    cachedPos[inputCell.id] = searchForDoor(inputCell)
+    return cachedPos[inputCell.id]
 end
 
 --- Special marker handling
@@ -300,6 +352,10 @@ end
 
 local exteriorNorth = util.transform.identity
 local function getFacing(player)
+    if not player.rotation then
+        print("no rotation for " .. tostring(player) .. ", assuming default " .. tostring(exteriorNorth))
+        return exteriorNorth
+    end
     -- Player forward vector
     local forward = player.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
     local northMarker = exteriorNorth
@@ -324,14 +380,32 @@ end
 --- This is a helper to get cell information for the player,
 --- since cell:getAll isn't available on local scripts.
 local function onGetExteriorLocation(data)
-    local pos = getExteriorLocation(data.object)
-    local facing = getFacing(data.object)
-    data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
-        {
-            pos = { x = pos.x, y = pos.y, z = pos.z },
-            facing = { x = facing.x, y = facing.y, z = facing.z },
-            args = data,
-        })
+    --- special handling if we're only doing a cell reference.
+    local object = data.object
+    if not object then
+        if data.cellName then
+            object = world.getCellByName(data.cellName)
+        elseif data.cellId then
+            object = world.getCellById(data.cellId)
+        else
+            error("onGetExteriorLocation bad args: " .. aux_util.deepToString(data, 3))
+            return
+        end
+    end
+
+    local posObj = getExteriorLocation(object)
+    local facing = getFacing(object)
+
+    local payload = {
+        pos = posObj and posObj.pos and { x = posObj.pos.x, y = posObj.pos.y, z = posObj.pos.z },
+        exteriorCellId = posObj and posObj.exteriorCellId,
+        facing = { x = facing.x, y = facing.y, z = facing.z },
+        args = data,
+    }
+
+    print("sendEvent(" .. MOD_NAME .. "onReceiveExteriorLocation, " .. aux_util.deepToString(payload, 4) .. ")")
+
+    data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation", payload)
 end
 
 return {

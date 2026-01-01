@@ -292,6 +292,14 @@ local function getExteriorPositionAndFacing()
     end
 end
 
+local function renewExteriorPositionAndFacing()
+    core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", {
+        object = pself,
+        callbackObject = pself,
+        source = MOD_NAME .. "_player.lua",
+    })
+end
+
 return {
     interfaceName = MOD_NAME .. "Player",
     interface = {
@@ -299,6 +307,7 @@ return {
         getPaths = function() return allData end,
         playerName = playerName,
         getExteriorPositionAndFacing = getExteriorPositionAndFacing,
+        renewExteriorPositionAndFacing = renewExteriorPositionAndFacing,
     },
     eventHandlers = {
         [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation,
