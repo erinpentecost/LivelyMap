@@ -27,7 +27,7 @@ func getRampFile(rootPath string) string {
 	return rampPath
 }
 
-func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error {
+func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThreads int, vanity bool) error {
 	rampPath := getRampFile(rootPath)
 
 	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
@@ -112,8 +112,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
 			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 				&postprocessors.SMAA{},
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 			},
 			Codec: dds.Lossless,
 		})
@@ -152,8 +152,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     specularCells,
 			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 				&postprocessors.SMAA{},
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 			},
 			Codec: dds.DXT5,
 		})
@@ -164,8 +164,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
 			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
 				&postprocessors.SMAA{},
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
 			},
 			Codec: dds.DXT1,
 		})
@@ -175,8 +175,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     specularCells,
 			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
 				&postprocessors.SMAA{},
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
 			},
 			Codec: dds.DXT5,
 		})
@@ -187,26 +187,28 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment) error 
 			Extents:   extents.Extents,
 			Cells:     texturedCells,
 			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 				&postprocessors.SMAA{},
+				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 			},
 			Codec: dds.Lossless,
 		})
 	}
 
 	// vanity map
-	mapJobs = append(mapJobs, &mapRenderJob{
-		Directory: rootPath,
-		Name:      "vanity.png",
-		Extents:   parsedLands.MapExtents,
-		Cells:     texturedCells,
-		PostProcessors: []PostProcessor{
-			&postprocessors.SMAA{},
-		},
-	})
+	if vanity {
+		mapJobs = append(mapJobs, &mapRenderJob{
+			Directory: rootPath,
+			Name:      "vanity.png",
+			Extents:   parsedLands.MapExtents,
+			Cells:     texturedCells,
+			PostProcessors: []PostProcessor{
+				&postprocessors.SMAA{},
+			},
+		})
+	}
 
 	g, gctx := errgroup.WithContext(ctx)
-	g.SetLimit(6)
+	g.SetLimit(maxThreads)
 	for _, m := range mapJobs {
 		g.Go(func() error { return m.Draw(gctx) })
 	}

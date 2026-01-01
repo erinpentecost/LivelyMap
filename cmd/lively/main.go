@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	"flag"
+
 	"github.com/erinpentecost/LivelyMap/internal/hdmap"
 	"github.com/erinpentecost/LivelyMap/internal/savefile"
 	"github.com/ernmw/omwpacker/cfg"
@@ -16,7 +18,18 @@ import (
 
 const plugin_name = "livelymap.omwaddon"
 
-func sync(ctx context.Context, path string) error {
+var openmwCfgPath = flag.String("cfg", "./openmw.cfg", "full path to your openmw.cfg file")
+var threads = flag.Int("threads", 6, "number of threads to use. reduce this if you run out of memory.")
+var mapTextures = flag.Bool("maps", true, "create map textures")
+var saveFiles = flag.Bool("saves", true, "extract paths from save files")
+var vanity = flag.Bool("vanity", false, "generate full vanity map")
+
+func init() {
+	flag.Parse()
+}
+
+func sync(ctx context.Context) error {
+	path := *openmwCfgPath
 	env, err := cfg.Load(path)
 	if err != nil {
 		return fmt.Errorf("load openmw.cfg: %w", err)
@@ -29,28 +42,26 @@ func sync(ctx context.Context, path string) error {
 		}
 	}
 
-	if err := hdmap.DrawMaps(ctx, rootPath, env); err != nil {
-		return fmt.Errorf("draw maps: %w", err)
+	if *mapTextures {
+		if err := hdmap.DrawMaps(ctx, rootPath, env, *threads, *vanity); err != nil {
+			return fmt.Errorf("draw maps: %w", err)
+		}
 	}
 
-	if err := savefile.ExtractSaveData(rootPath, env); err != nil {
-		return fmt.Errorf("extract save data: %w", err)
+	if *saveFiles {
+		if err := savefile.ExtractSaveData(rootPath, env); err != nil {
+			return fmt.Errorf("extract save data: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func main() {
-	// debug
-	openmwcfg := "/home/ern/tes3/config/openmw.cfg"
-	if len(os.Args) > 1 {
-		openmwcfg = os.Args[1]
-	}
-
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill, syscall.SIGTERM)
 	defer cancel()
 
-	if err := sync(ctx, openmwcfg); err != nil {
+	if err := sync(ctx); err != nil {
 		fmt.Printf("FAILED: %v\n", err)
 		os.Exit(33)
 	}
