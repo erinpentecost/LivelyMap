@@ -354,7 +354,12 @@ local function createTextButton(parent, buttonText, color, name, properties, siz
                                 name = 'text',
                                 type = ui.TYPE.Text,
                                 template = I.MWUI.templates.textNormal,
-                                props = { text = buttonText, textColor = buttonColors.default }
+                                props = {
+                                    text = buttonText,
+                                    textColor = buttonColors.default,
+                                    textAlignH = ui.ALIGNMENT.Center,
+                                    textAlignV = ui.ALIGNMENT.Center,
+                                }
                             },
                             {
                                 name = 'padding',

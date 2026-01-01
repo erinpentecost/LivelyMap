@@ -288,7 +288,7 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
     }
 end
 
-local function viewportPosToRelativeMeshPos(currentMapData, viewportPos)
+local function viewportPosToRelativeMeshPos(currentMapData, viewportPos, ignoreBounds)
     if not currentMapData or not currentMapData.bounds then
         error("missing map data")
     end
@@ -326,7 +326,7 @@ local function viewportPosToRelativeMeshPos(currentMapData, viewportPos)
 
     -- 3. Map-world → relative mesh
     local rel = mapPosToRelativeCellPos(currentMapData, hitPos)
-    if not rel or (rel.x < 0 or rel.x > 1 or rel.y < 0 or rel.y > 1) then
+    if not rel or ((not ignoreBounds) and (rel.x < 0 or rel.x > 1 or rel.y < 0 or rel.y > 1)) then
         print("rel is bad. hitPos: " ..
             tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
             tostring(rayDir) .. ", t:" .. tostring(t))
@@ -344,7 +344,7 @@ local function viewportPosToRealPos(currentMapData, viewportPos)
         error("missing map data")
     end
 
-    local rel = viewportPosToRelativeMeshPos(currentMapData, viewportPos)
+    local rel = viewportPosToRelativeMeshPos(currentMapData, viewportPos, true)
     if not rel then
         return nil
     end
