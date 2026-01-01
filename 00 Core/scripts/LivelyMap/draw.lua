@@ -58,6 +58,8 @@ end))
 --- @field onDraw fun(icon: Icon, posData : ViewportData)
 --- @field onHide fun(icon: Icon)
 --- @field priority number? The higher the priority, the higher the layer.
+--- @field groupable boolean? If true, the icon may be grouped or adjusted if it collides with other icons.
+--- @field [string] any Other stuff might be crammed into this object. It's ok.
 
 ---@class RegisteredIcon
 --- @field onScreen boolean Exists so we don't call onHide every frame.
@@ -397,6 +399,12 @@ local function getIconExtent(icon)
     }
 end
 
+---comment
+---@param icons RegisteredIcon[]
+---@return any -- This is a UI element that represents a group of cramped icons.
+local function makeGroupedIconLayout(icons)
+end
+
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
@@ -458,6 +466,7 @@ local function renderIcons()
             for _, elem in ipairs(subset) do
                 print("- " .. elem.name .. " " .. aux_util.deepToString(getIconExtent(elem), 3))
             end
+            --- Now I have a list of all the icons that I need to combine.
         end
     end
 

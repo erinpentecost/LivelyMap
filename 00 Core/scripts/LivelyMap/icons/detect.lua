@@ -115,6 +115,7 @@ local function newDetectIcon(path, color)
             element.layout.props.visible = false
             element:update()
         end,
+        groupable = true,
     }
 
     local focusGain = function()

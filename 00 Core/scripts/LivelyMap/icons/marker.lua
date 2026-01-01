@@ -149,6 +149,7 @@ local function registerMarkerIcon(data)
         },
         events = {},
     }
+    ---@type RegisteredMarker
     local registeredMarker = {
         element = element,
         marker = data,
@@ -177,6 +178,7 @@ local function registerMarkerIcon(data)
             icon.element:update()
         end,
         priority = 200,
+        groupable = true,
     }
 
     local focusGain = function()
