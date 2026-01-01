@@ -238,6 +238,34 @@ local function binarySearchFirst(arr, predicate)
     return result
 end
 
+---@param array any[]
+---@param fn (fun(e:any): util.vector3)?
+---@return util.vector3?
+local function averageVector3s(array, fn)
+    if not array then
+        return nil
+    end
+    if not fn then
+        fn = function(e)
+            return e
+        end
+    end
+    local firstPos = fn(array[1])
+    local centerX = firstPos.x
+    local centerY = firstPos.y
+    local centerZ = firstPos.z or 0
+    for i = 2, #array, 1 do
+        local pos = fn(array[i])
+        centerX = centerX + pos.x
+        centerY = centerY + pos.y
+        centerZ = centerZ + (pos.z or 0)
+    end
+    centerX = centerX / #array
+    centerY = centerY / #array
+    centerZ = centerZ / #array
+    return util.vector3(centerX, centerY, centerZ)
+end
+
 
 local BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -285,5 +313,6 @@ return {
     binarySearchFirst = binarySearchFirst,
     inBox = inBox,
     shallowMerge = shallowMerge,
+    averageVector3s = averageVector3s,
     hashString = hashString,
 }

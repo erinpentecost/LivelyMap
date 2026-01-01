@@ -229,12 +229,20 @@ end
 ---@param cell any cell
 ---@return AugmentedPos
 local function getRepresentiveForCell(cell)
-    for _, obj in ipairs(cell:getAll(types.Door)) do
-        return { pos = obj.position, exteriorCellId = cell.id }
+    local center = mutil.averageVector3s(cell:getAll(types.Door), function(e)
+        return e.position
+    end)
+    if center then
+        return { pos = center, exteriorCellId = cell.id }
     end
-    for _, obj in ipairs(cell:getAll(types.Static)) do
-        return { pos = obj.position, exteriorCellId = cell.id }
+
+    center = mutil.averageVector3s(cell:getAll(types.Static), function(e)
+        return e.position
+    end)
+    if center then
+        return { pos = center, exteriorCellId = cell.id }
     end
+
     return {
         pos = util.vector3(
             (cell.gridX + 0.5) * mutil.CELL_SIZE,
