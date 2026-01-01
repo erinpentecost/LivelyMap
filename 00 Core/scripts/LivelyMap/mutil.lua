@@ -239,6 +239,37 @@ local function binarySearchFirst(arr, predicate)
 end
 
 
+local BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+local function toBase62(n)
+    if n == 0 then
+        return "0"
+    end
+    local t = {}
+    while n > 0 do
+        local r = n % 62
+        t[#t + 1] = BASE62:sub(r + 1, r + 1)
+        n = math.floor(n / 62)
+    end
+    return table.concat(t):reverse()
+end
+
+--- Hash a string to an alphanumeric string
+--- Deterministic, non-cryptographic
+--- @param s string
+--- @return string
+local function hashString(s)
+    local hash = 2166136261 -- FNV offset basis (32-bit)
+
+    for i = 1, #s do
+        hash = util.bitXor(hash, s:byte(i))
+        hash = (hash * 16777619) % 2 ^ 32
+    end
+
+    return toBase62(hash)
+end
+
+
 
 return {
     CELL_SIZE = CELL_SIZE,
@@ -254,4 +285,5 @@ return {
     binarySearchFirst = binarySearchFirst,
     inBox = inBox,
     shallowMerge = shallowMerge,
+    hashString = hashString,
 }

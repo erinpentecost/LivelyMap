@@ -140,9 +140,6 @@ local function mapClickRelease(mouseEvent, data)
     mouseData.thousandPixelsUp = nil
 end
 local function mapDragStart(mouseEvent, data)
-    -- oh I know the problem!
-    -- the center of the camera is jumping to the drag anchor start immediately
-
     -- re-anchor drag start
     mouseData.clickStartViewportPos = mouseEvent.position
     mouseData.clickStartWorldPos    = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)

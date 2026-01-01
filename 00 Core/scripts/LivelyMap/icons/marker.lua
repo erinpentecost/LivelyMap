@@ -44,8 +44,14 @@ settings.main.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.main[key]
 end))
 
-local markerData = storage.playerSection(MOD_NAME .. "_markerData")
-markerData:setLifeTime(storage.LIFE_TIME.Persistent)
+---This is persisted in the savefile.
+---@type {[string]: MarkerData}
+local markerData = {}
+
+---@return {[string]: MarkerData}
+local function getAllMarkers()
+    return markerData
+end
 
 local baseSize = util.vector2(32, 32)
 
@@ -204,7 +210,7 @@ local function registerMarkerIcon(data)
     end)
 
     -- persist
-    markerData:set(data.id, data)
+    markerData[data.id] = data
     -- register in map
     markerIcons[data.id] = registeredMarker
     interfaces.LivelyMapDraw.registerIcon(registeredMarker)
@@ -228,7 +234,7 @@ local function upsertMarkerIcon(data)
     }
     markerIcons[data.id].element:update()
     -- persist
-    markerData:set(data.id, data)
+    markerData[data.id] = data
 end
 
 
@@ -240,7 +246,7 @@ local function getMarkerByID(id)
         error("getMarkerByID(): id is bad")
         return
     end
-    local data = markerData:get(id)
+    local data = markerData[id]
     if not data then
         return nil
     end
@@ -256,17 +262,17 @@ local function getMarkerByID(id)
     }
 end
 
----@return {[string]: MarkerData}
-local function getAllMarkers()
-    return markerData:asTable()
-end
-
-
-local function onLoad()
+local function onLoad(data)
+    if data then
+        markerData = data
+    end
     print("Registering saved markers...")
     for _, marker in pairs(getAllMarkers()) do
         registerMarkerIcon(marker)
     end
+end
+local function onSave()
+    return markerData
 end
 
 
@@ -739,5 +745,6 @@ return {
     },
     engineHandlers = {
         onLoad = onLoad,
+        onSave = onSave,
     },
 }
