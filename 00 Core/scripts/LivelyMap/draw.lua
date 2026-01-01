@@ -478,7 +478,9 @@ local function renderIcons()
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
                     icon.ref.onDraw(icon.ref, pos)
-                    collisionFinder:AddElement(icon)
+                    if icon.ref.groupable then
+                        collisionFinder:AddElement(icon)
+                    end
                     goto continue
                 elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
@@ -490,7 +492,9 @@ local function renderIcons()
                         min.x <= screenSize.x and min.y <= screenSize.y then
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos)
-                        collisionFinder:AddElement(icon)
+                        if icon.ref.groupable then
+                            collisionFinder:AddElement(icon)
+                        end
                         goto continue
                     end
                 end
