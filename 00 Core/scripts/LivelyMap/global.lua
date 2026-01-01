@@ -221,19 +221,51 @@ local function onHideMap(data)
     end
 end
 
--- cache of interior cell id to exterior position
+---comment
+---@param cell any cell
+---@return any? object in the cell
+local function getRepresentiveObjectForCell(cell)
+
+end
+
+---@class AugmentedPos
+---@field pos util.vector3
+---@field object any? either the object that we requested the position of, or a representative object in an exterior space (like a door).
+
+--- cache of interior cell id to exterior position
+---@type {[string]: AugmentedPos}
 local cachedPos = {}
+
 --- Find the player's exterior location.
 --- If they are in an interior, find a door to an exit and use that position.
 ---@param data any player or cell
+---@return AugmentedPos?
 local function getExteriorLocation(data)
     local inputCell = data.cell or data
     if inputCell.isExterior then
         if data.position then
-            return data.position
+            --- don't cache the easy case.
+            return { pos = data.position, object = data }
+        elseif cachedPos[inputCell.id] then
+            -- return previously-cached computed position
+            return cachedPos[inputCell.id]
         else
-            --- we were passed in a cell, but those don't have good positions.
-            --- so we guess one.
+            --- we were passed in an exterior cell, which doesn't have a high-def
+            --- world position
+            local rep = getRepresentiveObjectForCell(inputCell)
+            if rep then
+                cachedPos[inputCell.id] = { pos = rep.position, object = rep }
+            else
+                --- we found no good object, so just use the center of the cell.
+                cachedPos[inputCell.id] = {
+                    pos = util.vector3(
+                        (inputCell.gridX + 0.5) * mutil.CELL_SIZE,
+                        (inputCell.gridY + 0.5) * mutil.CELL_SIZE,
+                        0
+                    ),
+                }
+            end
+            return cachedPos[inputCell.id]
         end
     end
     if cachedPos[inputCell.id] then
@@ -241,6 +273,7 @@ local function getExteriorLocation(data)
     end
     -- we need to recurse out until we find the exit door
     local seenCells = {}
+    ---@type fun(cell : any): AugmentedPos?
     local searchForDoor
     searchForDoor = function(cell)
         if not cell then
@@ -255,7 +288,7 @@ local function getExteriorLocation(data)
             if destCell then
                 -- If this door leads directly outside, we're done
                 if destCell.isExterior then
-                    return types.Door.destPosition(door)
+                    return { pos = types.Door.destPosition(door), object = door }
                 end
 
                 -- Otherwise, recurse
@@ -335,11 +368,12 @@ end
 --- This is a helper to get cell information for the player,
 --- since cell:getAll isn't available on local scripts.
 local function onGetExteriorLocation(data)
-    local pos = getExteriorLocation(data.object)
+    local posObj = getExteriorLocation(data.object)
     local facing = getFacing(data.object)
     data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
         {
-            pos = { x = pos.x, y = pos.y, z = pos.z },
+            pos = posObj and posObj.pos and { x = posObj.pos.x, y = posObj.pos.y, z = posObj.pos.z },
+            object = posObj and posObj.object,
             facing = { x = facing.x, y = facing.y, z = facing.z },
             args = data,
         })
