@@ -30,6 +30,7 @@ local async          = require("openmw.async")
 local interfaces     = require('openmw.interfaces')
 local storage        = require('openmw.storage')
 local h3cam          = require("scripts.LivelyMap.h3.cam")
+local overlapfinder  = require("scripts.LivelyMap.overlapfinder")
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -384,6 +385,18 @@ local function purgeRemovedIcons()
     end
 end
 
+
+---@param icon RegisteredIcon
+---@return RectExtent
+local function getIconExtent(icon)
+    -- assumes anchor is 0.5,0.5
+    local halfSize = icon.ref.element.layout.props.size / 2
+    return {
+        topLeft = icon.ref.element.layout.props.position + halfSize,
+        bottomRight = icon.ref.element.layout.props.position - halfSize,
+    }
+end
+
 local function renderIcons()
     -- If there is no map, hide all icons.
     if currentMapData == nil then
@@ -396,6 +409,8 @@ local function renderIcons()
     purgeRemovedIcons()
 
     local screenSize = ui.screenSize()
+
+    local collisionFinder = overlapfinder.NewOverlapFinder(getIconExtent)
 
     -- Render all the icons.
     for _, icon in ipairs(icons) do
@@ -410,6 +425,7 @@ local function renderIcons()
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
                     icon.ref.onDraw(icon.ref, pos)
+                    collisionFinder:AddElement(icon)
                     goto continue
                 elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
                     -- is the edge visible?
@@ -421,6 +437,7 @@ local function renderIcons()
                         min.x <= screenSize.x and min.y <= screenSize.y then
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos)
+                        collisionFinder:AddElement(icon)
                         goto continue
                     end
                 end
@@ -430,6 +447,19 @@ local function renderIcons()
         :: continue ::
     end
 
+
+    --- do we need to combine any?
+    ---@type RegisteredIcon[][]
+    local overlaps = collisionFinder:GetOverlappingSubsets()
+    for _, subset in ipairs(overlaps) do
+        if #subset > 1 then
+            -- this is a set of atleast 2
+            print("Colliding icons: ")
+            for _, elem in ipairs(subset) do
+                print("- " .. elem.name)
+            end
+        end
+    end
 
     iconContainer:update()
     mainWindow:update()
