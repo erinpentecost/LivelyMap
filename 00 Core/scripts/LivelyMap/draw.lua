@@ -94,7 +94,20 @@ local hoverBox = ui.create {
         anchor = util.vector2(0.5, 1),
         visible = false
     },
-    content = ui.content {}
+    content = ui.content { {
+        name = 'padding',
+        type = ui.TYPE.Container,
+        template = interfaces.MWUI.templates.padding,
+        props = {
+            --relativePosition = util.vector2(0.5, 0.5),
+            --size = util.vector2(200, 50),
+            --anchor = util.vector2(0.5, 0.5),
+            --relativePosition = util.vector2(0.5, 0.9),
+            --anchor = util.vector2(0.5, 1),
+            --visible = false
+        },
+        content = ui.content {}
+    } }
 }
 
 local mouseData = {
@@ -340,10 +353,10 @@ local mainWindow = ui.create {
 ---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
 local function setHoverBoxContent(layout)
     if layout then
-        hoverBox.layout.content = ui.content { layout }
+        hoverBox.layout.content["padding"].content = ui.content { layout }
         hoverBox.layout.props.visible = true
     else
-        hoverBox.layout.content = ui.content {}
+        hoverBox.layout.content["padding"].content = ui.content {}
         hoverBox.layout.props.visible = false
     end
     if currentMapData then

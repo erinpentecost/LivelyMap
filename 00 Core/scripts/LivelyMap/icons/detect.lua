@@ -122,7 +122,10 @@ local function newDetectIcon(path, color)
         --print("focusGain: " .. aux_util.deepToString(icon.entity, 3))
         if icon.entity then
             interfaces.LivelyMapDraw.setHoverBoxContent(
-                iutil.hoverTextLayout(getRecord(icon.entity).name, color)
+                iutil.hoverTextLayout(
+                    getRecord(icon.entity).name,
+                    color,
+                    path)
             )
         end
     end
