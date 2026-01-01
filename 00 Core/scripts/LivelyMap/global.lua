@@ -264,7 +264,12 @@ local function getExteriorLocation(player)
     return cachedPos[player.cell.id]
 end
 
-
+--- Special marker handling
+local function broadcastMarker(data)
+    for _, player in ipairs(world.players) do
+        player:sendEvent(MOD_NAME .. "onMarkerActivated", data)
+    end
+end
 local cachedMarkers = {}
 local markerRecords = {
     northmarker = true,
@@ -274,7 +279,7 @@ local markerRecords = {
     travelmarker = true,
 }
 local function onObjectActive(object)
-    if (not object.type) or (markerRecords[object.record]) then
+    if (not object.type) or (markerRecords[object.recordId]) then
         -- openmw hack to get a NorthMarker reference.
         -- NorthMarkers aren't available with cell:getAll().
         -- Thanks S3ctor for the workaround. :)
@@ -282,6 +287,7 @@ local function onObjectActive(object)
             cachedMarkers[object.cell.id] = {}
         end
         table.insert(cachedMarkers[object.cell.id], object)
+        broadcastMarker(object)
     end
 end
 local function getMarkers(cell)
