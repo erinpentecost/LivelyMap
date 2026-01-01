@@ -129,9 +129,8 @@ local function makeIcon(startIdx)
 end
 
 local function makeIcons()
-    myPaths = interfaces.LivelyMapPlayerData.exteriorsOnly(
-        interfaces.LivelyMapPlayerData.getPaths()
-        [interfaces.LivelyMapPlayerData.playerName].paths)
+    myPaths = interfaces.LivelyMapPlayerData.getPaths()
+        [interfaces.LivelyMapPlayerData.playerName].paths
 
 
     if settingCache.drawLimitNeravarinesJourney then

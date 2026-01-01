@@ -24,6 +24,7 @@ local input      = require('openmw.input')
 local MOD_NAME   = require("scripts.LivelyMap.ns")
 local core       = require("openmw.core")
 local util       = require("openmw.util")
+local aux_util   = require('openmw_aux.util')
 local pself      = require("openmw.self")
 
 local function splitString(str)
@@ -60,6 +61,7 @@ local function onConsoleCommand(mode, command, selectedObject)
     end
 end
 
+--- Calls to input.registerActionHandler should all be done in this function!
 local function init()
     local actionName = MOD_NAME .. "_ToggleMapWindow"
 
