@@ -612,13 +612,15 @@ local function summonMap(id)
         mapData = mutil.getMap(id)
     end
 
+    local pos = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
+
     local showData = mutil.shallowMerge(mapData, {
         cellID = pself.cell.id,
         player = pself,
         startWorldPosition = {
-            x = pself.position.x,
-            y = pself.position.y,
-            z = pself.position.z,
+            x = pos.x,
+            y = pos.y,
+            z = pos.z,
         },
     })
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
