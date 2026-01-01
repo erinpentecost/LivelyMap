@@ -563,6 +563,8 @@ local function onMapMoved(data)
 
     setHoverBoxContent(nil)
 
+    interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
+
     renderIcons()
 end
 

@@ -225,12 +225,19 @@ end
 local cachedPos = {}
 --- Find the player's exterior location.
 --- If they are in an interior, find a door to an exit and use that position.
-local function getExteriorLocation(player)
-    if player.cell.isExterior then
-        return player.position
+---@param data any player or cell
+local function getExteriorLocation(data)
+    local inputCell = data.cell or data
+    if inputCell.isExterior then
+        if data.position then
+            return data.position
+        else
+            --- we were passed in a cell, but those don't have good positions.
+            --- so we guess one.
+        end
     end
-    if cachedPos[player.cell.id] then
-        return cachedPos[player.cell.id]
+    if cachedPos[inputCell.id] then
+        return cachedPos[inputCell.id]
     end
     -- we need to recurse out until we find the exit door
     local seenCells = {}
@@ -260,8 +267,8 @@ local function getExteriorLocation(player)
         end
         return nil
     end
-    cachedPos[player.cell.id] = searchForDoor(player.cell)
-    return cachedPos[player.cell.id]
+    cachedPos[inputCell.id] = searchForDoor(inputCell)
+    return cachedPos[inputCell.id]
 end
 
 --- Special marker handling
@@ -300,6 +307,10 @@ end
 
 local exteriorNorth = util.transform.identity
 local function getFacing(player)
+    if not player.rotation then
+        print("no rotation for " .. tostring(player) .. ", assuming default " .. tostring(exteriorNorth))
+        return exteriorNorth
+    end
     -- Player forward vector
     local forward = player.rotation:apply(util.vector3(0.0, 1.0, 0.0)):normalize()
     local northMarker = exteriorNorth
