@@ -38,3 +38,7 @@ cancelButton: "Cancel"
 deleteButton: "Delete"
 
 debugName: "Debug Mode"
+
+markerImperialCult: "{name}, Imperial Cult"
+markerTemple: "{name}, Temple"
+markerPrison: "{name}"
