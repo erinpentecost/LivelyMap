@@ -553,7 +553,9 @@ local function onMapMoved(data)
     if not data.swapped then
         interfaces.UI.addMode('Interface', { windows = {} })
         mainWindow.layout.props.visible = true
-        mainWindow:update()
+        if currentMapData then
+            mainWindow:update()
+        end
     end
     renderIcons()
 end

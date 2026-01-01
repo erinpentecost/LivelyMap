@@ -686,7 +686,7 @@ local function editMarkerWindow(data)
 
     -- Default position/note.
     if not editingMapData.worldPos then
-        local ext = interfaces.LivelyMapPlayerData.getExteriorPositionAndFacing()
+        local ext = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing()
         if ext and ext.pos then
             editingMapData.worldPos = ext.pos
         else

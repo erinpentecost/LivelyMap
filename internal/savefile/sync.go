@@ -87,6 +87,9 @@ func ExtractSaveData(
 			if err != nil {
 				return fmt.Errorf("merge %q and %q: %w", dumpPath, newestSaveFileName, err)
 			}
+			if err := Validate(newData); err != nil {
+				return fmt.Errorf("validate merged data: %w", err)
+			}
 			marshalledNewData, err := json.Marshal(newData)
 			if err != nil {
 				return fmt.Errorf("marshal merged data for %q: %w", dumpPath, err)

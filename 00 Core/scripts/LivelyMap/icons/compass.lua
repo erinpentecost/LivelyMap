@@ -68,10 +68,10 @@ local compassIcon = {
     element = compassAtlas:getElement(),
     cached = {},
     pos = function()
-        return interfaces.LivelyMapPlayerData.getExteriorPositionAndFacing().pos
+        return interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
     end,
     facing = function()
-        return interfaces.LivelyMapPlayerData.getExteriorPositionAndFacing().facing
+        return interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().facing
     end,
     ---@param posData ViewportData
     onDraw = function(_, posData)

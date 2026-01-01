@@ -129,8 +129,8 @@ local function makeIcon(startIdx)
 end
 
 local function makeIcons()
-    myPaths = interfaces.LivelyMapPlayerData.getPaths()
-        [interfaces.LivelyMapPlayerData.playerName].paths
+    myPaths = interfaces.LivelyMapPlayer.getPaths()
+        [interfaces.LivelyMapPlayer.playerName].paths
 
 
     if settingCache.drawLimitNeravarinesJourney then
@@ -219,6 +219,9 @@ local function onUpdate(dt)
         end
         if icon.currentIdx >= #myPaths then
             icon.currentIdx = minimumIndex
+        end
+        if not myPaths[icon.currentIdx].x then
+            error("bad path: " .. aux_util.deepToString(myPaths[icon.currentIdx], 3))
         end
         --print("pt: " .. icon.partialStep)
         icon.cachedPos = mutil.lerpVec3(myPaths[icon.currentIdx], myPaths[icon.currentIdx + 1], icon.partialStep)

@@ -33,8 +33,16 @@ type PathEntry struct {
 	Yposition float64 `json:"y,omitempty"`
 	// Zposition is an exterior world Z position.
 	Zposition float64 `json:"z,omitempty"`
-	// CellID is an interior cell ID.
-	CellID string `json:"c,omitempty"`
+}
+
+func Validate(a *SaveData) error {
+	if len(a.Player) == 0 {
+		return fmt.Errorf("no player name")
+	}
+	a.Paths = slices.DeleteFunc(a.Paths, func(a *PathEntry) bool {
+		return a.TimeStamp <= 0
+	})
+	return nil
 }
 
 // Merge: keep the prefix of a.Paths with TimeStamp < earliest(B),

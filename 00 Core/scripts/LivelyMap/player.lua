@@ -288,7 +288,7 @@ local function getExteriorPositionAndFacing()
 end
 
 return {
-    interfaceName = MOD_NAME .. "PlayerData",
+    interfaceName = MOD_NAME .. "Player",
     interface = {
         version = 1,
         getPaths = function() return allData end,
