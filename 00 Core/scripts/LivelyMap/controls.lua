@@ -646,7 +646,7 @@ local function onFrame(dt)
         -- Interrupt tracking
         haltTracking()
         -- clear hoverbox
-        interfaces.LivelyMapDraw.setHoverBoxContent()
+        --interfaces.LivelyMapDraw.setHoverBoxContent()
     else
         advanceTracker()
     end

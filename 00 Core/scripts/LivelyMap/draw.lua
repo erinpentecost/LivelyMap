@@ -346,7 +346,9 @@ local function setHoverBoxContent(layout)
         hoverBox.layout.content = ui.content {}
         hoverBox.layout.props.visible = false
     end
-    hoverBox:update()
+    if currentMapData then
+        hoverBox:update()
+    end
 end
 
 local function closeToCenter(viewportPos)
@@ -405,31 +407,31 @@ local function getIconExtent(icon)
 end
 
 ---Modify the icon locations so they don't overlap so much.
----@param icons RegisteredIcon[]
-local function pushOverlappingIcons(icons)
+---@param iconList RegisteredIcon[]
+local function pushOverlappingIcons(iconList)
     -- first, get center point of all icons
-    local firstPos = icons[1].ref.element.layout.props.position
+    local firstPos = iconList[1].ref.element.layout.props.position
     local centerX = firstPos.x
     local centerY = firstPos.y
-    for i = 2, #icons, 1 do
-        local pos = icons[i].ref.element.layout.props.position
+    for i = 2, #iconList, 1 do
+        local pos = iconList[i].ref.element.layout.props.position
         centerX = centerX + pos.x
         centerY = centerY + pos.y
     end
-    centerX = centerX / #icons
-    centerY = centerY / #icons
+    centerX = centerX / #iconList
+    centerY = centerY / #iconList
     local center = util.vector2(centerX, centerY)
     -- now I need direction vectors to slide each icon away from the others
     -- if I just do (pos - center) it will get a pretty good result,
     -- but for full overlaps this won't detangle them.
     -- whatever I do, it needs to be deterministic so the icons
     -- won't flicker
-    for _, icon in ipairs(icons) do
+    for _, icon in ipairs(iconList) do
         if icon.ref.groupable then
             local pos = icon.ref.element.layout.props.position
             icon.ref.element.layout.props.position = pos +
                 ((pos - center):normalize() * icon.ref.element.layout.props.size.x * 0.3)
-            --icon.ref.element.layout.props.size = icon.ref.element.layout.props.size * 0.5
+            icon.ref.element.layout.props.size = icon.ref.element.layout.props.size * 0.8
             icon.ref.element:update()
         end
     end
@@ -612,6 +614,7 @@ local function toggleMap(open)
         summonMap()
     elseif (not open) and (currentMapData ~= nil) then
         core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
+        interfaces.LivelyMapMarker.editMarkerWindow(nil)
     end
 end
 
