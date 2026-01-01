@@ -144,7 +144,9 @@ local function mapDragStart(mouseEvent, data)
     mouseData.clickStartViewportPos = mouseEvent.position
     mouseData.clickStartWorldPos    = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
     print("drag! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(mouseData.clickStartWorldPos))
+
     -- Snapshot projection basis
+    -- TODO: this breaks when the offset point is not in the mesh
     local rightWorld              = putil.viewportPosToRealPos(
         currentMapData,
         mouseEvent.position + util.vector2(1000, 0)
