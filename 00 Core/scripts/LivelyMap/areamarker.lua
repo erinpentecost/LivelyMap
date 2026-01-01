@@ -34,9 +34,17 @@ local keytrack     = require("scripts.LivelyMap.keytrack")
 local uiInterface  = require("openmw.interfaces").UI
 local localization = core.l10n(MOD_NAME)
 
-local function markArea(cell)
+local cellData     = storage.globalSection(MOD_NAME .. "_cellNames")
+
+
+local function markArea(cellName)
+    local cellId = cellData:get(cellName)
+    if not cellId then
+        error("markArea given bad cell name: " .. tostring(cellName))
+    end
     core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", {
-        object = cell,
+        cellName = cellName,
+        cellId = cellId,
         callbackObject = pself,
         source = MOD_NAME .. "_areamarker.lua",
     })
@@ -46,6 +54,9 @@ end
 ---@param representativeObject any
 local function makeTemplate(cell, representativeObject)
     -- object is basically nil or a door
+    --
+    -- daedric shrines usually have "shrine" in the id
+    --
     return {
         iconName = "star",
         color = 4,
@@ -59,15 +70,28 @@ local function onReceiveExteriorLocation(data)
     if data.args.source ~= MOD_NAME .. "_areamarker.lua" then
         return
     end
-    local cell = data.args.object
 
-    local template = makeTemplate(cell, data.object)
+    local cellId = data.args.cellId
+    local cellName = data.args.cellName
+
+    if not cellName then
+        error("onReceiveExteriorLocation bad data: " .. aux_util.deepToString(data, 3))
+    end
+
+    --- don't change the marker if it already exists
+    local markId = cellId .. "_area"
+    local exists = interfaces.LivelyMapMarker.getMarkerByID(markId)
+    if exists then
+        return
+    end
+
+    local template = makeTemplate(cellId, data.object)
 
     ---@type MarkerData
     local markerInfo = {
         --- cell name
-        id = cell.id .. "_area",
-        note = cell.name,
+        id = markId,
+        note = cellName,
         iconName = template.iconName,
         color = template.color,
         worldPos = util.vector3(data.pos.x, data.pos.y, data.pos.z),

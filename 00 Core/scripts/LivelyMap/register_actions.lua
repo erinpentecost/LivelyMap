@@ -35,6 +35,10 @@ local function splitString(str)
     return out
 end
 
+function trim(s)
+    return s:match("^%s*(.-)%s*$")
+end
+
 local function onConsoleCommand(mode, command, selectedObject)
     local function getSuffixForCmd(prefix)
         if string.sub(command:lower(), 1, string.len(prefix)) == prefix then
@@ -58,6 +62,13 @@ local function onConsoleCommand(mode, command, selectedObject)
         else
             interfaces.LivelyMapMarker.editMarkerWindow({ id = tostring(id) })
         end
+    end
+
+    local markArea = getSuffixForCmd("lua markarea")
+    if markArea ~= nil then
+        local trimmed = trim(markArea)
+        print("Mark Area: " .. trimmed)
+        interfaces.LivelyMapAreaMarker.markArea(trimmed)
     end
 end
 

@@ -221,21 +221,29 @@ local function onHideMap(data)
     end
 end
 
----comment
----@param cell any cell
----@return any? object in the cell
-local function getRepresentiveObjectForCell(cell)
-    for _, obj in ipairs(cell:getAll(types.Door)) do
-        return obj
-    end
-    for _, obj in ipairs(cell:getAll(types.Static)) do
-        return obj
-    end
-end
-
 ---@class AugmentedPos
 ---@field pos util.vector3
----@field object any? either the object that we requested the position of, or a representative object in an exterior space (like a door).
+---@field exteriorCellId string? id for the exterior cell
+
+---comment
+---@param cell any cell
+---@return AugmentedPos
+local function getRepresentiveForCell(cell)
+    for _, obj in ipairs(cell:getAll(types.Door)) do
+        return { pos = obj.position, exteriorCellId = cell.id }
+    end
+    for _, obj in ipairs(cell:getAll(types.Static)) do
+        return { pos = obj.position, exteriorCellId = cell.id }
+    end
+    return {
+        pos = util.vector3(
+            (cell.gridX + 0.5) * mutil.CELL_SIZE,
+            (cell.gridY + 0.5) * mutil.CELL_SIZE,
+            0
+        ),
+        exteriorCellId = cell.id
+    }
+end
 
 --- cache of interior cell id to exterior position
 ---@type {[string]: AugmentedPos}
@@ -250,26 +258,14 @@ local function getExteriorLocation(data)
     if inputCell.isExterior then
         if data.position then
             --- don't cache the easy case.
-            return { pos = data.position, object = data }
+            return { pos = data.position, exteriorCellId = inputCell.id }
         elseif cachedPos[inputCell.id] then
             -- return previously-cached computed position
             return cachedPos[inputCell.id]
         else
             --- we were passed in an exterior cell, which doesn't have a high-def
             --- world position
-            local rep = getRepresentiveObjectForCell(inputCell)
-            if rep then
-                cachedPos[inputCell.id] = { pos = rep.position, object = rep }
-            else
-                --- we found no good object, so just use the center of the cell.
-                cachedPos[inputCell.id] = {
-                    pos = util.vector3(
-                        (inputCell.gridX + 0.5) * mutil.CELL_SIZE,
-                        (inputCell.gridY + 0.5) * mutil.CELL_SIZE,
-                        0
-                    ),
-                }
-            end
+            cachedPos[inputCell.id] = getRepresentiveForCell(inputCell)
             return cachedPos[inputCell.id]
         end
     end
@@ -293,7 +289,10 @@ local function getExteriorLocation(data)
             if destCell then
                 -- If this door leads directly outside, we're done
                 if destCell.isExterior then
-                    return { pos = types.Door.destPosition(door), object = door }
+                    return {
+                        pos = types.Door.destPosition(door),
+                        exteriorCellId = types.Door.destCell(door).id,
+                    }
                 end
 
                 -- Otherwise, recurse
@@ -373,15 +372,32 @@ end
 --- This is a helper to get cell information for the player,
 --- since cell:getAll isn't available on local scripts.
 local function onGetExteriorLocation(data)
-    local posObj = getExteriorLocation(data.object)
-    local facing = getFacing(data.object)
-    data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation",
-        {
-            pos = posObj and posObj.pos and { x = posObj.pos.x, y = posObj.pos.y, z = posObj.pos.z },
-            object = posObj and posObj.object,
-            facing = { x = facing.x, y = facing.y, z = facing.z },
-            args = data,
-        })
+    --- special handling if we're only doing a cell reference.
+    local object = data.object
+    if not object then
+        if data.cellName then
+            object = world.getCellByName(data.cellName)
+        elseif data.cellId then
+            object = world.getCellById(data.cellId)
+        else
+            error("onGetExteriorLocation bad args: " .. aux_util.deepToString(data, 3))
+            return
+        end
+    end
+
+    local posObj = getExteriorLocation(object)
+    local facing = getFacing(object)
+
+    local payload = {
+        pos = posObj and posObj.pos and { x = posObj.pos.x, y = posObj.pos.y, z = posObj.pos.z },
+        exteriorCellId = posObj and posObj.exteriorCellId,
+        facing = { x = facing.x, y = facing.y, z = facing.z },
+        args = data,
+    }
+
+    print("sendEvent(" .. MOD_NAME .. "onReceiveExteriorLocation, " .. aux_util.deepToString(payload, 4) .. ")")
+
+    data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation", payload)
 end
 
 return {
