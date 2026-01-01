@@ -26,6 +26,11 @@ var vanity = flag.Bool("vanity", false, "generate full vanity map")
 
 func init() {
 	flag.Parse()
+	fmt.Printf("cfg: %q\n", *openmwCfgPath)
+	fmt.Printf("threads: %d\n", *threads)
+	fmt.Printf("maps: %v\n", *mapTextures)
+	fmt.Printf("saveFiles: %v\n", *saveFiles)
+	fmt.Printf("vanity: %v\n", *vanity)
 }
 
 func sync(ctx context.Context) error {

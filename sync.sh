@@ -11,7 +11,6 @@ popd
 fi
 
 # run it
-shift
-./cmd/lively/lively --threads=3 --vanity=F --cfg=$@
+./cmd/lively/lively -threads=3 -vanity=F -cfg="$1"
 
 popd
