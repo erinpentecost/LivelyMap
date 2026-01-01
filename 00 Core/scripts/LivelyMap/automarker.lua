@@ -62,7 +62,6 @@ local markerBasicInfo = {
 local function onMarkerActivated(data)
     local template = markerBasicInfo[data.recordId]
     if not template then
-        error("found a new marker: " .. data.recordId)
         return
     end
 

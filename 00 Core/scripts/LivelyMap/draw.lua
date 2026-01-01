@@ -392,8 +392,8 @@ local function getIconExtent(icon)
     -- assumes anchor is 0.5,0.5
     local halfSize = icon.ref.element.layout.props.size / 2
     return {
-        topLeft = icon.ref.element.layout.props.position + halfSize,
-        bottomRight = icon.ref.element.layout.props.position - halfSize,
+        topLeft = icon.ref.element.layout.props.position - halfSize,
+        bottomRight = icon.ref.element.layout.props.position + halfSize,
     }
 end
 
@@ -456,7 +456,7 @@ local function renderIcons()
             -- this is a set of atleast 2
             print("Colliding icons: ")
             for _, elem in ipairs(subset) do
-                print("- " .. elem.name)
+                print("- " .. elem.name .. " " .. aux_util.deepToString(getIconExtent(elem), 3))
             end
         end
     end
