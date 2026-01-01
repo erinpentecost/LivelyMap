@@ -225,7 +225,12 @@ end
 ---@param cell any cell
 ---@return any? object in the cell
 local function getRepresentiveObjectForCell(cell)
-
+    for _, obj in ipairs(cell:getAll(types.Door)) do
+        return obj
+    end
+    for _, obj in ipairs(cell:getAll(types.Static)) do
+        return obj
+    end
 end
 
 ---@class AugmentedPos
