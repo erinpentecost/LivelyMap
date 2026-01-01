@@ -412,15 +412,26 @@ local function pushOverlappingIcons(icons)
     local centerX = firstPos.x
     local centerY = firstPos.y
     for i = 2, #icons, 1 do
-        local pos = icons[1].ref.element.layout.props.position
+        local pos = icons[i].ref.element.layout.props.position
         centerX = centerX + pos.x
         centerY = centerY + pos.y
     end
     centerX = centerX / #icons
     centerY = centerY / #icons
-    -- now, shrink and push away all the groupable icons.
+    local center = util.vector2(centerX, centerY)
+    -- now I need direction vectors to slide each icon away from the others
+    -- if I just do (pos - center) it will get a pretty good result,
+    -- but for full overlaps this won't detangle them.
+    -- whatever I do, it needs to be deterministic so the icons
+    -- won't flicker
     for _, icon in ipairs(icons) do
-
+        if icon.ref.groupable then
+            local pos = icon.ref.element.layout.props.position
+            icon.ref.element.layout.props.position = pos +
+                ((pos - center):normalize() * icon.ref.element.layout.props.size.x * 0.3)
+            --icon.ref.element.layout.props.size = icon.ref.element.layout.props.size * 0.5
+            icon.ref.element:update()
+        end
     end
 end
 
@@ -481,11 +492,12 @@ local function renderIcons()
     for _, subset in ipairs(overlaps) do
         if #subset > 1 then
             -- this is a set of atleast 2
-            print("Colliding icons: ")
+            --[[print("Colliding icons: ")
             for _, elem in ipairs(subset) do
                 print("- " .. elem.name .. " " .. aux_util.deepToString(getIconExtent(elem), 3))
-            end
+            end]]
             --- Now I have a list of all the icons that I need to combine.
+            pushOverlappingIcons(subset)
         end
     end
 
