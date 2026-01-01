@@ -21,6 +21,7 @@ local putil        = require("scripts.LivelyMap.putil")
 local core         = require("openmw.core")
 local util         = require("openmw.util")
 local pself        = require("openmw.self")
+local types        = require("openmw.types")
 local aux_util     = require('openmw_aux.util')
 local camera       = require("openmw.camera")
 local ui           = require("openmw.ui")
@@ -34,11 +35,11 @@ local keytrack     = require("scripts.LivelyMap.keytrack")
 local uiInterface  = require("openmw.interfaces").UI
 local localization = core.l10n(MOD_NAME)
 
-local cellData     = storage.globalSection(MOD_NAME .. "_cellNames")
+local cellData     = storage.globalSection(MOD_NAME .. "_cellNames"):asTable()
 
 
 local function markArea(cellName)
-    local cellId = cellData:get(cellName)
+    local cellId = cellData[cellName]
     if not cellId then
         error("markArea given bad cell name: " .. tostring(cellName))
     end
@@ -50,9 +51,7 @@ local function markArea(cellName)
     })
 end
 
----@param cell any
----@param representativeObject any
-local function makeTemplate(cell, representativeObject)
+local function makeTemplate(cellId, cellName)
     -- object is basically nil or a door
     --
     -- daedric shrines usually have "shrine" in the id
@@ -85,7 +84,7 @@ local function onReceiveExteriorLocation(data)
         return
     end
 
-    local template = makeTemplate(cellId, data.object)
+    local template = makeTemplate(cellId, cellName)
 
     ---@type MarkerData
     local markerInfo = {
@@ -101,6 +100,24 @@ local function onReceiveExteriorLocation(data)
 end
 
 
+local function onQuestUpdate(questId, stage)
+    print("quest update!!")
+    print(aux_util.deepToString(types.Player.journal(pself).topics, 4))
+    -- test with:
+    -- Journal, "FG_Egg_Poachers", 1
+    -- Journal, "FG_VerethiGang", 10
+    for name, _ in pairs(cellData) do
+        --- TODO: super broken
+        --- these topics are like "Vivec Arena", with lowercase id "vivec arena"
+        --- but the cell name is like "Vivec, Arena Pit"
+        local topic = types.Player.journal(pself).topics[string.lower(name)]
+        if topic and #topic.entries then
+            print("Found journal entry for '" .. name .. "', marking it on the map.")
+            markArea(name)
+        end
+    end
+end
+
 return {
     interfaceName = MOD_NAME .. "AreaMarker",
     interface = {
@@ -110,5 +127,7 @@ return {
     eventHandlers = {
         [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation,
     },
-    engineHandlers = {}
+    engineHandlers = {
+        onQuestUpdate = onQuestUpdate
+    }
 }
