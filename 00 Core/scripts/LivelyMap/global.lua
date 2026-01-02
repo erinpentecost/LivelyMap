@@ -258,9 +258,6 @@ local function getRepresentiveForCell(cell)
         end
     end
 
-    --- TODO: I can get all the door records here
-    --- which will tell me what type of place this is
-    --- then I can pick the correct stamp later
     local center = mutil.averageVector3s(doors, function(e)
         return e and e.position
     end)

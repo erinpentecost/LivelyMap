@@ -79,7 +79,6 @@ end
 ---@return table
 local function makeTemplate(cellId, cellName, doorInfos)
     --- TODO: try to find a good stamp for the type of cell.
-    --- TODO: doors is nil on walk-up
     print(cellId .. " has doors: " .. aux_util.deepToString(doorInfos, 3))
     return {
         iconName = "circle",
