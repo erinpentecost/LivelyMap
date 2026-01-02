@@ -23,6 +23,7 @@ var threads = flag.Int("threads", 6, "number of threads to use. reduce this if y
 var mapTextures = flag.Bool("maps", true, "create map textures")
 var saveFiles = flag.Bool("saves", true, "extract paths from save files")
 var vanity = flag.Bool("vanity", false, "generate full vanity map")
+var rampPath = flag.String("ramp", "classic", "full path to a ramp file, or one of: classic,gold,light,purple")
 
 func init() {
 	flag.Parse()
@@ -31,6 +32,7 @@ func init() {
 	fmt.Printf("maps: %v\n", *mapTextures)
 	fmt.Printf("saveFiles: %v\n", *saveFiles)
 	fmt.Printf("vanity: %v\n", *vanity)
+	fmt.Printf("rampPath: %q\n", *rampPath)
 }
 
 func sync(ctx context.Context) error {
@@ -48,7 +50,7 @@ func sync(ctx context.Context) error {
 	}
 
 	if *mapTextures {
-		if err := hdmap.DrawMaps(ctx, rootPath, env, *threads, *vanity); err != nil {
+		if err := hdmap.DrawMaps(ctx, rootPath, env, *threads, *vanity, *rampPath); err != nil {
 			return fmt.Errorf("draw maps: %w", err)
 		}
 	}
