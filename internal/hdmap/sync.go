@@ -17,19 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func getRampFile(rootPath string) string {
-	rampPath := filepath.Join(rootPath, "ramp.bmp")
-	if f, err := os.Stat(rampPath); err != nil || f.IsDir() {
-		fmt.Printf("Using built-in ramp file.\n")
-		return ""
-	}
-	fmt.Printf("Using %q as the ramp file.\n", rampPath)
-	return rampPath
-}
-
-func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThreads int, vanity bool) error {
-	rampPath := getRampFile(rootPath)
-
+func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThreads int, vanity bool, rampPath string) error {
 	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
 	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures", "LivelyMap")
 	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures", "LivelyMap")
