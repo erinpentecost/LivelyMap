@@ -294,8 +294,20 @@ local function createButton(parent, layout, updateColor, buttonFunction, args)
             parent:update()
         end),
         focusLoss = async:callback(function()
+            --- This event is invoked when any parent widget becomes invisible,
+            --- as well as the mouse cursor moving off the widget.
+            --- The former case will crash the script.
+
+            print("focusLoss - " .. tostring(layout.name))
             updateColor(layout, 'default')
-            parent:update()
+            --- This call to update can fail if we're tearing down the window
+            --- while the button still has focus.
+            local success, result = pcall(parent.update, parent)
+            if not success then
+                error("Failed to update widget " .. tostring(layout.name) .. " during focusLoss: " .. tostring(result))
+                --- Nuclear option.
+                --- require('openmw.debug').reloadLua()
+            end
         end)
     }
     return layout
