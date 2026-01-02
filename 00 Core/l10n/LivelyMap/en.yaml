@@ -19,6 +19,15 @@ toggleMapWindowKeyBind: "Toggle Map Window"
 controllerButtonsName: "Enable Controller Buttons"
 controllerButtonsDescription: "D-Pad pans the map, right stick zooms."
 
+automaticName: "Automatic Stamping"
+automaticDescription: "Control automated stamping rules."
+autoMarkNamedExteriorCellsName: "Mark Named Cells"
+autoMarkNamedExteriorCellsDescription: "Automatically mark named exterior cells when you enter them. Cells might also be marked if you know a matching Topic for them."
+autoMarkTemplesAndCultsName: "Mark Temples and Imperial Cults"
+autoMarkTemplesAndCultsDescription: "Automatically mark destination locations for Almsivi and Divine Intervention."
+autoMarkPrisonsName: "Mark Prisons"
+autoMarkPrisonsDescription: "Automatically mark prisons."
+
 extendDetectRangeName: "Extend Detect Spells"
 extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger distance."
 

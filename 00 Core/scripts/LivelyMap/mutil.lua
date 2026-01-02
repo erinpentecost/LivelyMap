@@ -250,20 +250,51 @@ local function averageVector3s(array, fn)
             return e
         end
     end
-    local firstPos = fn(array[1])
-    local centerX = firstPos.x
-    local centerY = firstPos.y
-    local centerZ = firstPos.z or 0
-    for i = 2, #array, 1 do
+    local centerX = 0
+    local centerY = 0
+    local centerZ = 0
+    local count = #array
+    for i = 1, #array, 1 do
         local pos = fn(array[i])
-        centerX = centerX + pos.x
-        centerY = centerY + pos.y
-        centerZ = centerZ + (pos.z or 0)
+        if pos then
+            centerX = centerX + pos.x
+            centerY = centerY + pos.y
+            centerZ = centerZ + (pos.z or 0)
+        else
+            count = count - 1
+        end
     end
-    centerX = centerX / #array
-    centerY = centerY / #array
-    centerZ = centerZ / #array
-    return util.vector3(centerX, centerY, centerZ)
+    if count > 0 then
+        centerX = centerX / count
+        centerY = centerY / count
+        centerZ = centerZ / count
+        return util.vector3(centerX, centerY, centerZ)
+    end
+    return nil
+end
+
+-- Canonicalize a string for fuzzy matching
+local function canonicalizeId(s)
+    if not s then
+        return ""
+    end
+
+    -- 1. lowercase
+    s = string.lower(s)
+
+    -- 2. replace separators with space
+    s = s:gsub("[_%-%./]+", " ")
+
+    -- 3. remove punctuation
+    s = s:gsub("%p", "")
+
+    -- 4. collapse whitespace
+    s = s:gsub("%s+", " ")
+
+    -- 5. trim
+    s = s:match("^%s*(.-)%s*$")
+
+    return s
 end
 
 
@@ -315,4 +346,5 @@ return {
     shallowMerge = shallowMerge,
     averageVector3s = averageVector3s,
     hashString = hashString,
+    canonicalizeId = canonicalizeId,
 }
