@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
 
 local MOD_NAME       = require("scripts.LivelyMap.ns")
+local aux_util       = require('openmw_aux.util')
 
 local category       = {
     --- vivec, cantons, velothi towers, tombs.
@@ -146,9 +147,9 @@ local function getScores(doorInfos)
     local out = {}
     for _, door in ipairs(doorInfos) do
         if doorToCategory[door.recordId] then
-            out[doorToCategory[door.recordId]] = (doorToCategory[door.recordId] or 0) + 1
+            out[doorToCategory[door.recordId]] = (out[doorToCategory[door.recordId]] or 0) + 1
         elseif doorToCategory[door.model] then
-            out[doorToCategory[door.model]] = (doorToCategory[door.model] or 0) + 1
+            out[doorToCategory[door.model]] = (out[doorToCategory[door.model]] or 0) + 1
         end
     end
     return out
@@ -187,6 +188,9 @@ local function getTemplateForDoors(doorInfos)
     elseif highScore(category.stronghold) then
         return templates.stronghold
     end
+
+    print("Can't identify area. Scores: " .. aux_util.deepToString(scores, 5))
+
     return templates.default
 end
 
