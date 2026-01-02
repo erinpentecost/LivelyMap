@@ -245,7 +245,7 @@ local automaticContainer = {
     groupKey = automaticGroupKey,
     section = storage.playerSection(automaticGroupKey)
 }
-setmetatable(controlsContainer, lookupFuncTable)
+setmetatable(automaticContainer, lookupFuncTable)
 
 ---@alias SettingContainer table
 

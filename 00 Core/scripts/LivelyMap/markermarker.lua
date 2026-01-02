@@ -45,6 +45,8 @@ local settingCache = {
     autoMarkPrisons = settings.automatic.autoMarkPrisons,
 }
 
+print("settings.automatic: " .. aux_util.deepToString(settings.automatic, 4))
+
 settings.automatic.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.automatic[key]
 end))
@@ -87,6 +89,9 @@ local markerBasicInfo = {
 local function onMarkerActivated(data)
     local template = markerBasicInfo[data.recordId]
     if not template then
+        return
+    end
+    if not template.allowed() then
         return
     end
 
