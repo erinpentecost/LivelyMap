@@ -124,6 +124,13 @@ local function init()
                 renderer = "checkbox",
             },
             {
+                key = "autoMarkFromJournal",
+                name = "autoMarkFromJournalName",
+                description = "autoMarkFromJournalDescription",
+                default = false,
+                renderer = "checkbox",
+            },
+            {
                 key = "autoMarkTemplesAndCults",
                 name = "autoMarkTemplesAndCultsName",
                 description = "autoMarkTemplesAndCultsDescription",

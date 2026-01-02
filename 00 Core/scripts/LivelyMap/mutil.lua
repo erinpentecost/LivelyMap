@@ -279,22 +279,22 @@ local function canonicalizeId(s)
         return ""
     end
 
-    -- 1. lowercase
-    s = string.lower(s)
+    -- Normalize case and separators in one pass
+    s = string.lower(s):gsub("[_%-%./]+", " ")
 
-    -- 2. replace separators with space
-    s = s:gsub("[_%-%./]+", " ")
+    local tokens = {}
 
-    -- 3. remove punctuation
-    s = s:gsub("%p", "")
+    -- Tokenize and strip punctuation per token
+    for w in s:gmatch("%S+") do
+        -- remove punctuation inside token
+        w = w:gsub("%p", "")
+        if w ~= "" then
+            tokens[#tokens + 1] = w
+        end
+    end
 
-    -- 4. collapse whitespace
-    s = s:gsub("%s+", " ")
-
-    -- 5. trim
-    s = s:match("^%s*(.-)%s*$")
-
-    return s
+    table.sort(tokens)
+    return table.concat(tokens, " ")
 end
 
 

@@ -221,26 +221,55 @@ local function onHideMap(data)
     end
 end
 
+---@class DoorInfo
+---@field recordId string
+---@field model string
+
+---@param doorObj any
+---@return DoorInfo?
+local function getDoorInfo(doorObj)
+    local rec = types.Door.record(doorObj)
+    if not rec then
+        return nil
+    end
+    return {
+        recordId = rec.id,
+        model = rec.model,
+    }
+end
+
+
 ---@class AugmentedPos
 ---@field pos util.vector3
 ---@field exteriorCellId string? id for the exterior cell
+---@field doorInfos DoorInfo[] door meshes in the cell
 
----comment
+
 ---@param cell any cell
 ---@return AugmentedPos
 local function getRepresentiveForCell(cell)
-    local center = mutil.averageVector3s(cell:getAll(types.Door), function(e)
+    local doorInfos = {}
+    local doors = cell:getAll(types.Door)
+
+    for _, d in pairs(doors) do
+        local info = getDoorInfo(d)
+        if info then
+            table.insert(doorInfos, info)
+        end
+    end
+
+    local center = mutil.averageVector3s(doors, function(e)
         return e and e.position
     end)
     if center then
-        return { pos = center, exteriorCellId = cell.id }
+        return { pos = center, exteriorCellId = cell.id, doorInfos = doorInfos }
     end
 
     center = mutil.averageVector3s(cell:getAll(types.Static), function(e)
         return e and e.position
     end)
     if center then
-        return { pos = center, exteriorCellId = cell.id }
+        return { pos = center, exteriorCellId = cell.id, doorInfos = doorInfos }
     end
 
     return {
@@ -249,7 +278,8 @@ local function getRepresentiveForCell(cell)
             (cell.gridY + 0.5) * mutil.CELL_SIZE,
             0
         ),
-        exteriorCellId = cell.id
+        exteriorCellId = cell.id,
+        doorInfos = doorInfos,
     }
 end
 
@@ -300,6 +330,7 @@ local function getExteriorLocation(data)
                     return {
                         pos = types.Door.destPosition(door),
                         exteriorCellId = types.Door.destCell(door).id,
+                        doorInfos = { getDoorInfo(door) }
                     }
                 end
 
@@ -377,8 +408,19 @@ local function getFacing(player)
 end
 
 
+---@class ExteriorLocationResult
+---@field pos {x: number, y: number, z: number}?
+---@field exteriorCellId string?
+---@field facing {x: number, y: number}?
+---@field doorInfos DoorInfo[]
+---@field args any
+
 --- This is a helper to get cell information for the player,
 --- since cell:getAll isn't available on local scripts.
+--- This function does too many things, but it's all smashed together
+--- to reduce the number of events needing to be passed (which each have
+--- a delay of one frame).
+---@see ExteriorLocationResult
 local function onGetExteriorLocation(data)
     --- special handling if we're only doing a cell reference.
     local object = data.object
@@ -396,10 +438,12 @@ local function onGetExteriorLocation(data)
     local posObj = getExteriorLocation(object)
     local facing = getFacing(object)
 
+    ---@type ExteriorLocationResult
     local payload = {
         pos = posObj and posObj.pos and { x = posObj.pos.x, y = posObj.pos.y, z = posObj.pos.z },
         exteriorCellId = posObj and posObj.exteriorCellId,
         facing = { x = facing.x, y = facing.y, z = facing.z },
+        doorInfos = posObj and posObj.doorInfos or {},
         args = data,
     }
 

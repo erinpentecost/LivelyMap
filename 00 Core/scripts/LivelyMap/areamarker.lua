@@ -39,6 +39,7 @@ local cellData     = storage.globalSection(MOD_NAME .. "_cellNames"):asTable()
 
 local settingCache = {
     autoMarkNamedExteriorCells = settings.automatic.autoMarkNamedExteriorCells,
+    autoMarkFromJournal = settings.automatic.autoMarkFromJournal
 }
 
 settings.automatic.subscribe(async:callback(function(_, key)
@@ -71,14 +72,21 @@ local function markArea(cellName, cellId)
     })
 end
 
-local function makeTemplate(cellId, cellName)
+---try to pick a good icon for the type of area.
+---@param cellId string
+---@param cellName string
+---@param doorInfos DoorInfo[]
+---@return table
+local function makeTemplate(cellId, cellName, doorInfos)
     --- TODO: try to find a good stamp for the type of cell.
+    print(cellId .. " has doors: " .. aux_util.deepToString(doorInfos, 3))
     return {
         iconName = "circle",
         color = 4,
     }
 end
 
+---@param data ExteriorLocationResult
 local function onReceiveExteriorLocation(data)
     if not data then
         return
@@ -96,7 +104,7 @@ local function onReceiveExteriorLocation(data)
 
     local markId = cellId .. "_area"
 
-    local template = makeTemplate(cellId, cellName)
+    local template = makeTemplate(cellId, cellName, data.doorInfos)
 
     ---@type MarkerData
     local markerInfo = {
@@ -112,14 +120,7 @@ local function onReceiveExteriorLocation(data)
 end
 
 
-local function onQuestUpdate(questId, stage)
-    print("quest update!!")
-    print(aux_util.deepToString(types.Player.journal(pself).topics, 4))
-    -- test with:
-    -- Journal, "FG_Egg_Poachers", 1
-    -- Journal, "FG_VerethiGang", 10
-    --
-
+local function markFromJournal()
     -- build map of canonicalized topics
     local topics = {}
     for _, topic in pairs(types.Player.journal(pself).topics) do
@@ -135,6 +136,12 @@ local function onQuestUpdate(questId, stage)
         end
     end
 end
+
+interfaces.LivelyMapDraw.onMapMoved(function(data)
+    if (not data.swapped) and (settingCache.autoMarkFromJournal) then
+        markFromJournal()
+    end
+end)
 
 local lastExteriorCell = nil
 local delta = 0
@@ -168,6 +175,5 @@ return {
     },
     engineHandlers = {
         onUpdate = onUpdate,
-        onQuestUpdate = onQuestUpdate
     }
 }
