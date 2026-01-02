@@ -169,6 +169,13 @@ local function init()
                 renderer = "checkbox",
             },
             {
+                key = "volatileNeravarinesJourney",
+                name = "volatileNeravarinesJourneyName",
+                description = "volatileNeravarinesJourneyDescription",
+                default = false,
+                renderer = "checkbox",
+            },
+            {
                 key = "palleteColor1",
                 name = "palleteColor1Name",
                 renderer = MOD_NAME .. "color",

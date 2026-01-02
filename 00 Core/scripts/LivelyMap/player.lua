@@ -19,16 +19,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -- This file is in charge of tracking and exposing path information.
 -- Interact with it via the interface it exposes.
 
-local MOD_NAME    = require("scripts.LivelyMap.ns")
-local types       = require('openmw.types')
-local json        = require('scripts.LivelyMap.json.json')
-local mutil       = require('scripts.LivelyMap.mutil')
-local core        = require('openmw.core')
-local pself       = require("openmw.self")
-local util        = require("openmw.util")
-local vfs         = require('openmw.vfs')
-local aux_util    = require('openmw_aux.util')
-local settings    = require("scripts.LivelyMap.settings")
+local MOD_NAME = require("scripts.LivelyMap.ns")
+local types    = require('openmw.types')
+local json     = require('scripts.LivelyMap.json.json')
+local mutil    = require('scripts.LivelyMap.mutil')
+local core     = require('openmw.core')
+local pself    = require("openmw.self")
+local util     = require("openmw.util")
+local vfs      = require('openmw.vfs')
+local aux_util = require('openmw_aux.util')
+local settings = require("scripts.LivelyMap.settings")
+local async    = require("openmw.async")
+
+
+local settingCache = {
+    volatileNeravarinesJourney = settings.main.volatileNeravarinesJourney,
+}
+settings.main.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.main[key]
+end))
+
 
 local magicPrefix = "!!" .. MOD_NAME .. "!!STARTOFENTRY!!"
 local magicSuffix = "!!" .. MOD_NAME .. "!!ENDOFENTRY!!"
@@ -123,6 +133,9 @@ allData[playerName] = {
 }
 
 local function onSave()
+    if settingCache.volatileNeravarinesJourney then
+        return nil
+    end
     -- debug
     --print("onSave:" .. aux_util.deepToString(fromSave, 3))
     -- do the save. this needs to be in json
@@ -152,6 +165,10 @@ end
 
 local loadDone = false
 local function onLoad(data)
+    if settingCache.volatileNeravarinesJourney then
+        return nil
+    end
+
     if loadDone then
         error("onLoad called twice")
     end
