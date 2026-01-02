@@ -280,7 +280,6 @@ end
 --- This is not the right way to do UI.
 --- Please don't use it as an example.
 
-local stampMakerWindow
 --- must be odd and >= 3
 local numColumns = 5
 local previewIconSize = util.vector2(64, 64)
@@ -586,78 +585,86 @@ local function updateDeleteButtonElement()
 end
 updateDeleteButtonElement()
 
-stampMakerWindow = ui.create {
-    name = "stampMaker",
-    layer = 'Modal',
-    type = ui.TYPE.Container,
-    template = interfaces.MWUI.templates.boxTransparentThick,
-    props = {
-        relativePosition = util.vector2(0.5, 0.5),
-        anchor = util.vector2(0.5, 0.5),
-        visible = false,
-        autoSize = true,
-    },
-    content = ui.content { {
-        name = 'mainV',
-        type = ui.TYPE.Flex,
+local stampMakerWindow = nil
+
+local function newStampMakerWindow()
+    return ui.create {
+        name = "stampMaker",
+        layer = 'Modal',
+        type = ui.TYPE.Container,
+        template = interfaces.MWUI.templates.boxTransparentThick,
         props = {
-            relativePosition = util.vector2(0.5, 0),
-            --anchor = util.vector2(0.5, 0.5),
-            horizontal = false,
-            --size = util.vector2(400, 400),
-            --autoSize = false,
-            --autoSize = true
+            relativePosition = util.vector2(0.5, 0.5),
+            anchor = util.vector2(0.5, 0.5),
+            visible = false,
+            autoSize = true,
         },
-        content = ui.content {
-            myui.padWidget(0, 4),
-            noteBox,
-            spacer,
-            myui.padWidget(0, 4),
-            gridElement,
-            spacer,
-            myui.padWidget(0, 8),
-            {
-                name = 'buttons',
-                type = ui.TYPE.Flex,
-                props = {
-                    relativePosition = util.vector2(0.5, 0),
-                    size = util.vector2(windowWidth, 40),
-                    --anchor = util.vector2(0.5, 0.5),
-                    horizontal = true,
-                    --size = util.vector2(400, 400),
-                    --autoSize = false,
-                    --autoSize = true
-                },
-                content = ui.content {
-                    spacer,
-                    deleteButtonElement,
-                    spacer,
-                    cancelButtonElement,
-                    spacer,
-                    saveButtonElement,
-                    spacer,
-                },
-                external = {
-                    grow = 1,
-                }
+        content = ui.content { {
+            name = 'mainV',
+            type = ui.TYPE.Flex,
+            props = {
+                relativePosition = util.vector2(0.5, 0),
+                --anchor = util.vector2(0.5, 0.5),
+                horizontal = false,
+                --size = util.vector2(400, 400),
+                --autoSize = false,
+                --autoSize = true
             },
-        }
-    } }
-}
+            content = ui.content {
+                myui.padWidget(0, 4),
+                noteBox,
+                spacer,
+                myui.padWidget(0, 4),
+                gridElement,
+                spacer,
+                myui.padWidget(0, 8),
+                {
+                    name = 'buttons',
+                    type = ui.TYPE.Flex,
+                    props = {
+                        relativePosition = util.vector2(0.5, 0),
+                        size = util.vector2(windowWidth, 40),
+                        --anchor = util.vector2(0.5, 0.5),
+                        horizontal = true,
+                        --size = util.vector2(400, 400),
+                        --autoSize = false,
+                        --autoSize = true
+                    },
+                    content = ui.content {
+                        spacer,
+                        deleteButtonElement,
+                        spacer,
+                        cancelButtonElement,
+                        spacer,
+                        saveButtonElement,
+                        spacer,
+                    },
+                    external = {
+                        grow = 1,
+                    }
+                },
+            }
+        } }
+    }
+end
 
 
 local addedMode = false
 ---@param data EditingMarkerData
 local function editMarkerWindow(data)
+    if stampMakerWindow then
+        stampMakerWindow:destroy()
+    end
+
     if not data then
         if addedMode then
             interfaces.UI.removeMode('Interface')
             addedMode = false
         end
-        stampMakerWindow.layout.props.visible = false
-        stampMakerWindow:update()
         return
     end
+
+    stampMakerWindow = newStampMakerWindow()
 
     if type(data) ~= "table" then
         error("editMarkerWindow: data should be a table, not a " .. type(data))

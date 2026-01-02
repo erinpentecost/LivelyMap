@@ -332,21 +332,25 @@ settings.pso.subscribe(async:callback(function(_, key)
     end
 end))
 
-local mainWindow = ui.create {
-    name = "worldmaproot",
-    layer = 'Windows',
-    type = ui.TYPE.Widget,
-    props = {
-        size = ui.screenSize(),
-        visible = false,
-    },
-    events = {
-        mousePress = async:callback(mapClickPress),
-        mouseRelease = async:callback(mapClickRelease),
-        mouseMove = async:callback(mapMouseMove),
-    },
-    content = ui.content { iconContainer, hoverBox, menuBar },
-}
+local mainWindow = nil
+
+local function newMainWindow()
+    return ui.create {
+        name = "worldmaproot",
+        layer = 'Windows',
+        type = ui.TYPE.Widget,
+        props = {
+            size = ui.screenSize(),
+            visible = true,
+        },
+        events = {
+            mousePress = async:callback(mapClickPress),
+            mouseRelease = async:callback(mapClickRelease),
+            mouseMove = async:callback(mapMouseMove),
+        },
+        content = ui.content { iconContainer, hoverBox, menuBar },
+    }
+end
 
 --- Change hover box content.
 ---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
@@ -516,7 +520,9 @@ local function renderIcons()
     end
 
     iconContainer:update()
-    mainWindow:update()
+    if mainWindow then
+        mainWindow:update()
+    end
 
     --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
 
@@ -537,11 +543,18 @@ local function renderIcons()
     --]]
 end
 
+---@type fun(data :MeshAnnotatedMapData)[]
 local onMapMovedHandlers = {}
+---@type fun(data :MeshAnnotatedMapData)[]
 local onMapHiddenHandlers = {}
 
+---Don't process these events immediately, since their origin may be
+---from a delayed action. Delayed actions can't be nested.
+---@type {fn: fun(data : MeshAnnotatedMapData), data : MeshAnnotatedMapData}[]
+local pendingMapChangeEvents = {}
+
 ---@param data MeshAnnotatedMapData
-local function onMapMoved(data)
+local function doOnMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data
 
@@ -551,9 +564,8 @@ local function onMapMoved(data)
 
     if not data.swapped then
         interfaces.UI.addMode('Interface', { windows = {} })
-        mainWindow.layout.props.visible = true
         if currentMapData then
-            mainWindow:update()
+            mainWindow = newMainWindow()
         end
     end
 
@@ -561,10 +573,16 @@ local function onMapMoved(data)
 
     interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
 
-    renderIcons()
+    --this might be causing race condition issues
+    --renderIcons()
 end
 
-local function onMapHidden(data)
+---@param data MeshAnnotatedMapData
+local function onMapMoved(data)
+    table.insert(pendingMapChangeEvents, { fn = doOnMapMoved, data = data })
+end
+
+local function doOnMapHidden(data)
     print("onMapHidden" .. aux_util.deepToString(data, 3))
 
     for _, fn in ipairs(onMapHiddenHandlers) do
@@ -573,15 +591,35 @@ local function onMapHidden(data)
 
     if not data.swapped then
         interfaces.UI.removeMode('Interface')
-        mainWindow.layout.props.visible = false
-        mainWindow:update()
+        if mainWindow then
+            mainWindow:destroy()
+        end
     end
     -- TODO: maybe hide icons?
     currentMapData = nil
 end
 
+---@param data MeshAnnotatedMapData
+local function onMapHidden(data)
+    table.insert(pendingMapChangeEvents, { fn = doOnMapHidden, data = data })
+end
+
+---
+---@return boolean true if an event was processed.
+local function processPendingMapEvent()
+    local event = table.remove(pendingMapChangeEvents, 1)
+    if event then
+        event.fn(event.data)
+        return true
+    end
+    return false
+end
+
 --local lastCameraPos = nil
 local function onUpdate(dt)
+    if processPendingMapEvent() then
+        return
+    end
     if currentMapData == nil then
         return
     end
