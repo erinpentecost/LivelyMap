@@ -537,11 +537,18 @@ local function renderIcons()
     --]]
 end
 
+---@type fun(data :MeshAnnotatedMapData)[]
 local onMapMovedHandlers = {}
+---@type fun(data :MeshAnnotatedMapData)[]
 local onMapHiddenHandlers = {}
 
+---Don't process these events immediately, since their origin may be
+---from a delayed action. Delayed actions can't be nested.
+---@type {fn: fun(data : MeshAnnotatedMapData), data : MeshAnnotatedMapData}[]
+local pendingMapChangeEvents = {}
+
 ---@param data MeshAnnotatedMapData
-local function onMapMoved(data)
+local function doOnMapMoved(data)
     print("onMapMoved" .. aux_util.deepToString(data, 3))
     currentMapData = data
 
@@ -561,10 +568,16 @@ local function onMapMoved(data)
 
     interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
 
-    renderIcons()
+    --this might be causing race condition issues
+    --renderIcons()
 end
 
-local function onMapHidden(data)
+---@param data MeshAnnotatedMapData
+local function onMapMoved(data)
+    table.insert(pendingMapChangeEvents, { fn = doOnMapMoved, data = data })
+end
+
+local function doOnMapHidden(data)
     print("onMapHidden" .. aux_util.deepToString(data, 3))
 
     for _, fn in ipairs(onMapHiddenHandlers) do
@@ -580,8 +593,27 @@ local function onMapHidden(data)
     currentMapData = nil
 end
 
+---@param data MeshAnnotatedMapData
+local function onMapHidden(data)
+    table.insert(pendingMapChangeEvents, { fn = doOnMapHidden, data = data })
+end
+
+---
+---@return boolean true if an event was processed.
+local function processPendingMapEvent()
+    local event = table.remove(pendingMapChangeEvents, 1)
+    if event then
+        event.fn(event.data)
+        return true
+    end
+    return false
+end
+
 --local lastCameraPos = nil
 local function onUpdate(dt)
+    if processPendingMapEvent() then
+        return
+    end
     if currentMapData == nil then
         return
     end

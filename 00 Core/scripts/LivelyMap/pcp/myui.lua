@@ -272,6 +272,7 @@ local textColors = {
 -- Shared code for making button layouts
 local function createButton(parent, layout, updateColor, buttonFunction, args)
     args = args or {}
+    --- these callbacks are being invoked at the wrong time
     layout.events = {
         mousePress = async:callback(function(mouseEvent, data)
             if mouseEvent.button == 1 then
@@ -298,29 +299,6 @@ local function createButton(parent, layout, updateColor, buttonFunction, args)
         end)
     }
     return layout
-end
-
--- Create an image button to execute a specified function
-local function createImageButton(parent, name, properties, buttonFunction, args)
-    local buttonColors = {
-        default = util.color.rgb(1.0, 1.0, 1.0),
-        over = util.color.rgb(0.8, 0.8, 0.8),
-        pressed = util.color.rgb(0.6, 0.6, 0.6)
-    }
-    local buttonLayout = {
-        name = name,
-        type = ui.TYPE.Image,
-        props = properties,
-        userData = {}
-    }
-
-    local button = createButton(parent, buttonLayout,
-        function(layout, state)
-            layout.props.color = buttonColors[state]
-        end,
-        buttonFunction, args)
-
-    return button
 end
 
 -- Dumb nonsense to get around an OpenMW bug
