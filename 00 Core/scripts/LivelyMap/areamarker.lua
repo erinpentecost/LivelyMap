@@ -72,14 +72,22 @@ local function markArea(cellName, cellId)
     })
 end
 
-local function makeTemplate(cellId, cellName)
+---try to pick a good icon for the type of area.
+---@param cellId string
+---@param cellName string
+---@param doorInfos DoorInfo[]
+---@return table
+local function makeTemplate(cellId, cellName, doorInfos)
     --- TODO: try to find a good stamp for the type of cell.
+    --- TODO: doors is nil on walk-up
+    print(cellId .. " has doors: " .. aux_util.deepToString(doorInfos, 3))
     return {
         iconName = "circle",
         color = 4,
     }
 end
 
+---@param data ExteriorLocationResult
 local function onReceiveExteriorLocation(data)
     if not data then
         return
@@ -97,7 +105,7 @@ local function onReceiveExteriorLocation(data)
 
     local markId = cellId .. "_area"
 
-    local template = makeTemplate(cellId, cellName)
+    local template = makeTemplate(cellId, cellName, data.doorInfos)
 
     ---@type MarkerData
     local markerInfo = {

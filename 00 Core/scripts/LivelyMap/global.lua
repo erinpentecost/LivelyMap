@@ -411,8 +411,19 @@ local function getFacing(player)
 end
 
 
+---@class ExteriorLocationResult
+---@field pos {x: number, y: number, z: number}?
+---@field exteriorCellId string?
+---@field facing {x: number, y: number}?
+---@field doorInfos DoorInfo[]
+---@field args any
+
 --- This is a helper to get cell information for the player,
 --- since cell:getAll isn't available on local scripts.
+--- This function does too many things, but it's all smashed together
+--- to reduce the number of events needing to be passed (which each have
+--- a delay of one frame).
+---@see ExteriorLocationResult
 local function onGetExteriorLocation(data)
     --- special handling if we're only doing a cell reference.
     local object = data.object
@@ -430,10 +441,12 @@ local function onGetExteriorLocation(data)
     local posObj = getExteriorLocation(object)
     local facing = getFacing(object)
 
+    ---@type ExteriorLocationResult
     local payload = {
         pos = posObj and posObj.pos and { x = posObj.pos.x, y = posObj.pos.y, z = posObj.pos.z },
         exteriorCellId = posObj and posObj.exteriorCellId,
         facing = { x = facing.x, y = facing.y, z = facing.z },
+        doorInfos = posObj and posObj.doorInfos or {},
         args = data,
     }
 

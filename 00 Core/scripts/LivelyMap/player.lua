@@ -234,6 +234,7 @@ end
 
 
 local lastExteriorPosition = nil
+---@param data ExteriorLocationResult
 local function onReceiveExteriorLocation(data)
     if not data then
         return
