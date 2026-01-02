@@ -4,9 +4,14 @@ MENU: scripts/LivelyMap/colorpicker/register.lua
 PLAYER: scripts/LivelyMap/register_actions.lua
 MENU: scripts/LivelyMap/menu_settings.lua
 
+# Cache expensive stuff to temporary storage
+GLOBAL: scripts/LivelyMap/loaders/cellnames.lua
+GLOBAL: scripts/LivelyMap/loaders/mapdata.lua
+
+# Extendable interfaces
+PLAYER: scripts/LivelyMap/doorcategorizer.lua
+
 # Core stuff
-GLOBAL: scripts/LivelyMap/cellnames.lua
-GLOBAL: scripts/LivelyMap/mapdata.lua
 GLOBAL: scripts/LivelyMap/global.lua
 PLAYER: scripts/LivelyMap/player.lua
 PLAYER: scripts/LivelyMap/controls.lua

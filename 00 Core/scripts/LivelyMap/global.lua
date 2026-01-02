@@ -327,10 +327,15 @@ local function getExteriorLocation(data)
             if destCell then
                 -- If this door leads directly outside, we're done
                 if destCell.isExterior then
+                    --- we actually need to get all doors or we will
+                    --- mess up the cache when a player uses a
+                    --- mage guild guide.
+                    local tmp = getRepresentiveForCell(destCell)
+
                     return {
                         pos = types.Door.destPosition(door),
                         exteriorCellId = types.Door.destCell(door).id,
-                        doorInfos = { getDoorInfo(door) }
+                        doorInfos = tmp.doorInfos,
                     }
                 end
 
