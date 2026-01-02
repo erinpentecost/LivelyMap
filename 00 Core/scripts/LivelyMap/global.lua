@@ -221,29 +221,58 @@ local function onHideMap(data)
     end
 end
 
+---@class DoorInfo
+---@field recordId string
+---@field model string
+
+---@param doorObj any
+---@return DoorInfo?
+local function getDoorInfo(doorObj)
+    local rec = types.Door.record(doorObj)
+    if not rec then
+        return nil
+    end
+    return {
+        recordId = rec.id,
+        model = rec.model,
+    }
+end
+
+
 ---@class AugmentedPos
 ---@field pos util.vector3
 ---@field exteriorCellId string? id for the exterior cell
+---@field doorInfos DoorInfo[] door meshes in the cell
 
----comment
+
 ---@param cell any cell
 ---@return AugmentedPos
 local function getRepresentiveForCell(cell)
+    local doorInfos = {}
+    local doors = cell:getAll(types.Door)
+
+    for _, d in pairs(doors) do
+        local info = getDoorInfo(d)
+        if info then
+            table.insert(doorInfos, info)
+        end
+    end
+
     --- TODO: I can get all the door records here
     --- which will tell me what type of place this is
     --- then I can pick the correct stamp later
-    local center = mutil.averageVector3s(cell:getAll(types.Door), function(e)
+    local center = mutil.averageVector3s(doors, function(e)
         return e and e.position
     end)
     if center then
-        return { pos = center, exteriorCellId = cell.id }
+        return { pos = center, exteriorCellId = cell.id, doorInfos = doorInfos }
     end
 
     center = mutil.averageVector3s(cell:getAll(types.Static), function(e)
         return e and e.position
     end)
     if center then
-        return { pos = center, exteriorCellId = cell.id }
+        return { pos = center, exteriorCellId = cell.id, doorInfos = doorInfos }
     end
 
     return {
@@ -252,7 +281,8 @@ local function getRepresentiveForCell(cell)
             (cell.gridY + 0.5) * mutil.CELL_SIZE,
             0
         ),
-        exteriorCellId = cell.id
+        exteriorCellId = cell.id,
+        doorInfos = doorInfos,
     }
 end
 
@@ -303,6 +333,7 @@ local function getExteriorLocation(data)
                     return {
                         pos = types.Door.destPosition(door),
                         exteriorCellId = types.Door.destCell(door).id,
+                        doorInfos = { getDoorInfo(door) }
                     }
                 end
 
