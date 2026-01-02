@@ -1,6 +1,8 @@
 # LivelyMap
 
-This is an OpenMW mod and tool.
+Overworld map replacer for openmw. Rendered in 3D (with the help of parallax shaders). Track and show your historic path through the game. Use custom stamp markers or also rely on automatic markers.
+
+![texture options](livelymap_textures.png)
 
 ## Installing the mod
 
