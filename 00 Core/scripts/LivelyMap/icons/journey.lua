@@ -91,7 +91,6 @@ local function newIcon()
         end,
         onHide = function(s)
             -- s is this icon.
-            --print("hiding " .. getRecord(s.entity).name)
             s.element.layout.props.visible = false
             s.element:update()
         end,

@@ -43,7 +43,7 @@ local settingCache   = {
     palleteColor4   = settings.main.palleteColor4,
     palleteColor5   = settings.main.palleteColor5,
 }
-print("first run settings:" .. aux_util.deepToString(settingCache, 5))
+
 settings.main.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.main[key]
 end))
@@ -566,6 +566,7 @@ end
 
 local function onMapHidden(data)
     print("onMapHidden" .. aux_util.deepToString(data, 3))
+
     for _, fn in ipairs(onMapHiddenHandlers) do
         fn(data)
     end

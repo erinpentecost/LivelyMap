@@ -36,6 +36,9 @@ extendDetectRangeDescription: "Extend Detect spell ranges so they cover a larger
 drawLimitNeravarinesJourneyName: "Limit Neravarine's Journey"
 drawLimitNeravarinesJourneyDescription: "Only draw the last 4 hours of the Neravarine's Journey. Path data will still be saved."
 
+volatileNeravarinesJourneyName: "Volatile Neravarine's Journey"
+volatileNeravarinesJourneyDescription: "Don't load or save path data. This will speed up loading and saving your game."
+
 palleteColor1Name: "Pallete Color 1"
 palleteColor2Name: "Pallete Color 2"
 palleteColor3Name: "Pallete Color 3"
