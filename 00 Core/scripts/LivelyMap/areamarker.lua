@@ -47,6 +47,7 @@ settings.automatic.subscribe(async:callback(function(_, key)
 end))
 
 
+
 ---@param cellName string
 ---@param cellId string?
 local function markArea(cellName, cellId)
@@ -72,20 +73,6 @@ local function markArea(cellName, cellId)
     })
 end
 
----try to pick a good icon for the type of area.
----@param cellId string
----@param cellName string
----@param doorInfos DoorInfo[]
----@return table
-local function makeTemplate(cellId, cellName, doorInfos)
-    --- TODO: try to find a good stamp for the type of cell.
-    print(cellId .. " has doors: " .. aux_util.deepToString(doorInfos, 3))
-    return {
-        iconName = "circle",
-        color = 4,
-    }
-end
-
 ---@param data ExteriorLocationResult
 local function onReceiveExteriorLocation(data)
     if not data then
@@ -104,7 +91,7 @@ local function onReceiveExteriorLocation(data)
 
     local markId = cellId .. "_area"
 
-    local template = makeTemplate(cellId, cellName, data.doorInfos)
+    local template = interfaces.LivelyMapDoorCategorizer.getTemplateForDoors(data.doorInfos)
 
     ---@type MarkerData
     local markerInfo = {

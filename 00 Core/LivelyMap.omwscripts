@@ -8,6 +8,9 @@ MENU: scripts/LivelyMap/menu_settings.lua
 GLOBAL: scripts/LivelyMap/loaders/cellnames.lua
 GLOBAL: scripts/LivelyMap/loaders/mapdata.lua
 
+# Extendable interfaces
+PLAYER: scripts/LivelyMap/doorcategorizer.lua
+
 # Core stuff
 GLOBAL: scripts/LivelyMap/global.lua
 PLAYER: scripts/LivelyMap/player.lua
