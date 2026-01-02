@@ -82,34 +82,6 @@ local function hideIcon(icon)
     end
 end
 
-local hoverBox = ui.create {
-    name = 'hoverBox',
-    type = ui.TYPE.Container,
-    template = interfaces.MWUI.templates.boxTransparent,
-    props = {
-        --relativePosition = util.vector2(0.5, 0.5),
-        --size = util.vector2(200, 50),
-        --anchor = util.vector2(0.5, 0.5),
-        relativePosition = util.vector2(0.5, 0.9),
-        anchor = util.vector2(0.5, 1),
-        visible = false
-    },
-    content = ui.content { {
-        name = 'padding',
-        type = ui.TYPE.Container,
-        template = interfaces.MWUI.templates.padding,
-        props = {
-            --relativePosition = util.vector2(0.5, 0.5),
-            --size = util.vector2(200, 50),
-            --anchor = util.vector2(0.5, 0.5),
-            --relativePosition = util.vector2(0.5, 0.9),
-            --anchor = util.vector2(0.5, 1),
-            --visible = false
-        },
-        content = ui.content {}
-    } }
-}
-
 local mouseData = {
     dragging = false,
     clickStartViewportPos = nil,
@@ -332,7 +304,33 @@ settings.pso.subscribe(async:callback(function(_, key)
     end
 end))
 
+local function newHoverBoxLayout(childLayout)
+    if not childLayout then
+        return { name = 'hoverBox', props = { visible = false } }
+    end
+    return {
+        name = 'hoverBox',
+        type = ui.TYPE.Container,
+        template = interfaces.MWUI.templates.boxTransparent,
+        props = {
+            --relativePosition = util.vector2(0.5, 0.5),
+            --size = util.vector2(200, 50),
+            --anchor = util.vector2(0.5, 0.5),
+            relativePosition = util.vector2(0.5, 0.9),
+            anchor = util.vector2(0.5, 1),
+        },
+        content = ui.content { {
+            name = 'padding',
+            type = ui.TYPE.Container,
+            template = interfaces.MWUI.templates.padding,
+            props = {},
+            content = ui.content { childLayout }
+        } }
+    }
+end
+
 local mainWindow = nil
+local hoverBox = ui.create(newHoverBoxLayout())
 
 local function newMainWindow()
     return ui.create {
@@ -355,16 +353,19 @@ end
 --- Change hover box content.
 ---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
 local function setHoverBoxContent(layout)
-    if layout then
-        hoverBox.layout.content["padding"].content = ui.content { layout }
-        hoverBox.layout.props.visible = true
-    else
-        hoverBox.layout.content["padding"].content = ui.content {}
-        hoverBox.layout.props.visible = false
+    hoverBox.layout = newHoverBoxLayout(layout)
+
+    if not mainWindow then
+        return
     end
-    if currentMapData then
-        hoverBox:update()
-    end
+
+    --print(aux_util.deepToString(mainWindow.layout.content, 5))
+
+    hoverBox:update()
+    --local hovIndex = mainWindow.layout.content:indexOf("hoverBox")
+    --mainWindow.layout.content[hovIndex].layout = newHoverBoxLayout(layout)
+
+    mainWindow:update()
 end
 
 local function closeToCenter(viewportPos)
