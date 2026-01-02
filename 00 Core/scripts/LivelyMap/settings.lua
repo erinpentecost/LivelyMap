@@ -23,6 +23,7 @@ local input                    = require('openmw.input')
 
 local psoGroupKey              = "Settings/" .. MOD_NAME .. "/pso"
 local controlsGroupKey         = "Settings/" .. MOD_NAME .. "/controls"
+local automaticGroupKey        = "Settings/" .. MOD_NAME .. "/automatic"
 local mainGroupKey             = "Settings/" .. MOD_NAME
 
 local toggleMapWindowActionKey = MOD_NAME .. "_ToggleMapWindow"
@@ -102,6 +103,38 @@ local function init()
                 name = "controllerButtonsName",
                 description = "controllerButtonsDescription",
                 default = true,
+                renderer = "checkbox",
+            },
+        }
+    }
+
+    interfaces.Settings.registerGroup {
+        key = automaticGroupKey,
+        page = MOD_NAME,
+        l10n = MOD_NAME,
+        name = "automaticName",
+        description = "automaticDescription",
+        permanentStorage = true,
+        settings = {
+            {
+                key = "autoMarkNamedExteriorCells",
+                name = "autoMarkNamedExteriorCellsName",
+                description = "autoMarkNamedExteriorCellsDescription",
+                default = false,
+                renderer = "checkbox",
+            },
+            {
+                key = "autoMarkTemplesAndCults",
+                name = "autoMarkTemplesAndCultsName",
+                description = "autoMarkTemplesAndCultsDescription",
+                default = true,
+                renderer = "checkbox",
+            },
+            {
+                key = "autoMarkPrisons",
+                name = "autoMarkPrisonsName",
+                description = "autoMarkPrisonsDescription",
+                default = false,
                 renderer = "checkbox",
             },
         }
@@ -208,6 +241,11 @@ local controlsContainer = {
 }
 setmetatable(controlsContainer, lookupFuncTable)
 
+local automaticContainer = {
+    groupKey = automaticGroupKey,
+    section = storage.playerSection(automaticGroupKey)
+}
+setmetatable(automaticContainer, lookupFuncTable)
 
 ---@alias SettingContainer table
 
@@ -215,6 +253,7 @@ setmetatable(controlsContainer, lookupFuncTable)
 ---@field init fun()
 ---@field main SettingContainer
 ---@field pso SettingContainer
+---@field automatic SettingContainer
 
 ---@type Settings
 return {
@@ -222,4 +261,5 @@ return {
     main = mainContainer,
     pso = psoContainer,
     controls = controlsContainer,
+    automatic = automaticContainer,
 }

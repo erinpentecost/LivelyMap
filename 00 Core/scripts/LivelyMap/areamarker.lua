@@ -37,12 +37,32 @@ local localization = core.l10n(MOD_NAME)
 
 local cellData     = storage.globalSection(MOD_NAME .. "_cellNames"):asTable()
 
+local settingCache = {
+    autoMarkNamedExteriorCells = settings.automatic.autoMarkNamedExteriorCells,
+}
 
-local function markArea(cellName)
-    local cellId = cellData[cellName]
+settings.automatic.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.automatic[key]
+end))
+
+
+---@param cellName string
+---@param cellId string?
+local function markArea(cellName, cellId)
+    if not cellId then
+        cellId = cellData[cellName]
+    end
     if not cellId then
         error("markArea given bad cell name: " .. tostring(cellName))
     end
+
+    local markId = cellId .. "_area"
+    local exists = interfaces.LivelyMapMarker.getMarkerByID(markId)
+    if exists then
+        -- don't re-mark areas.
+        return
+    end
+
     core.sendGlobalEvent(MOD_NAME .. "onGetExteriorLocation", {
         cellName = cellName,
         cellId = cellId,
@@ -52,12 +72,9 @@ local function markArea(cellName)
 end
 
 local function makeTemplate(cellId, cellName)
-    -- object is basically nil or a door
-    --
-    -- daedric shrines usually have "shrine" in the id
-    --
+    --- TODO: try to find a good stamp for the type of cell.
     return {
-        iconName = "star",
+        iconName = "circle",
         color = 4,
     }
 end
@@ -77,12 +94,7 @@ local function onReceiveExteriorLocation(data)
         error("onReceiveExteriorLocation bad data: " .. aux_util.deepToString(data, 3))
     end
 
-    --- don't change the marker if it already exists
     local markId = cellId .. "_area"
-    local exists = interfaces.LivelyMapMarker.getMarkerByID(markId)
-    if exists then
-        return
-    end
 
     local template = makeTemplate(cellId, cellName)
 
@@ -106,15 +118,42 @@ local function onQuestUpdate(questId, stage)
     -- test with:
     -- Journal, "FG_Egg_Poachers", 1
     -- Journal, "FG_VerethiGang", 10
-    for name, _ in pairs(cellData) do
-        --- TODO: super broken
-        --- these topics are like "Vivec Arena", with lowercase id "vivec arena"
-        --- but the cell name is like "Vivec, Arena Pit"
-        local topic = types.Player.journal(pself).topics[string.lower(name)]
-        if topic and #topic.entries then
-            print("Found journal entry for '" .. name .. "', marking it on the map.")
-            markArea(name)
+    --
+
+    -- build map of canonicalized topics
+    local topics = {}
+    for _, topic in pairs(types.Player.journal(pself).topics) do
+        if #topic.entries > 0 then
+            topics[mutil.canonicalizeId(topic.name)] = true
         end
+    end
+
+    for cellName, cellId in pairs(cellData) do
+        if topics[mutil.canonicalizeId(cellName)] then
+            print("Found journal entry for '" .. cellName .. "', marking it on the map.")
+            markArea(cellName, cellId)
+        end
+    end
+end
+
+local lastExteriorCell = nil
+local delta = 0
+local function onUpdate(dt)
+    if dt == 0 then
+        -- don't do anything if paused.
+        return
+    end
+    if not settingCache.autoMarkNamedExteriorCells then
+        return
+    end
+    delta = delta - dt
+    if delta > 0 then
+        return
+    end
+    delta = 1.3
+    if pself.cell.isExterior and lastExteriorCell ~= pself.cell then
+        lastExteriorCell = pself.cell
+        markArea(pself.cell.name, pself.cell.id)
     end
 end
 
@@ -128,6 +167,7 @@ return {
         [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation,
     },
     engineHandlers = {
+        onUpdate = onUpdate,
         onQuestUpdate = onQuestUpdate
     }
 }
