@@ -4,6 +4,8 @@ This is an OpenMW mod and tool.
 
 ## Installing the mod
 
+First set up the data folders and plugin. Then run the sync tool. This order matters.
+
 ### Data Folders and Plugin
 
 There are *Data Folders* in this folder that you need to add to your `openmw.cfg`.
@@ -20,11 +22,11 @@ Don't add `LivelyMap.omwscripts` if you see it.
 This will generate all the required textures and metadata from your install.
 It will also extract path data from your saved games.
 
-You can specify a custom ramp.bmp by placing it in the same folder as this README and then running the sync tool. This should be a 1x512 resolution file, with the midpoint representing the water level.
+You can specify a custom ramp file with the `-ramp="myrampfile.bmp"` argument. This should be a 1x512 resolution file, with the midpoint representing the water level. You'll need to modify the sync script to include this argument.
 
 ## Updating the mod
 
-Make sure `cmd/lively/lively` or `cmd/lively/lively.exe` are deleted after you pull in the new files.
+Make sure `cmd/lively/lively` or `cmd/lively/lively.exe` are deleted after you pull in the new files. This is the binary that is built when you run the sync script.
 
 ## Using the map
 
@@ -38,8 +40,8 @@ There are buttons in a bar at the top of the map. These do extra stuff.
 
 If you are using a parallax shader, the map will appear 3-dimensional! This is cool, but you will need to calibrate the vertical offset or icons will appear to float as you pan around. In the mod settings, enable *Parallax Calibration Mode*, then bring up the map. This adds three buttons to the top bar. The *-* reduces the offset width, and *+* increases it. The *down-arrow-into-a-bucket* toggles between only allowing icons to be pushed down into the mesh or if the offset width should be equally distributed between the top and bottom of the mesh. This is determined by how your shader is handling parallax offsets. When you're done, turn calibration mode off in your settings.
 
-## Debugging
+## FAQ
 
-To bring up the map, open your console and type `lua map`.
+*Why is the map pink?* You either didn't run the sync tool, or the sync tool failed.
 
-To bring up the map marker window, open your console and type `lua marker`. Optionally provide an id (ex: `lua marker mymarker`). Markers will appear in the map.
+*Why are the icons so floaty?* You are using a parallax shader but haven't followed the Parallax Shader Calibration steps.
