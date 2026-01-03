@@ -571,6 +571,7 @@ local function doOnMapMoved(data)
 
     if not data.swapped then
         interfaces.UI.addMode('Interface', { windows = {} })
+        interfaces.GamepadControls.setGamepadCursorActive(true)
         if currentMapData then
             mainWindow = newMainWindow()
         end
@@ -598,6 +599,7 @@ local function doOnMapHidden(data)
 
     if not data.swapped then
         interfaces.UI.removeMode('Interface')
+        interfaces.GamepadControls.setGamepadCursorActive(false)
         if mainWindow then
             mainWindow:destroy()
         end
