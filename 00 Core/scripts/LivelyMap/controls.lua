@@ -26,6 +26,7 @@ local camera      = require("openmw.camera")
 local ui          = require("openmw.ui")
 local settings    = require("scripts.LivelyMap.settings")
 local async       = require("openmw.async")
+local types       = require("openmw.types")
 local interfaces  = require('openmw.interfaces')
 local storage     = require('openmw.storage')
 local input       = require('openmw.input')
@@ -98,6 +99,35 @@ local function clearControls()
     pself.controls.run = false
 end
 
+---@class ControlSwitches
+---@field [any] any
+
+---@return ControlSwitches
+local function currentControlSwitches()
+    local out = {}
+    for _, v in pairs(pself.type.CONTROL_SWITCH) do
+        out[v] = pself.type.getControlSwitch(pself, v)
+    end
+    return out
+end
+
+---@param switches ControlSwitches
+local function applyControlSwitches(switches)
+    if switches then
+        for k, v in pairs(switches) do
+            pself.type.setControlSwitch(pself, k, v)
+        end
+    else
+        print("no stored control switches")
+    end
+end
+
+local function disableControlSwitches()
+    for _, v in pairs(pself.type.CONTROL_SWITCH) do
+        pself.type.setControlSwitch(pself, v, false)
+    end
+end
+
 ---@class CameraData
 ---@field pitch number?
 ---@field yaw number?
@@ -106,6 +136,7 @@ end
 ---@field relativePosition util.vector3?
 ---@field mode any
 ---@field force boolean? Ignore validation!
+---@field controlSwitches any? Used during restore only.
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -137,9 +168,7 @@ end
 ---@type CameraData?
 local originalCameraState = nil
 local function startCamera()
-    controls.overrideMovementControls(true)
     cameraInterface.disableModeControl(MOD_NAME)
-    controls.overrideUiControls(true)
     uiInterface.setHudVisibility(false)
     clearControls()
     if originalCameraState == nil then
@@ -147,20 +176,21 @@ local function startCamera()
         -- this might be called multiple times before
         -- endCamera() is called.
         originalCameraState = currentCameraData()
+        originalCameraState.controlSwitches = currentControlSwitches()
     end
+    disableControlSwitches()
     camera.setMode(camera.MODE.Static, true)
     camera.setYaw(0)
 end
 
 --- Restore the camera back to original state.
 local function endCamera()
-    controls.overrideMovementControls(false)
     cameraInterface.enableModeControl(MOD_NAME)
-    controls.overrideUiControls(false)
     uiInterface.setHudVisibility(true)
     clearControls()
     if originalCameraState then
         setCamera(originalCameraState)
+        applyControlSwitches(originalCameraState.controlSwitches)
     end
     originalCameraState = nil
 end
