@@ -605,8 +605,10 @@ local function doOnMapHidden(data)
     end
 
     if not data.swapped then
+        -- assumes we're exiting-to-gameplay
         interfaces.UI.removeMode('Interface')
         interfaces.GamepadControls.setGamepadCursorActive(false)
+        -- remove UI
         if mainWindow then
             mainWindow:destroy()
         end

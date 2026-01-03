@@ -652,6 +652,11 @@ local function onFrame(dt)
         interfaces.LivelyMapDraw.toggleMap(false,
             function()
                 print("Done switching to inventory window.")
+                if gamepadMode then
+                    --- since this isn't a normal exit-to-gameplay,
+                    --- we need to reset the gamepad cursor.
+                    interfaces.GamepadControls.setGamepadCursorActive(false)
+                end
                 interfaces.UI.addMode('Interface', { windows = { "Inventory" } })
             end)
         return
@@ -660,6 +665,11 @@ local function onFrame(dt)
         print("Switching to stats window.")
         interfaces.LivelyMapDraw.toggleMap(false, function()
             print("Done switching to stats window.")
+            if gamepadMode then
+                --- since this isn't a normal exit-to-gameplay,
+                --- we need to reset the gamepad cursor.
+                interfaces.GamepadControls.setGamepadCursorActive(false)
+            end
             interfaces.UI.addMode('Interface', { windows = { "Stats" } })
         end)
         return
