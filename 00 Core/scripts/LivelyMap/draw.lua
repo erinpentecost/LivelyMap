@@ -573,6 +573,8 @@ local function doOnMapMoved(data)
     end
 
     if not data.swapped then
+        -- invoking addMode while in gamepad UI will result in registerWindow's
+        -- hideFn being called on the next frame. This is why we ignore hideFn.
         interfaces.UI.addMode('Interface', { windows = {} })
         interfaces.GamepadControls.setGamepadCursorActive(true)
         if currentMapData then
@@ -677,7 +679,7 @@ local function summonMap(callbackId)
 end
 
 ---@param open boolean? Nil to toggle. Otherwise, boolean indicating desired state.
----@param callback fun()? Called once the change is processed.
+---@param callback fun()? Called once the toggle is processed. This can take multiple frames, so this is the only way to know when it's done.
 local function toggleMap(open, callback)
     if open == nil then
         open = currentMapData == nil

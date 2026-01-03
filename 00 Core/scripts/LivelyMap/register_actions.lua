@@ -87,7 +87,10 @@ local function init()
     -- Exit the map when one of these triggers goes off:
     for _, exitTrigger in ipairs { "GameMenu" } do
         input.registerTriggerHandler(exitTrigger, async:callback(function()
-            interfaces.LivelyMapDraw.toggleMap(false)
+            interfaces.LivelyMapDraw.toggleMap(false,
+                function()
+                    print("Trigger: Closed map because " .. exitTrigger .. " triggered.")
+                end)
         end))
     end
 
@@ -115,7 +118,10 @@ local function init()
         -- Exit the map when one of these triggers goes off:
         for _, exitTrigger in ipairs { "Journal", "Inventory" } do
             input.registerTriggerHandler(exitTrigger, async:callback(function()
-                interfaces.LivelyMapDraw.toggleMap(false)
+                interfaces.LivelyMapDraw.toggleMap(false,
+                    function()
+                        print("Trigger: Closed map because " .. exitTrigger .. " triggered.")
+                    end)
             end))
         end
     end

@@ -647,14 +647,21 @@ local function onFrame(dt)
         return
     end
 
-    if keys.inventoryWindow.pressed then
-        interfaces.LivelyMapDraw.toggleMap(false)
-        interfaces.UI.addMode('Interface', { windows = { "Inventory" } })
+    if keys.inventoryWindow.rise then
+        print("Switching to inventory window.")
+        interfaces.LivelyMapDraw.toggleMap(false,
+            function()
+                print("Done switching to inventory window.")
+                interfaces.UI.addMode('Interface', { windows = { "Inventory" } })
+            end)
         return
     end
-    if keys.statsWindow.pressed then
-        interfaces.LivelyMapDraw.toggleMap(false)
-        interfaces.UI.addMode('Interface', { windows = { "Stats" } })
+    if keys.statsWindow.rise then
+        print("Switching to stats window.")
+        interfaces.LivelyMapDraw.toggleMap(false, function()
+            print("Done switching to stats window.")
+            interfaces.UI.addMode('Interface', { windows = { "Stats" } })
+        end)
         return
     end
 

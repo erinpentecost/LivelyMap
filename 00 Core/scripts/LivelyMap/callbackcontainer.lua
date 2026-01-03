@@ -48,6 +48,9 @@ end
 
 ---@param id number
 function CallbackContainerFunctions.invoke(self, id)
+    if id == nil then
+        return
+    end
     if not self.pendingCallbacks[id] then
         print("Callback missing: " .. tostring(id))
         return
