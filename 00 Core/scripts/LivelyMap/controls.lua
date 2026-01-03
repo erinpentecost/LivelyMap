@@ -592,6 +592,11 @@ local function haltTracking()
     trackInfo.tracking = false
 end
 
+local pendingMouseMove = 0
+local function onMouseWheel(direction)
+    pendingMouseMove = direction
+end
+
 local vecForward = util.vector3(0, 1, 0)
 local vecBackward = vecForward * -1
 local vecRight = util.vector3(1, 0, 0)
@@ -638,6 +643,7 @@ local function onFrame(dt)
             break
         end
     end
+    hasInput = hasInput or (pendingMouseMove ~= 0)
     if not hasInput then
         advanceTracker()
         return
@@ -670,8 +676,11 @@ local function onFrame(dt)
         vecRight * keys.right.analog +
         vecLeft * keys.left.analog +
         vecUp * keys.zoomOut.analog +
-        vecDown * keys.zoomIn.analog
+        vecDown * keys.zoomIn.analog +
+        vecUp * pendingMouseMove
     ):normalize() * moveSpeed * dt
+
+    pendingMouseMove = 0
 
     moveCamera({
         relativePosition = moveVec
@@ -799,6 +808,7 @@ return {
         trackToWorldPosition = trackToWorldPosition,
     },
     engineHandlers = {
+        onMouseWheel = onMouseWheel,
         onFrame = onFrame,
         onSave = onSave,
         onLoad = onLoad,

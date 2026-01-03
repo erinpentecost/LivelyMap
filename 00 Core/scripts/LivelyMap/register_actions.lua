@@ -36,7 +36,7 @@ local function splitString(str)
     return out
 end
 
-function trim(s)
+local function trim(s)
     return s:match("^%s*(.-)%s*$")
 end
 
