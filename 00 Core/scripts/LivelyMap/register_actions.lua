@@ -26,6 +26,7 @@ local core       = require("openmw.core")
 local util       = require("openmw.util")
 local aux_util   = require('openmw_aux.util')
 local pself      = require("openmw.self")
+local settings   = require("scripts.LivelyMap.settings")
 
 local function splitString(str)
     local out = {}
@@ -84,9 +85,12 @@ local function init()
     input.registerActionHandler(actionName, actionCallback)
 
     -- Exit the map when one of these triggers goes off:
-    for _, exitTrigger in ipairs { "Journal", "Inventory", "GameMenu" } do
+    for _, exitTrigger in ipairs { "GameMenu", "Journal", "Inventory" } do
         input.registerTriggerHandler(exitTrigger, async:callback(function()
-            interfaces.LivelyMapDraw.toggleMap(false)
+            interfaces.LivelyMapDraw.toggleMap(false,
+                function()
+                    print("Trigger: Closed map because " .. exitTrigger .. " triggered.")
+                end)
         end))
     end
 

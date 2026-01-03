@@ -15,27 +15,28 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME       = require("scripts.LivelyMap.ns")
-local mutil          = require("scripts.LivelyMap.mutil")
-local putil          = require("scripts.LivelyMap.putil")
-local core           = require("openmw.core")
-local util           = require("openmw.util")
-local pself          = require("openmw.self")
-local aux_util       = require('openmw_aux.util')
-local myui           = require('scripts.LivelyMap.pcp.myui')
-local camera         = require("openmw.camera")
-local ui             = require("openmw.ui")
-local settings       = require("scripts.LivelyMap.settings")
-local async          = require("openmw.async")
-local interfaces     = require('openmw.interfaces')
-local storage        = require('openmw.storage')
-local h3cam          = require("scripts.LivelyMap.h3.cam")
-local overlapfinder  = require("scripts.LivelyMap.overlapfinder")
+local MOD_NAME          = require("scripts.LivelyMap.ns")
+local mutil             = require("scripts.LivelyMap.mutil")
+local putil             = require("scripts.LivelyMap.putil")
+local core              = require("openmw.core")
+local util              = require("openmw.util")
+local pself             = require("openmw.self")
+local aux_util          = require('openmw_aux.util')
+local myui              = require('scripts.LivelyMap.pcp.myui')
+local camera            = require("openmw.camera")
+local ui                = require("openmw.ui")
+local settings          = require("scripts.LivelyMap.settings")
+local async             = require("openmw.async")
+local interfaces        = require('openmw.interfaces')
+local storage           = require('openmw.storage')
+local h3cam             = require("scripts.LivelyMap.h3.cam")
+local overlapfinder     = require("scripts.LivelyMap.overlapfinder")
+local callbackcontainer = require("scripts.LivelyMap.callbackcontainer")
 
 ---@type MeshAnnotatedMapData?
-local currentMapData = nil
+local currentMapData    = nil
 
-local settingCache   = {
+local settingCache      = {
     psoUnlock       = settings.pso.psoUnlock,
     psoDepth        = settings.pso.psoDepth,
     psoPushdownOnly = settings.pso.psoPushdownOnly,
@@ -50,6 +51,8 @@ end))
 settings.pso.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.pso[key]
 end))
+
+local toggleCallbacks = callbackcontainer.NewCallbackContainer()
 
 ---@class Icon
 --- @field element any UI element.
@@ -562,7 +565,7 @@ local pendingMapChangeEvents = {}
 
 ---@param data MeshAnnotatedMapData
 local function doOnMapMoved(data)
-    print("onMapMoved" .. aux_util.deepToString(data, 3))
+    print("doOnMapMoved: " .. aux_util.deepToString(data, 3))
     currentMapData = data
 
     for _, fn in ipairs(onMapMovedHandlers) do
@@ -570,7 +573,10 @@ local function doOnMapMoved(data)
     end
 
     if not data.swapped then
+        -- invoking addMode while in gamepad UI will result in registerWindow's
+        -- hideFn being called on the next frame. This is why we ignore hideFn.
         interfaces.UI.addMode('Interface', { windows = {} })
+        interfaces.GamepadControls.setGamepadCursorActive(true)
         if currentMapData then
             mainWindow = newMainWindow()
         end
@@ -579,6 +585,8 @@ local function doOnMapMoved(data)
     setHoverBoxContent(nil)
 
     interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
+
+    toggleCallbacks:invoke(data.callbackId)
 
     --this might be causing race condition issues
     --renderIcons()
@@ -590,20 +598,24 @@ local function onMapMoved(data)
 end
 
 local function doOnMapHidden(data)
-    print("onMapHidden" .. aux_util.deepToString(data, 3))
+    print("doOnMapHidden: " .. aux_util.deepToString(data, 3))
 
     for _, fn in ipairs(onMapHiddenHandlers) do
         fn(data)
     end
 
     if not data.swapped then
+        -- assumes we're exiting-to-gameplay
         interfaces.UI.removeMode('Interface')
+        -- remove UI
         if mainWindow then
             mainWindow:destroy()
         end
     end
-    -- TODO: maybe hide icons?
+
     currentMapData = nil
+
+    toggleCallbacks:invoke(data.callbackId)
 end
 
 ---@param data MeshAnnotatedMapData
@@ -650,13 +662,8 @@ local function onUpdate(dt)
     --- probably because the camera is not in the right spot.
 end
 
-local function summonMap(id)
-    local mapData
-    if id == "" or id == nil then
-        mapData = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
-    else
-        mapData = mutil.getMap(id)
-    end
+local function summonMap(callbackId)
+    local mapData = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
 
     local pos = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
     local showData = mutil.shallowMerge(mapData, {
@@ -667,20 +674,32 @@ local function summonMap(id)
             y = pos.y,
             z = pos.z,
         },
+        callbackId = callbackId,
     })
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 
 ---@param open boolean? Nil to toggle. Otherwise, boolean indicating desired state.
-local function toggleMap(open)
+---@param callback fun()? Called once the toggle is processed. This can take multiple frames, so this is the only way to know when it's done.
+local function toggleMap(open, callback)
     if open == nil then
         open = currentMapData == nil
     end
+
+    local callbackId = nil
+    if callback then
+        callbackId = toggleCallbacks:add(callback)
+        print("Toggle receipt ID: " .. callbackId)
+    end
+
     if open and currentMapData == nil then
-        summonMap()
+        summonMap(callbackId)
     elseif (not open) and (currentMapData ~= nil) then
-        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself })
+        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself, callbackId = callbackId })
         interfaces.LivelyMapMarker.editMarkerWindow(nil)
+    elseif callback then
+        -- no change, so do callback
+        toggleCallbacks:invoke(callbackId)
     end
 end
 
