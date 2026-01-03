@@ -57,7 +57,7 @@ local function markArea(cellName, cellId)
         error("markArea given bad cell name")
     end
 
-    local markId = cellId .. "_area"
+    local markId = cellName .. "_area"
     local exists = interfaces.LivelyMapMarker.getMarkerByID(markId)
     if exists then
         -- don't re-mark areas.
@@ -89,7 +89,7 @@ local function onReceiveExteriorLocation(data)
         return
     end
 
-    local markId = cellId .. "_area"
+    local markId = cellName .. "_area"
 
     local template = interfaces.LivelyMapDoorCategorizer.getTemplateForDoors(data.doorInfos)
 
