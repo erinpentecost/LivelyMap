@@ -562,6 +562,9 @@ end
 ---@param duration number?
 ---@param onEnd fun(result: MoveResult?)?
 local function trackToWorldPosition(worldPos, duration, onEnd)
+    if not currentMapData then
+        return nil
+    end
     --[[print("trackToWorldPosition(" ..
         aux_util.deepToString(worldPos, 3) ..
         ", " .. tostring(duration) .. ", " .. aux_util.deepToString(onEnd, 1) .. ")")]]
@@ -725,7 +728,7 @@ local function onMapMoved(data)
         local validPositions = screenPositionsValid(screenPositions)
         if validPositions ~= 4 then
             --- the map is not completely visible!
-            print("NEW MAP IS NOT TOTALLY VISIBLE!!!!!!")
+            print("New map doesn't fully occupy viewport, sliding into safe zone.")
             haltTracking()
             --- slide the camera over so the map is more visible
             --- TODO: this jumps around like mad if you are zoomed out too much

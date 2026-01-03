@@ -331,6 +331,7 @@ end
 
 local mainWindow = nil
 local hoverBox = ui.create(newHoverBoxLayout())
+local pendingHoverBoxLayout = nil
 
 local function newMainWindow()
     return ui.create {
@@ -353,19 +354,22 @@ end
 --- Change hover box content.
 ---@param layout any UI element or layout. Set to empty or nil to clear the hover box.
 local function setHoverBoxContent(layout)
-    hoverBox.layout = newHoverBoxLayout(layout)
+    pendingHoverBoxLayout = layout
+end
+
+local function applyPendingHoverBoxContent()
+    hoverBox.layout = newHoverBoxLayout(pendingHoverBoxLayout)
 
     if not mainWindow then
         return
     end
 
-    --print(aux_util.deepToString(mainWindow.layout.content, 5))
+    -- all calls to :update() on UI elements this file owns
+    -- should be done inside onUpdate() rather than directly exposed
+    -- to random callers through the interface. this is because
+    -- delayed UI actions can't be nested and result in fatal errors.
 
     hoverBox:update()
-    --local hovIndex = mainWindow.layout.content:indexOf("hoverBox")
-    --mainWindow.layout.content[hovIndex].layout = newHoverBoxLayout(layout)
-
-    mainWindow:update()
 end
 
 local function closeToCenter(viewportPos)
@@ -520,8 +524,10 @@ local function renderIcons()
         end
     end
 
-    iconContainer:update()
+
     if mainWindow then
+        applyPendingHoverBoxContent()
+        iconContainer:update()
         mainWindow:update()
     end
 
