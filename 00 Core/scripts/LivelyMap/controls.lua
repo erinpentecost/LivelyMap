@@ -43,8 +43,11 @@ local defaultPitch    = 1
 local stickDeadzone   = 0.3
 
 
+local gamepadMode = interfaces.GamepadControls.isControllerMenusEnabled()
+
 local settingCache = {
     controllerButtons = settings.controls.controllerButtons,
+    replaceMapInGamepadMode = settings.controls.replaceMapInGamepadMode,
 }
 settings.controls.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.controls[key]
@@ -52,34 +55,42 @@ end))
 
 -- Track inputs we need for navigating the map.
 local keys = {
-    forward  = keytrack.NewKey("forward", function(dt)
+    forward         = keytrack.NewKey("forward", function(dt)
         return input.isKeyPressed(input.KEY.UpArrow) or
             (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
     end),
-    backward = keytrack.NewKey("backward", function(dt)
+    backward        = keytrack.NewKey("backward", function(dt)
         return input.isKeyPressed(input.KEY.DownArrow) or
             (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
     end),
-    left     = keytrack.NewKey("left", function(dt)
+    left            = keytrack.NewKey("left", function(dt)
         return input.isKeyPressed(input.KEY.LeftArrow) or
             (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft))
     end),
-    right    = keytrack.NewKey("right", function(dt)
+    right           = keytrack.NewKey("right", function(dt)
         return input.isKeyPressed(input.KEY.RightArrow) or
             (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight))
     end),
 
-    zoomIn   = keytrack.NewKey("zoomIn", function(dt)
+    zoomIn          = keytrack.NewKey("zoomIn", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
             (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
     end),
 
-    zoomOut  = keytrack.NewKey("zoomOut", function(dt)
+    zoomOut         = keytrack.NewKey("zoomOut", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
             (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
-    end)
+    end),
+    statsWindow     = keytrack.NewKey("statsWindow", function(dt)
+        return (gamepadMode or settingCache.controllerButtons) and
+            input.getAxisValue(input.CONTROLLER_AXIS.TriggerLeft) > stickDeadzone
+    end),
+    inventoryWindow = keytrack.NewKey("inventoryWindow", function(dt)
+        return (gamepadMode or settingCache.controllerButtons) and
+            input.getAxisValue(input.CONTROLLER_AXIS.TriggerRight) > stickDeadzone
+    end),
 }
 
 -- Reset inputs so they don't get stuck.
@@ -612,12 +623,9 @@ local function onFrame(dt)
     end
 
     -- Track inputs.
-    keys.forward:update(dt)
-    keys.backward:update(dt)
-    keys.left:update(dt)
-    keys.right:update(dt)
-    keys.zoomIn:update(dt)
-    keys.zoomOut:update(dt)
+    for _, inp in pairs(keys) do
+        inp:update(dt)
+    end
 
     if newMapTileThisFrame then
         newMapTileThisFrame = false
@@ -634,25 +642,37 @@ local function onFrame(dt)
             break
         end
     end
-    if hasInput then
-        local moveVec = (vecForward * keys.forward.analog +
-            vecBackward * keys.backward.analog +
-            vecRight * keys.right.analog +
-            vecLeft * keys.left.analog +
-            vecUp * keys.zoomOut.analog +
-            vecDown * keys.zoomIn.analog
-        ):normalize() * moveSpeed * dt
-
-        moveCamera({
-            relativePosition = moveVec
-        })
-        -- Interrupt tracking
-        haltTracking()
-        -- clear hoverbox
-        --interfaces.LivelyMapDraw.setHoverBoxContent()
-    else
+    if not hasInput then
         advanceTracker()
+        return
     end
+
+    if keys.inventoryWindow.pressed then
+        interfaces.LivelyMapDraw.toggleMap(false)
+        interfaces.UI.addMode('Interface', { windows = { "Inventory" } })
+        return
+    end
+    if keys.statsWindow.pressed then
+        interfaces.LivelyMapDraw.toggleMap(false)
+        interfaces.UI.addMode('Interface', { windows = { "Stats" } })
+        return
+    end
+
+    local moveVec = (vecForward * keys.forward.analog +
+        vecBackward * keys.backward.analog +
+        vecRight * keys.right.analog +
+        vecLeft * keys.left.analog +
+        vecUp * keys.zoomOut.analog +
+        vecDown * keys.zoomIn.analog
+    ):normalize() * moveSpeed * dt
+
+    moveCamera({
+        relativePosition = moveVec
+    })
+    -- Interrupt tracking
+    haltTracking()
+    -- clear hoverbox
+    --interfaces.LivelyMapDraw.setHoverBoxContent()
 end
 
 ---@param hits ScreenHits

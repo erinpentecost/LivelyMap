@@ -26,6 +26,7 @@ local core       = require("openmw.core")
 local util       = require("openmw.util")
 local aux_util   = require('openmw_aux.util')
 local pself      = require("openmw.self")
+local settings   = require("scripts.LivelyMap.settings")
 
 local function splitString(str)
     local out = {}
@@ -84,7 +85,7 @@ local function init()
     input.registerActionHandler(actionName, actionCallback)
 
     -- Exit the map when one of these triggers goes off:
-    for _, exitTrigger in ipairs { "Journal", "Inventory", "GameMenu" } do
+    for _, exitTrigger in ipairs { "GameMenu" } do
         input.registerTriggerHandler(exitTrigger, async:callback(function()
             interfaces.LivelyMapDraw.toggleMap(false)
         end))
@@ -96,6 +97,28 @@ local function init()
             interfaces.LivelyMapDraw.toggleMap(false)
         end
     end)
+
+
+    if settings.controls.replaceMapInGamepadMode and interfaces.GamepadControls.isControllerMenusEnabled() then
+        print("Replacing map window.")
+        interfaces.UI.registerWindow(
+            "Map",
+            function()
+                print("Gamepad: Replacing map...")
+                interfaces.LivelyMapDraw.toggleMap(true, function()
+                    print("Gamepad: Replace done.")
+                end)
+            end, function()
+                print("Gamepad: Hide requested, but ignored.")
+            end)
+    else
+        -- Exit the map when one of these triggers goes off:
+        for _, exitTrigger in ipairs { "Journal", "Inventory" } do
+            input.registerTriggerHandler(exitTrigger, async:callback(function()
+                interfaces.LivelyMapDraw.toggleMap(false)
+            end))
+        end
+    end
 end
 
 

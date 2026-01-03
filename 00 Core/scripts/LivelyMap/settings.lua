@@ -105,6 +105,13 @@ local function init()
                 default = true,
                 renderer = "checkbox",
             },
+            {
+                key = "replaceMapInGamepadMode",
+                name = "replaceMapInGamepadModeName",
+                description = "replaceMapInGamepadModeDescription",
+                default = true,
+                renderer = "checkbox",
+            },
         }
     }
 

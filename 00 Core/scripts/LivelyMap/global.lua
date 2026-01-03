@@ -59,6 +59,7 @@ end
 ---@field player userdata The player that owns this instance.
 ---@field object userdata The map mesh static object instance.
 ---@field swapped boolean? Indicates the swap-in or swap-out state of the map.
+---@field callbackId number? Optional event receipt.
 
 ---Returns immutable map metadata.
 ---@param data string | number | HasID
@@ -170,7 +171,8 @@ local function onShowMap(data)
             -- swapped means the map is being replaced with a different one.
             v.player:sendEvent(MOD_NAME .. "onMapHidden",
                 mutil.shallowMerge(v, {
-                    swapped = swapped
+                    swapped = swapped,
+                    callbackId = data.callbackId,
                 }))
             v.object:remove()
             table.insert(toDelete, k)
@@ -191,7 +193,7 @@ local function onShowMap(data)
     -- notify the map that it moved.
     -- the map is responsible for telling the player.
     activeMap.object:sendEvent(MOD_NAME .. "onMapMoved",
-        mutil.shallowMerge(data, { swapped = swapped }))
+        mutil.shallowMerge(data, { swapped = swapped, callbackId = data.callbackId }))
 end
 
 local function onHideMap(data)
