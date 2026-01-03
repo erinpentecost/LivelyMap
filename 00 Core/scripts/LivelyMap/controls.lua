@@ -656,7 +656,11 @@ local function onFrame(dt)
         print("Switching to stats window.")
         interfaces.LivelyMapDraw.toggleMap(false, function()
             print("Done switching to stats window.")
-            interfaces.UI.addMode('Interface', { windows = { "Stats" } })
+            if interfaces.StatsWindow then
+                interfaces.StatsWindow.show(true)
+            else
+                interfaces.UI.addMode('Interface', { windows = { "Stats" } })
+            end
         end)
         return
     end
