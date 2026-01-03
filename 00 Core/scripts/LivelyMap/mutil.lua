@@ -273,6 +273,13 @@ local function averageVector3s(array, fn)
     return nil
 end
 
+-- TODO: l10n this
+local forbiddenWords = {
+    canton = true,
+    the = true,
+    a = true,
+    of = true,
+}
 -- Canonicalize a string for fuzzy matching
 local function canonicalizeId(s)
     if not s then
@@ -288,7 +295,7 @@ local function canonicalizeId(s)
     for w in s:gmatch("%S+") do
         -- remove punctuation inside token
         w = w:gsub("%p", "")
-        if w ~= "" then
+        if (w ~= "") and (not forbiddenWords[w]) then
             tokens[#tokens + 1] = w
         end
     end
