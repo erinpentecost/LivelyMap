@@ -15,6 +15,6 @@ if not exist ".\cmd\lively\lively.exe" (
 
 rem --- Run it ---
 rem %* contains all arguments
-.\cmd\lively\lively.exe -threads=3 -vanity=F -cfg="%~1"
+.\cmd\lively\lively.exe -threads=5 -vanity=F -cfg="%~1"
 
 endlocal

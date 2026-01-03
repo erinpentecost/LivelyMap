@@ -6,12 +6,12 @@ Overworld map replacer for openmw. Rendered in 3D (with the help of parallax sha
 
 ## Installing the mod
 
-First set up the data folders and plugin. Then run the sync tool. This order matters.
+First set up the data folders and plugin. Then run the sync tool. *This order matters.*
 
 ### Data Folders and Plugin
 
 There are *Data Folders* in this folder that you need to add to your `openmw.cfg`.
-These all have numbers as prefixes. At a minimum, you need to add `00 Core`. Don't add more than one folder with the same number, they are exclusive.
+These all have numbers as prefixes. At a minimum, you need to add `00 Core` and one of the `01 ****` folders. Don't add more than one folder with the same number, they are exclusive.
 
 You also need to add `00 Core/LivelyMap.omwaddon` as a plugin to `openmw.cfg`.
 Don't add `LivelyMap.omwscripts` if you see it.
@@ -40,10 +40,14 @@ There are buttons in a bar at the top of the map. These do extra stuff.
 
 ### Parallax Shader Calibration
 
-If you are using a parallax shader, the map will appear 3-dimensional! This is cool, but you will need to calibrate the vertical offset or icons will appear to float as you pan around. In the mod settings, enable *Parallax Calibration Mode*, then bring up the map. This adds three buttons to the top bar. The *-* reduces the offset width, and *+* increases it. The *down-arrow-into-a-bucket* toggles between only allowing icons to be pushed down into the mesh or if the offset width should be equally distributed between the top and bottom of the mesh. This is determined by how your shader is handling parallax offsets. When you're done, turn calibration mode off in your settings.
+If you are using a parallax shader and either `02 Normals` or `02 Extreme Normals`, the map will appear 3-dimensional! This is cool, but you will need to calibrate the vertical offset or icons will appear to float as you pan around. In the mod settings, enable *Parallax Calibration Mode*, then bring up the map. This adds three buttons to the top bar. The *-* reduces the offset width, and *+* increases it. The *down-arrow-into-a-bucket* toggles between only allowing icons to be pushed down into the mesh or if the offset width should be equally distributed between the top and bottom of the mesh. This is determined by how your shader is handling parallax offsets. When you're done, turn calibration mode off in your settings.
 
 ## FAQ
 
 *Why is the map pink?* You either didn't run the sync tool, or the sync tool failed.
 
 *Why are the icons so floaty?* You are using a parallax shader but haven't followed the Parallax Shader Calibration steps.
+
+*Why is my save file so big?* You might have a lot of path data saved in it. Run the sync tool to extract the path data from your save. The data will be moved into a json file under `00 Core/scripts/LivelyMap/data/paths`.
+
+*Why am I getting out of memory errors when running the sync file?* Edit the sync file and change `-threads=#` to `-threads=1` and try again.

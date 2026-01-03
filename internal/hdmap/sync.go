@@ -19,13 +19,13 @@ import (
 
 func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThreads int, vanity bool, rampPath string) error {
 	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
-	core00TexturePath := filepath.Join(rootPath, "00 Core", "textures", "LivelyMap")
+	classicTexturePath := filepath.Join(rootPath, "01 Classic Map", "textures", "LivelyMap")
 	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures", "LivelyMap")
 	potatoTexturePath := filepath.Join(rootPath, "01 Potato Map", "textures", "LivelyMap")
 	normalsTexturePath := filepath.Join(rootPath, "02 Normals", "textures", "LivelyMap")
 	extremeNormalsTexturePath := filepath.Join(rootPath, "02 Extreme Normals", "textures", "LivelyMap")
 
-	for _, texturePath := range []string{core00TexturePath, detailTexturePath, core00DataPath} {
+	for _, texturePath := range []string{classicTexturePath, detailTexturePath, core00DataPath} {
 		if tdir, err := os.Stat(texturePath); err != nil {
 			return fmt.Errorf("open directory %q: %w", texturePath, err)
 		} else if !tdir.IsDir() {
@@ -70,8 +70,10 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	}
 
 	// Special "sky" cell
-	if err := renderSky(core00TexturePath, renderer, specRenderer); err != nil {
-		return fmt.Errorf("render sky texture: %w", err)
+	for _, path := range []string{classicTexturePath, detailTexturePath, potatoTexturePath} {
+		if err := renderSky(path, renderer, specRenderer); err != nil {
+			return fmt.Errorf("render sky texture: %w", err)
+		}
 	}
 
 	// Render individual vertex color "detail" cells
@@ -95,7 +97,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	for _, extents := range Partition(parsedLands.MapExtents) {
 		mapInfos[strconv.Itoa(int(extents.ID))] = extents
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: core00TexturePath,
+			Directory: classicTexturePath,
 			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     classicColorCells,
@@ -135,7 +137,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 			Codec: dds.DXT5,
 		})
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: core00TexturePath,
+			Directory: classicTexturePath,
 			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 			Extents:   extents.Extents,
 			Cells:     specularCells,
