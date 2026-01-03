@@ -42,12 +42,8 @@ local defaultPitch    = 1
 
 local stickDeadzone   = 0.3
 
-
-local gamepadMode = interfaces.GamepadControls.isControllerMenusEnabled()
-
-local settingCache = {
+local settingCache    = {
     controllerButtons = settings.controls.controllerButtons,
-    replaceMapInGamepadMode = settings.controls.replaceMapInGamepadMode,
 }
 settings.controls.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.controls[key]
@@ -84,11 +80,11 @@ local keys = {
             (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
     end),
     statsWindow     = keytrack.NewKey("statsWindow", function(dt)
-        return (gamepadMode or settingCache.controllerButtons) and
+        return settingCache.controllerButtons and
             input.getAxisValue(input.CONTROLLER_AXIS.TriggerLeft) > stickDeadzone
     end),
     inventoryWindow = keytrack.NewKey("inventoryWindow", function(dt)
-        return (gamepadMode or settingCache.controllerButtons) and
+        return settingCache.controllerButtons and
             input.getAxisValue(input.CONTROLLER_AXIS.TriggerRight) > stickDeadzone
     end),
 }
@@ -652,11 +648,6 @@ local function onFrame(dt)
         interfaces.LivelyMapDraw.toggleMap(false,
             function()
                 print("Done switching to inventory window.")
-                if gamepadMode then
-                    --- since this isn't a normal exit-to-gameplay,
-                    --- we need to reset the gamepad cursor.
-                    interfaces.GamepadControls.setGamepadCursorActive(false)
-                end
                 interfaces.UI.addMode('Interface', { windows = { "Inventory" } })
             end)
         return
@@ -665,11 +656,6 @@ local function onFrame(dt)
         print("Switching to stats window.")
         interfaces.LivelyMapDraw.toggleMap(false, function()
             print("Done switching to stats window.")
-            if gamepadMode then
-                --- since this isn't a normal exit-to-gameplay,
-                --- we need to reset the gamepad cursor.
-                interfaces.GamepadControls.setGamepadCursorActive(false)
-            end
             interfaces.UI.addMode('Interface', { windows = { "Stats" } })
         end)
         return

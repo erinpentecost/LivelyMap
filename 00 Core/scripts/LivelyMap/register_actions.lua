@@ -85,7 +85,7 @@ local function init()
     input.registerActionHandler(actionName, actionCallback)
 
     -- Exit the map when one of these triggers goes off:
-    for _, exitTrigger in ipairs { "GameMenu" } do
+    for _, exitTrigger in ipairs { "GameMenu", "Journal", "Inventory" } do
         input.registerTriggerHandler(exitTrigger, async:callback(function()
             interfaces.LivelyMapDraw.toggleMap(false,
                 function()
@@ -100,31 +100,6 @@ local function init()
             interfaces.LivelyMapDraw.toggleMap(false)
         end
     end)
-
-
-    if settings.controls.replaceMapInGamepadMode and interfaces.GamepadControls.isControllerMenusEnabled() then
-        print("Replacing map window.")
-        interfaces.UI.registerWindow(
-            "Map",
-            function()
-                print("Gamepad: Replacing map...")
-                interfaces.LivelyMapDraw.toggleMap(true, function()
-                    print("Gamepad: Replace done.")
-                end)
-            end, function()
-                print("Gamepad: Hide requested, but ignored.")
-            end)
-    else
-        -- Exit the map when one of these triggers goes off:
-        for _, exitTrigger in ipairs { "Journal", "Inventory" } do
-            input.registerTriggerHandler(exitTrigger, async:callback(function()
-                interfaces.LivelyMapDraw.toggleMap(false,
-                    function()
-                        print("Trigger: Closed map because " .. exitTrigger .. " triggered.")
-                    end)
-            end))
-        end
-    end
 end
 
 
