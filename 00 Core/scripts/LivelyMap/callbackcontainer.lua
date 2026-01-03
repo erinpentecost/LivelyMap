@@ -22,6 +22,7 @@ CallbackContainerFunctions.__index = CallbackContainerFunctions
 ---@class CallbackContainer
 ---@field add fun(fn: fun()): number?
 ---@field invoke fun(id: number)
+---@field abort fun(id: number)
 
 function NewCallbackContainer()
     local new = {
@@ -57,6 +58,14 @@ function CallbackContainerFunctions.invoke(self, id)
     end
     print("Invoking callback " .. tostring(id) .. "...")
     self.pendingCallbacks[id]()
+    self.pendingCallbacks[id] = nil
+end
+
+---@param id number
+function CallbackContainerFunctions.abort(self, id)
+    if id == nil then
+        return
+    end
     self.pendingCallbacks[id] = nil
 end
 

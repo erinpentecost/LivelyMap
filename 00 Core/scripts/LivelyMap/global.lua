@@ -214,7 +214,7 @@ local function onHideMap(data)
     for k, v in pairs(persist.activeMaps[playerID]) do
         print("Deleting map " .. tostring(v.ID) .. ": " .. aux_util.deepToString(v, 3))
         v.player:sendEvent(MOD_NAME .. "onMapHidden",
-            mutil.shallowMerge(v, { swapped = false }))
+            mutil.shallowMerge(v, { swapped = false, callbackId = data.callbackId }))
         v.object:remove()
         table.insert(toDelete, k)
     end
