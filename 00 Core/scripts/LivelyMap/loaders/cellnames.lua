@@ -15,38 +15,35 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME  = require("scripts.LivelyMap.ns")
-local world     = require('openmw.world')
-local storage   = require('openmw.storage')
-local mutil     = require("scripts.LivelyMap.mutil")
+local MOD_NAME          = require("scripts.LivelyMap.ns")
+local world             = require('openmw.world')
+local storage           = require('openmw.storage')
+local mutil             = require("scripts.LivelyMap.mutil")
+local aux_util          = require('openmw_aux.util')
 
 -- This file just caches cell names into global storage.
 -- This makes it available to player and global scripts alike.
 -- Do NOT `require` this file anywhere.
 
 --- cell names to IDs
-local cellNames = storage.globalSection(MOD_NAME .. "_cellNames")
-cellNames:setLifeTime(storage.LIFE_TIME.Temporary)
+local cellFuzzyNameToId = storage.globalSection(MOD_NAME .. "_cellFuzzyNameToId")
+cellFuzzyNameToId:setLifeTime(storage.LIFE_TIME.Temporary)
+local cellIdToName = storage.globalSection(MOD_NAME .. "_cellIdToName")
+cellIdToName:setLifeTime(storage.LIFE_TIME.Temporary)
 
 local function loadCellNames()
-    local tmp = {}
+    local toName = {}
+    local toId = {}
 
-    -- load up with fuzzy matches
     for _, cell in ipairs(world.cells) do
-        if cell.name then
-            tmp[mutil.canonicalizeId(cell.name)] = cell.id
-            tmp[mutil.canonicalizeId(cell.id)] = cell.id
+        if cell.name and cell.name ~= "" then
+            toName[mutil.canonicalizeId(cell.name)] = cell.id
+            toId[cell.id] = cell.name
         end
     end
 
-    -- overwrite with exact matches
-    for _, cell in ipairs(world.cells) do
-        if cell.name then
-            tmp[cell.name] = cell.id
-        end
-    end
-
-    cellNames:reset(tmp)
+    cellFuzzyNameToId:reset(toName)
+    cellIdToName:reset(toId)
 end
 
 loadCellNames()

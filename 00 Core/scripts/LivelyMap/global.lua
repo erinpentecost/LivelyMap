@@ -452,7 +452,7 @@ local function onGetExteriorLocation(data)
         args = data,
     }
 
-    print("sendEvent(" .. MOD_NAME .. "onReceiveExteriorLocation, " .. aux_util.deepToString(payload, 4) .. ")")
+    --print("sendEvent(" .. MOD_NAME .. "onReceiveExteriorLocation, " .. aux_util.deepToString(payload, 4) .. ")")
 
     data.callbackObject:sendEvent(MOD_NAME .. "onReceiveExteriorLocation", payload)
 end

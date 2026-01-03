@@ -333,9 +333,9 @@ local function viewportPosToRelativeMeshPos(currentMapData, viewportPos, ignoreB
         return nil
     end
 
-    print("rel is ok! hitPos: " ..
+    --[[print("rel is ok! hitPos: " ..
         tostring(hitPos) .. ", rayOrigin: " .. tostring(rayOrigin) .. ", rayDir: " ..
-        tostring(rayDir) .. ", t:" .. tostring(t))
+        tostring(rayDir) .. ", t:" .. tostring(t))]]
     return rel
 end
 
