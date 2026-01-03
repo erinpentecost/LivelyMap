@@ -41,7 +41,7 @@ function CallbackContainerFunctions.add(self, fn)
         local curId = self.nextPendingCallbackId
         self.pendingCallbacks[curId] = fn
         self.nextPendingCallbackId = self.nextPendingCallbackId + 1
-        return self.nextPendingCallbackId
+        return curId
     end
     return nil
 end
@@ -49,6 +49,7 @@ end
 ---@param id number
 function CallbackContainerFunctions.invoke(self, id)
     if not self.pendingCallbacks[id] then
+        print("Callback missing: " .. tostring(id))
         return
     end
     print("Invoking callback " .. tostring(id) .. "...")

@@ -565,7 +565,7 @@ local pendingMapChangeEvents = {}
 
 ---@param data MeshAnnotatedMapData
 local function doOnMapMoved(data)
-    print("onMapMoved" .. aux_util.deepToString(data, 3))
+    print("doOnMapMoved: " .. aux_util.deepToString(data, 3))
     currentMapData = data
 
     for _, fn in ipairs(onMapMovedHandlers) do
@@ -596,7 +596,7 @@ local function onMapMoved(data)
 end
 
 local function doOnMapHidden(data)
-    print("onMapHidden" .. aux_util.deepToString(data, 3))
+    print("doOnMapHidden: " .. aux_util.deepToString(data, 3))
 
     for _, fn in ipairs(onMapHiddenHandlers) do
         fn(data)
