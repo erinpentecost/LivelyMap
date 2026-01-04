@@ -176,6 +176,18 @@ local function init()
                 renderer = "checkbox",
             },
             {
+                key = "iconScale",
+                name = "iconScaleName",
+                description = "iconScaleDescription",
+                default = 1,
+                renderer = "number",
+                argument = {
+                    integer = false,
+                    min = 0.25,
+                    max = 50,
+                }
+            },
+            {
                 key = "palleteColor1",
                 name = "palleteColor1Name",
                 renderer = MOD_NAME .. "color",
