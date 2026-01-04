@@ -15,17 +15,25 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local util       = require('openmw.util')
-local pself      = require("openmw.self")
-local mutil      = require("scripts.LivelyMap.mutil")
-local nearby     = require('openmw.nearby')
-local settings   = require("scripts.LivelyMap.settings")
-local async      = require("openmw.async")
-local camera     = require("openmw.camera")
-local myui       = require('scripts.LivelyMap.pcp.myui')
-local interfaces = require('openmw.interfaces')
-local ui         = require('openmw.ui')
-local async      = require("openmw.async")
+local util         = require('openmw.util')
+local pself        = require("openmw.self")
+local mutil        = require("scripts.LivelyMap.mutil")
+local nearby       = require('openmw.nearby')
+local settings     = require("scripts.LivelyMap.settings")
+local async        = require("openmw.async")
+local camera       = require("openmw.camera")
+local myui         = require('scripts.LivelyMap.pcp.myui')
+local interfaces   = require('openmw.interfaces')
+local ui           = require('openmw.ui')
+local async        = require("openmw.async")
+
+local settingCache = {
+    iconScale = settings.main.iconScale,
+}
+
+settings.automatic.subscribe(async:callback(function(_, key)
+    settingCache[key] = settings.main[key]
+end))
 
 local function distanceScale(posData)
     local dist = (camera.getPosition() - posData.mapWorldPos):length()
@@ -34,7 +42,7 @@ local function distanceScale(posData)
     if posData.hovering then
         max = 1.25
     end
-    return util.remap(dist, 100, 500, max, 0.5)
+    return util.remap(dist, 100, 500, max, 0.5) * settingCache.iconScale
 end
 
 local function hoverTextLayout(text, color, path)

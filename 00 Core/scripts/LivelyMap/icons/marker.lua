@@ -101,7 +101,8 @@ local stampPathData = {
 local function stampList()
     for stampPath in vfs.pathsWithPrefix("textures\\LivelyMap\\stamps") do
         table.insert(stampPathData.orderedFullPaths, stampPath)
-        local baseName = string.match(stampPath, '(%a+)[.]')
+        local baseName = string.match(stampPath, '([^/\\]+)%.')
+        --print(tostring(baseName) .. " - " .. tostring(stampPath))
         stampPathData.basenameToFullPathMap[baseName] = stampPath
         stampPathData.fullPathToIDMap[stampPath] = {
             idx = #stampPathData.orderedFullPaths,
