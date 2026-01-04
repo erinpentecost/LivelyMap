@@ -95,7 +95,11 @@ local mouseData = {
     dragThreshold = 10,
 }
 local function mapClicked(mouseEvent, data)
-    print("click! " .. aux_util.deepToString(mouseEvent, 3) .. " worldspace: " .. tostring(mouseData.clickStartWorldPos))
+    local cellPos = mutil.worldPosToCellPos(mouseData.clickStartWorldPos)
+    print("click! " ..
+    aux_util.deepToString(mouseEvent, 3) ..
+    " worldspace: " ..
+    tostring(mouseData.clickStartWorldPos) .. " cell: " .. math.floor(cellPos.x) .. "," .. math.floor(cellPos.y))
     -- need to go from world pos to cam pos now
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos, 1)
 end
