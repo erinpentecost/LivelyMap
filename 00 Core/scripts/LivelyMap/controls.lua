@@ -40,6 +40,8 @@ local cameraInterface = require("openmw.interfaces").Camera
 
 local defaultHeight   = 200
 local defaultPitch    = 1
+local minCameraHeight = 100
+local maxCameraHeight = 600
 
 local stickDeadzone   = 0.3
 
@@ -415,12 +417,7 @@ local function moveCamera(data)
 
         -- clamp camera height
         if currentMapData and (newPos.z ~= currentPosition.z) then
-            local relativeZ = newPos.z - currentMapData.object.position.z
-            if relativeZ < defaultHeight / 2 then
-                relativeZ = defaultHeight / 2
-            elseif relativeZ > defaultHeight * 3 then
-                relativeZ = defaultHeight * 3
-            end
+            local relativeZ = util.clamp(newPos.z - currentMapData.object.position.z, minCameraHeight, maxCameraHeight)
             newPos = util.vector3(newPos.x, newPos.y, relativeZ + currentMapData.object.position.z)
         end
 
@@ -575,8 +572,9 @@ local function cameraOffset(targetPosition, camPitch, camViewVector)
 end
 
 ---@param worldPos util.vector3
+---@param relativeHeight number? Zoom level you want.
 ---@return CameraData?
-local function worldPosToCameraPos(worldPos)
+local function worldPosToCameraPos(worldPos, relativeHeight)
     if not currentMapData then
         error("currentMapData is nil")
     end
@@ -584,7 +582,11 @@ local function worldPosToCameraPos(worldPos)
     local cellPos = mutil.worldPosToCellPos(worldPos)
     local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos, true)
     local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
-    local heightOffset = util.vector3(0, 0, defaultHeight)
+
+    if not relativeHeight then
+        relativeHeight = camera.getPosition().z - currentMapData.object.position.z
+    end
+    local heightOffset = util.vector3(0, 0, relativeHeight)
     --- these vars are all good!
     ---print("cellPos:" .. tostring(cellPos) .. ", rel:" .. tostring(rel) .. ", mapmeshpos:" .. tostring(mapWorldPos))
     local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
@@ -783,7 +785,7 @@ local function onMapMoved(data)
         -- Orient the camera so starting position is in the center.
         startCamera()
         print("initial track start")
-        local camPos = worldPosToCameraPos(data.startWorldPosition)
+        local camPos = worldPosToCameraPos(data.startWorldPosition, defaultHeight)
         camPos.force = true
         moveCamera(camPos)
     end
