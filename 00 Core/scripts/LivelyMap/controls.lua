@@ -635,9 +635,14 @@ local vecRight = util.vector3(1, 0, 0)
 local vecLeft = vecRight * -1
 local vecUp = util.vector3(0, 0, 1)
 local vecDown = vecUp * -1
-local moveSpeed = 100
+local moveSpeed = 150
 
 local newMapTileThisFrame = false
+
+-- easeInOutSine is a smoothing function. t ranges from 0 to 1.
+local function easeInOutSine(t)
+    return -1 * (math.cos(math.pi * t) - 1) / 2
+end
 
 local function onFrame(dt)
     -- Fake a duration if we're paused.
@@ -703,19 +708,23 @@ local function onFrame(dt)
         return
     end
 
-    local moveVec = (vecForward * keys.forward.analog +
+    local heightSpeedModifier = util.remap(camera.getPosition().z - currentMapData.object.position.z, minCameraHeight,
+        maxCameraHeight, 0, 1)
+
+    local planarMoveVec = (vecForward * keys.forward.analog +
         vecBackward * keys.backward.analog +
         vecRight * keys.right.analog +
-        vecLeft * keys.left.analog +
-        vecUp * keys.zoomOut.analog +
+        vecLeft * keys.left.analog
+    ):normalize() * moveSpeed * dt * (3 * heightSpeedModifier + 1)
+
+    local zoomMoveVec = (vecUp * keys.zoomOut.analog +
         vecDown * keys.zoomIn.analog +
-        vecUp * pendingMouseMove
-    ):normalize() * moveSpeed * dt
+        vecUp * pendingMouseMove):normalize() * moveSpeed * dt * (3 * easeInOutSine(heightSpeedModifier) + 1)
 
     pendingMouseMove = 0
 
     moveCamera({
-        relativePosition = moveVec
+        relativePosition = planarMoveVec + zoomMoveVec
     })
     -- Interrupt tracking
     haltTracking()
