@@ -97,9 +97,9 @@ local mouseData = {
 local function mapClicked(mouseEvent, data)
     local cellPos = mutil.worldPosToCellPos(mouseData.clickStartWorldPos)
     print("click! " ..
-    aux_util.deepToString(mouseEvent, 3) ..
-    " worldspace: " ..
-    tostring(mouseData.clickStartWorldPos) .. " cell: " .. math.floor(cellPos.x) .. "," .. math.floor(cellPos.y))
+        aux_util.deepToString(mouseEvent, 3) ..
+        " worldspace: " ..
+        tostring(mouseData.clickStartWorldPos) .. " cell: " .. math.floor(cellPos.x) .. "," .. math.floor(cellPos.y))
     -- need to go from world pos to cam pos now
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos, 1)
 end
@@ -172,7 +172,7 @@ local iconContainer = ui.create {
     --layer = 'Windows',
     type = ui.TYPE.Widget,
     props = {
-        size = ui.screenSize(),
+        relativeSize = util.vector2(1, 1),
     },
     events = {
     },
@@ -346,7 +346,7 @@ local function newMainWindow()
         layer = 'Windows',
         type = ui.TYPE.Widget,
         props = {
-            size = ui.screenSize(),
+            relativeSize = util.vector2(1, 1),
             visible = true,
         },
         events = {
@@ -377,15 +377,6 @@ local function applyPendingHoverBoxContent()
     -- delayed UI actions can't be nested and result in fatal errors.
 
     hoverBox:update()
-end
-
-local function closeToCenter(viewportPos)
-    local screenSize = ui.screenSize()
-    local radius2 = (screenSize / 100):length2()
-    if radius2 < 32 * 32 then
-        radius2 = 32 * 32
-    end
-    return (viewportPos - (screenSize / 2)):length2() < radius2
 end
 
 local function purgeRemovedIcons()

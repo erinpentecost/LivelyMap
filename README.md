@@ -51,6 +51,8 @@ If you are using a parallax shader and either `02 Normals` or `02 Extreme Normal
 
 *Why are the icons so floaty?* You are using a parallax shader but haven't followed the Parallax Shader Calibration steps.
 
+*Why are the icons in the wrong spots?* Set your `[GUI] scaling factor` to `1` in your settings.cfg.
+
 *Why is my save file so big?* You might have a lot of path data saved in it. Run the sync tool to extract the path data from your save. The data will be moved into a json file under `00 Core/scripts/LivelyMap/data/paths`.
 
 *Why am I getting out of memory errors when running the sync file?* Edit the sync file and change `-threads=#` to `-threads=1` and try again.

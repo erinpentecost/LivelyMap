@@ -40,6 +40,8 @@ local cameraInterface = require("openmw.interfaces").Camera
 
 local defaultHeight   = 200
 local defaultPitch    = 1
+local minCameraHeight = 100
+local maxCameraHeight = 600
 
 local stickDeadzone   = 0.3
 
@@ -54,32 +56,32 @@ end))
 local keys = {
     forward         = keytrack.NewKey("forward", function(dt)
         return input.isKeyPressed(input.KEY.UpArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
     end),
     backward        = keytrack.NewKey("backward", function(dt)
         return input.isKeyPressed(input.KEY.DownArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
     end),
     left            = keytrack.NewKey("left", function(dt)
         return input.isKeyPressed(input.KEY.LeftArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) < -1 * stickDeadzone)
     end),
     right           = keytrack.NewKey("right", function(dt)
         return input.isKeyPressed(input.KEY.RightArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) > stickDeadzone)
     end),
 
     zoomIn          = keytrack.NewKey("zoomIn", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
     end),
-
     zoomOut         = keytrack.NewKey("zoomOut", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
     end),
+
     statsWindow     = keytrack.NewKey("statsWindow", function(dt)
         return settingCache.controllerButtons and
             input.getAxisValue(input.CONTROLLER_AXIS.TriggerLeft) > stickDeadzone
@@ -415,12 +417,7 @@ local function moveCamera(data)
 
         -- clamp camera height
         if currentMapData and (newPos.z ~= currentPosition.z) then
-            local relativeZ = newPos.z - currentMapData.object.position.z
-            if relativeZ < defaultHeight / 2 then
-                relativeZ = defaultHeight / 2
-            elseif relativeZ > defaultHeight * 3 then
-                relativeZ = defaultHeight * 3
-            end
+            local relativeZ = util.clamp(newPos.z - currentMapData.object.position.z, minCameraHeight, maxCameraHeight)
             newPos = util.vector3(newPos.x, newPos.y, relativeZ + currentMapData.object.position.z)
         end
 
@@ -575,8 +572,9 @@ local function cameraOffset(targetPosition, camPitch, camViewVector)
 end
 
 ---@param worldPos util.vector3
+---@param relativeHeight number? Zoom level you want.
 ---@return CameraData?
-local function worldPosToCameraPos(worldPos)
+local function worldPosToCameraPos(worldPos, relativeHeight)
     if not currentMapData then
         error("currentMapData is nil")
     end
@@ -584,7 +582,11 @@ local function worldPosToCameraPos(worldPos)
     local cellPos = mutil.worldPosToCellPos(worldPos)
     local rel = putil.cellPosToRelativeMeshPos(currentMapData, cellPos, true)
     local mapWorldPos = putil.relativeMeshPosToAbsoluteMeshPos(currentMapData, rel)
-    local heightOffset = util.vector3(0, 0, defaultHeight)
+
+    if not relativeHeight then
+        relativeHeight = camera.getPosition().z - currentMapData.object.position.z
+    end
+    local heightOffset = util.vector3(0, 0, relativeHeight)
     --- these vars are all good!
     ---print("cellPos:" .. tostring(cellPos) .. ", rel:" .. tostring(rel) .. ", mapmeshpos:" .. tostring(mapWorldPos))
     local camOffset = cameraOffset(mapCenter + heightOffset, defaultPitch, util.vector3(0, 1, 0))
@@ -633,9 +635,14 @@ local vecRight = util.vector3(1, 0, 0)
 local vecLeft = vecRight * -1
 local vecUp = util.vector3(0, 0, 1)
 local vecDown = vecUp * -1
-local moveSpeed = 100
+local moveSpeed = 150
 
 local newMapTileThisFrame = false
+
+-- easeInOutSine is a smoothing function. t ranges from 0 to 1.
+local function easeInOutSine(t)
+    return -1 * (math.cos(math.pi * t) - 1) / 2
+end
 
 local function onFrame(dt)
     -- Fake a duration if we're paused.
@@ -701,19 +708,23 @@ local function onFrame(dt)
         return
     end
 
-    local moveVec = (vecForward * keys.forward.analog +
+    local heightSpeedModifier = util.remap(camera.getPosition().z - currentMapData.object.position.z, minCameraHeight,
+        maxCameraHeight, 0, 1)
+
+    local planarMoveVec = (vecForward * keys.forward.analog +
         vecBackward * keys.backward.analog +
         vecRight * keys.right.analog +
-        vecLeft * keys.left.analog +
-        vecUp * keys.zoomOut.analog +
+        vecLeft * keys.left.analog
+    ):normalize() * moveSpeed * dt * (3 * heightSpeedModifier + 1)
+
+    local zoomMoveVec = (vecUp * keys.zoomOut.analog +
         vecDown * keys.zoomIn.analog +
-        vecUp * pendingMouseMove
-    ):normalize() * moveSpeed * dt
+        vecUp * pendingMouseMove):normalize() * moveSpeed * dt * (3 * easeInOutSine(heightSpeedModifier) + 1)
 
     pendingMouseMove = 0
 
     moveCamera({
-        relativePosition = moveVec
+        relativePosition = planarMoveVec + zoomMoveVec
     })
     -- Interrupt tracking
     haltTracking()
@@ -783,7 +794,7 @@ local function onMapMoved(data)
         -- Orient the camera so starting position is in the center.
         startCamera()
         print("initial track start")
-        local camPos = worldPosToCameraPos(data.startWorldPosition)
+        local camPos = worldPosToCameraPos(data.startWorldPosition, defaultHeight)
         camPos.force = true
         moveCamera(camPos)
     end

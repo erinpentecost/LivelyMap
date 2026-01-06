@@ -17,20 +17,57 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThreads int, vanity bool, rampPath string) error {
-	core00DataPath := filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data")
-	classicTexturePath := filepath.Join(rootPath, "01 Classic Map", "textures", "LivelyMap")
-	detailTexturePath := filepath.Join(rootPath, "01 Detail Map", "textures", "LivelyMap")
-	potatoTexturePath := filepath.Join(rootPath, "01 Potato Map", "textures", "LivelyMap")
-	normalsTexturePath := filepath.Join(rootPath, "02 Normals", "textures", "LivelyMap")
-	extremeNormalsTexturePath := filepath.Join(rootPath, "02 Extreme Normals", "textures", "LivelyMap")
+type annotatedDirectory struct {
+	path      string
+	available bool
+}
 
-	for _, texturePath := range []string{classicTexturePath, detailTexturePath, core00DataPath} {
-		if tdir, err := os.Stat(texturePath); err != nil {
-			return fmt.Errorf("open directory %q: %w", texturePath, err)
-		} else if !tdir.IsDir() {
-			return fmt.Errorf("%q is not a directory", texturePath)
-		}
+func newAnnotatedDirectory(path string) (*annotatedDirectory, error) {
+	if tdir, err := os.Stat(path); err != nil {
+		fmt.Printf("Can't find %q!", path)
+		return &annotatedDirectory{
+			path:      path,
+			available: false,
+		}, nil
+	} else if !tdir.IsDir() {
+		return nil, fmt.Errorf("%q is not a directory", path)
+	}
+	return &annotatedDirectory{
+		path:      path,
+		available: true,
+	}, nil
+}
+
+func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThreads int, vanity bool, rampPath string) error {
+	core00DataPath, err := newAnnotatedDirectory(filepath.Join(rootPath, "00 Core", "scripts", "LivelyMap", "data"))
+	if err != nil {
+		return err
+	}
+	classicTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "01 Classic Map", "textures", "LivelyMap"))
+	if err != nil {
+		return err
+	}
+	detailTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "01 Detail Map", "textures", "LivelyMap"))
+	if err != nil {
+		return err
+	}
+	potatoTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "01 Potato Map", "textures", "LivelyMap"))
+	if err != nil {
+		return err
+	}
+	normalsTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "02 Normals", "textures", "LivelyMap"))
+	if err != nil {
+		return err
+	}
+	extremeNormalsTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "02 Extreme Normals", "textures", "LivelyMap"))
+	if err != nil {
+		return err
+	}
+
+	texturePaths := []*annotatedDirectory{
+		classicTexturePath,
+		detailTexturePath,
+		potatoTexturePath,
 	}
 
 	fmt.Printf("Parsing %d plugins...\n", len(env.Plugins))
@@ -70,9 +107,11 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	}
 
 	// Special "sky" cell
-	for _, path := range []string{classicTexturePath, detailTexturePath, potatoTexturePath} {
-		if err := renderSky(path, renderer, specRenderer); err != nil {
-			return fmt.Errorf("render sky texture: %w", err)
+	for _, path := range texturePaths {
+		if path.available {
+			if err := renderSky(path.path, renderer, specRenderer); err != nil {
+				return fmt.Errorf("render sky texture: %w", err)
+			}
 		}
 	}
 
@@ -96,92 +135,113 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	allHeights := map[string]float32{}
 	for _, extents := range Partition(parsedLands.MapExtents) {
 		mapInfos[strconv.Itoa(int(extents.ID))] = extents
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: classicTexturePath,
-			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     classicColorCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.SMAA{},
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-			},
-			Codec: dds.Lossless,
-		})
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: normalsTexturePath,
-			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     normalCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				&postprocessors.MinimumEdgeTransparencyProcessor{
-					Minimum: 255,
+		if classicTexturePath.available {
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: classicTexturePath.path,
+				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     classicColorCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 				},
-			},
-			Codec: dds.DXT5,
-		})
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: extremeNormalsTexturePath,
-			Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     normalCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				&postprocessors.LocalToneMapAlpha{
-					WindowRadiusDenom: 10,
+				Codec: dds.Lossless,
+			})
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: classicTexturePath.path,
+				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     specularCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 				},
-				&postprocessors.MinimumEdgeTransparencyProcessor{
-					Minimum: 255,
+				Codec: dds.DXT5,
+			})
+		}
+		if normalsTexturePath.available {
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: normalsTexturePath.path,
+				Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     normalCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					&postprocessors.MinimumEdgeTransparencyProcessor{
+						Minimum: 255,
+					},
 				},
-			},
-			Codec: dds.DXT5,
-		})
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: classicTexturePath,
-			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     specularCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.SMAA{},
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-			},
-			Codec: dds.DXT5,
-		})
+				Codec: dds.DXT5,
+			})
+		}
+		if extremeNormalsTexturePath.available {
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: extremeNormalsTexturePath.path,
+				Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     normalCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					&postprocessors.LocalToneMapAlpha{
+						WindowRadiusDenom: 10,
+					},
+					&postprocessors.MinimumEdgeTransparencyProcessor{
+						Minimum: 255,
+					},
+				},
+				Codec: dds.DXT5,
+			})
+		}
 
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: potatoTexturePath,
-			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     classicColorCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.SMAA{},
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
-			},
-			Codec: dds.DXT1,
-		})
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: potatoTexturePath,
-			Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     specularCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.SMAA{},
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
-			},
-			Codec: dds.DXT5,
-		})
+		if potatoTexturePath.available {
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: potatoTexturePath.path,
+				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     classicColorCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+				},
+				Codec: dds.DXT1,
+			})
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: potatoTexturePath.path,
+				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     specularCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+				},
+				Codec: dds.DXT5,
+			})
+		}
 
-		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: detailTexturePath,
-			Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-			Extents:   extents.Extents,
-			Cells:     texturedCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.SMAA{},
-				&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-			},
-			Codec: dds.Lossless,
-		})
+		if detailTexturePath.available {
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: detailTexturePath.path,
+				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     texturedCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				},
+				Codec: dds.Lossless,
+			})
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: detailTexturePath.path,
+				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     specularCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				},
+				Codec: dds.DXT5,
+			})
+		}
 	}
 
 	// vanity map
@@ -209,7 +269,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 
 	// Save map image info so the Lua mod knows what to do with them:
 	return printMapInfo(
-		filepath.Join(core00DataPath, "maps.json"),
+		filepath.Join(core00DataPath.path, "maps.json"),
 		parsedLands,
 		mapInfos,
 		allHeights,
