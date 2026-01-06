@@ -56,32 +56,32 @@ end))
 local keys = {
     forward         = keytrack.NewKey("forward", function(dt)
         return input.isKeyPressed(input.KEY.UpArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
     end),
     backward        = keytrack.NewKey("backward", function(dt)
         return input.isKeyPressed(input.KEY.DownArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
     end),
     left            = keytrack.NewKey("left", function(dt)
         return input.isKeyPressed(input.KEY.LeftArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadLeft))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) < -1 * stickDeadzone)
     end),
     right           = keytrack.NewKey("right", function(dt)
         return input.isKeyPressed(input.KEY.RightArrow) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadRight))
+            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) > stickDeadzone)
     end),
 
     zoomIn          = keytrack.NewKey("zoomIn", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
     end),
-
     zoomOut         = keytrack.NewKey("zoomOut", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
+            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
     end),
+
     statsWindow     = keytrack.NewKey("statsWindow", function(dt)
         return settingCache.controllerButtons and
             input.getAxisValue(input.CONTROLLER_AXIS.TriggerLeft) > stickDeadzone
