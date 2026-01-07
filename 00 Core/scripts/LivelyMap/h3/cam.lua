@@ -28,12 +28,12 @@ local function isObjectBehindCamera(worldPos)
 end
 
 ---@class ViewportPosResult
----@field pos util.vector2?
+---@field pos util.vector2? Normalized.
 ---@field onScreen boolean
 
 ---@param worldPos util.vector3
 ---@return ViewportPosResult
-local function worldPosToViewportPos(worldPos)
+local function worldPosToNormalizedViewportPos(worldPos)
     -- This is from h3.
     local viewportPos = camera.worldToViewportVector(worldPos)
     local screenSize = ui.screenSize()
@@ -44,7 +44,7 @@ local function worldPosToViewportPos(worldPos)
 
     if isObjectBehindCamera(worldPos) then return { onScreen = false } end
 
-    local pos = util.vector2(viewportPos.x, viewportPos.y)
+    local pos = util.vector2(viewportPos.x / screenSize.x, viewportPos.y / screenSize.y)
 
     if not validX or not validY or not withinViewDistance then
         return
@@ -84,6 +84,6 @@ end
 
 return {
     isObjectBehindCamera = isObjectBehindCamera,
-    worldPosToViewportPos = worldPosToViewportPos,
+    worldPosToNormalizedViewportPos = worldPosToNormalizedViewportPos,
     viewportPosToWorldRay = viewportPosToWorldRay,
 }

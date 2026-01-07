@@ -35,14 +35,15 @@ settings.automatic.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.main[key]
 end))
 
-local function distanceScale(posData)
-    local dist = (camera.getPosition() - posData.mapWorldPos):length()
-    dist = util.clamp(dist, 100, 500)
-    local max = 1
-    if posData.hovering then
-        max = 1.25
+local baseIconSize = util.vector2(0.05, 0.05)
+local function iconSize(posData)
+    if posData then
+        local dist = (camera.getPosition() - posData.mapWorldPos):length()
+        dist = util.clamp(dist, 100, 500)
+        return baseIconSize * util.remap(dist, 100, 500, 1, 0.5) * settingCache.iconScale
+    else
+        return baseIconSize
     end
-    return util.remap(dist, 100, 500, max, 0.5) * settingCache.iconScale
 end
 
 local function hoverTextLayout(text, color, path)
@@ -83,6 +84,6 @@ local function hoverTextLayout(text, color, path)
 end
 
 return {
-    distanceScale = distanceScale,
+    iconSize = iconSize,
     hoverTextLayout = hoverTextLayout,
 }

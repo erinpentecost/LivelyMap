@@ -53,8 +53,6 @@ local function getAllMarkers()
     return markerData
 end
 
-local baseSize = util.vector2(32, 32)
-
 ---@class MarkerData
 ---@field id string Unique internal ID.
 ---@field hidden boolean Basically soft-delete.
@@ -146,9 +144,9 @@ local function registerMarkerIcon(data)
         props = {
             propagateEvents = false,
             visible = true,
-            position = util.vector2(100, 100),
+            relativePosition = util.vector2(0.2, 0.2),
             anchor = util.vector2(0.5, 0.5),
-            size = baseSize,
+            relativeSize = iutil.iconSize(),
             resource = ui.texture {
                 path = resolveStampFullPath(data.iconName)
             },
@@ -174,9 +172,9 @@ local function registerMarkerIcon(data)
             end
 
             icon.element.layout.props.visible = true
-            icon.element.layout.props.position = posData.viewportPos.pos
+            icon.element.layout.props.relativePosition = posData.viewportPos.pos
 
-            icon.element.layout.props.size = baseSize * iutil.distanceScale(posData)
+            icon.element.layout.props.relativeSize = iutil.iconSize(posData)
 
             icon.element:update()
         end,

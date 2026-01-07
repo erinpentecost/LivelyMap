@@ -418,10 +418,11 @@ end
 ---@return RectExtent
 local function getIconExtent(icon)
     -- assumes anchor is 0.5,0.5
-    local halfSize = icon.ref.element.layout.props.size / 2
+    -- THIS WILL NOT WORK because sizes are absolute, not relative.
+    local halfSize = icon.ref.element.layout.props.relativeSize / 2
     return {
-        topLeft = icon.ref.element.layout.props.position - halfSize,
-        bottomRight = icon.ref.element.layout.props.position + halfSize,
+        topLeft = icon.ref.element.layout.props.relativePosition - halfSize,
+        bottomRight = icon.ref.element.layout.props.relativePosition + halfSize,
     }
 end
 
@@ -430,7 +431,7 @@ end
 local function pushOverlappingIcons(iconList)
     -- first, get center point of all icons
     local center = mutil.averageVector3s(iconList, function(e)
-        return e.ref.element.layout.props.position
+        return e.ref.element.layout.props.relativePosition
     end)
     if not center then
         return
@@ -443,10 +444,10 @@ local function pushOverlappingIcons(iconList)
     -- won't flicker
     for _, icon in ipairs(iconList) do
         if icon.ref.groupable then
-            local pos = icon.ref.element.layout.props.position
-            icon.ref.element.layout.props.position = pos +
-                ((pos - center):normalize() * icon.ref.element.layout.props.size.x * 0.3)
-            icon.ref.element.layout.props.size = icon.ref.element.layout.props.size * 0.8
+            local pos = icon.ref.element.layout.props.relativePosition
+            icon.ref.element.layout.props.relativePosition = pos +
+                ((pos - center):normalize() * icon.ref.element.layout.props.relativeSize.x * 0.3)
+            icon.ref.element.layout.props.relativeSize = icon.ref.element.layout.props.relativeSize * 0.8
             icon.ref.element:update()
         end
     end
@@ -463,8 +464,6 @@ local function renderIcons()
 
     purgeRemovedIcons()
 
-    local screenSize = ui.screenSize()
-
     local collisionFinder = overlapfinder.NewOverlapFinder(getIconExtent)
 
     -- Render all the icons.
@@ -475,7 +474,7 @@ local function renderIcons()
         local iFacing = icon.ref.facing and icon.ref.facing(icon.ref) or nil
 
         if iPos then
-            local pos = putil.realPosToViewportPos(currentMapData, settingCache, iPos, iFacing)
+            local pos = putil.realPosToNormalizedViewportPos(currentMapData, settingCache, iPos, iFacing)
             if pos and pos.viewportPos then
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
@@ -484,14 +483,18 @@ local function renderIcons()
                         collisionFinder:AddElement(icon)
                     end
                     goto continue
-                elseif pos.viewportPos.pos and icon.ref.element.layout.props.size then
+                elseif pos.viewportPos.pos and icon.ref.element.layout.props.relativeSize then
                     -- is the edge visible?
-                    local halfBox = icon.ref.element.layout.props.size / 2
+                    local halfBox = icon.ref.element.layout.props.relativeSize / 2
                     local min = pos.viewportPos.pos - halfBox
                     local max = pos.viewportPos.pos + halfBox
 
                     if max.x >= 0 and max.y >= 0 and
-                        min.x <= screenSize.x and min.y <= screenSize.y then
+                        min.x <= 1 and min.y <= 1 then
+                        print(aux_util.deepToString(icon.ref.element.layout, 10))
+                        print("partially visible. pos: " ..
+                            tostring(pos.viewportPos.pos) ..
+                            ", size: " .. tostring(icon.ref.element.layout.props.relativeSize))
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos)
                         if icon.ref.groupable then
