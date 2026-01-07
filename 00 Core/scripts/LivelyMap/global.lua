@@ -442,6 +442,11 @@ local function onGetExteriorLocation(data)
         end
     end
 
+    if not object then
+        print("Failed to find object: " .. aux_util.deepToString(data))
+        return
+    end
+
     local posObj = getExteriorLocation(object)
     local facing = getFacing(object)
 

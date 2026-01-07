@@ -57,7 +57,10 @@ function CallbackContainerFunctions.invoke(self, id)
         return
     end
     print("Invoking callback " .. tostring(id) .. "...")
-    self.pendingCallbacks[id]()
+    local status, err = pcall(self.pendingCallbacks[id])
+    if not status then
+        print("Callback " .. tostring(id) .. " error: " .. tostring(err))
+    end
     self.pendingCallbacks[id] = nil
 end
 

@@ -564,7 +564,10 @@ local function doOnMapMoved(data)
     currentMapData = data
 
     for _, fn in ipairs(onMapMovedHandlers) do
-        fn(currentMapData)
+        local status, err = pcall(function() fn(currentMapData) end)
+        if not status then
+            print("OnMapMoved(" .. aux_util.deepToString(currentMapData) .. ") callback error: " .. tostring(err))
+        end
     end
 
     if not data.swapped then
@@ -596,7 +599,10 @@ local function doOnMapHidden(data)
     print("doOnMapHidden: " .. aux_util.deepToString(data, 3))
 
     for _, fn in ipairs(onMapHiddenHandlers) do
-        fn(data)
+        local status, err = pcall(function() fn(data) end)
+        if not status then
+            print("OnMapHidden(" .. aux_util.deepToString(data) .. ") callback error: " .. tostring(err))
+        end
     end
 
     if not data.swapped then
@@ -684,12 +690,13 @@ local function toggleMap(open, callback)
     local callbackId = nil
     if callback then
         callbackId = toggleCallbacks:add(callback)
-        print("Toggle receipt ID: " .. callbackId)
     end
 
     if open and currentMapData == nil then
+        if callbackId then print("Toggle on receipt ID: " .. callbackId) end
         summonMap(callbackId)
     elseif (not open) and (currentMapData ~= nil) then
+        if callbackId then print("Toggle off receipt ID: " .. callbackId) end
         core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself, callbackId = callbackId })
         interfaces.LivelyMapMarker.editMarkerWindow(nil)
     elseif callback then
