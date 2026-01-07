@@ -182,6 +182,9 @@ local function startCamera()
         -- endCamera() is called.
         originalCameraState = currentCameraData()
         originalCameraState.controlSwitches = currentControlSwitches()
+        if originalCameraState.mode == camera.MODE.Static then
+            originalCameraState.mode = camera.MODE.ThirdPerson
+        end
         print("Saved original camera state: " .. aux_util.deepToString(originalCameraState, 4))
     end
     disableControlSwitches()
