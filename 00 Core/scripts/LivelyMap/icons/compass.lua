@@ -43,6 +43,7 @@ compassAtlas:spawn({
     anchor = util.vector2(0.5, 0.5),
     color = settingCache.palleteColor1,
     events = {},
+    relativeSize = iutil.iconSize(),
 })
 
 settings.main.subscribe(async:callback(function(_, key)
@@ -52,8 +53,6 @@ settings.main.subscribe(async:callback(function(_, key)
         compassAtlas:getElement():update()
     end
 end))
-
-local baseSize = util.vector2(64, 64)
 
 local function adjustedYaw(deg)
     local yaw = math.deg(deg)
@@ -76,7 +75,7 @@ local compassIcon = {
     ---@param posData ViewportData
     onDraw = function(_, posData)
         compassAtlas:getElement().layout.props.visible = true
-        compassAtlas:getElement().layout.props.position = posData.viewportPos.pos
+        compassAtlas:getElement().layout.props.relativePosition = posData.viewportPos.pos
 
         if not posData.viewportPos.onScreen then
             compassAtlas:getElement().layout.props.visible = false
@@ -84,7 +83,7 @@ local compassIcon = {
             return
         end
 
-        compassAtlas:getElement().layout.props.size = baseSize * iutil.distanceScale(posData)
+        compassAtlas:getElement().layout.props.relativeSize = iutil.iconSize(posData)
 
         if posData.viewportFacing then
             local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)

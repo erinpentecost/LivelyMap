@@ -222,7 +222,7 @@ end
 --- @param pos WorldSpacePos
 --- @param facingWorldDir util.vector2 | util.vector3 | nil
 --- @return ViewportData?
-local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorldDir)
+local function realPosToNormalizedViewportPos(currentMapData, psoSettings, pos, facingWorldDir)
     -- this works ok, but fails when the camera gets too close.
     if not currentMapData then
         error("no current map")
@@ -272,8 +272,8 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
 
         if relFacing then
             local mapWorldFacingPos = relativeMeshPosToAbsoluteMeshPos(currentMapData, relFacing)
-            local s0 = h3cam.worldPosToViewportPos(mapWorldPos)
-            local s1 = h3cam.worldPosToViewportPos(mapWorldFacingPos)
+            local s0 = h3cam.worldPosToNormalizedViewportPos(mapWorldPos)
+            local s1 = h3cam.worldPosToNormalizedViewportPos(mapWorldFacingPos)
             if s0 and s1 and s0.pos and s1.pos then
                 viewportFacing = (s1.pos - s0.pos):normalize()
             end
@@ -282,7 +282,7 @@ local function realPosToViewportPos(currentMapData, psoSettings, pos, facingWorl
 
 
     return {
-        viewportPos = h3cam.worldPosToViewportPos(mapWorldPos + parallaxWorldOffset),
+        viewportPos = h3cam.worldPosToNormalizedViewportPos(mapWorldPos + parallaxWorldOffset),
         mapWorldPos = mapWorldPos,
         viewportFacing = viewportFacing,
     }
@@ -368,7 +368,7 @@ return {
     relativeMeshPosToAbsoluteMeshPos = relativeMeshPosToAbsoluteMeshPos,
     relativeMeshPosToCellPos = relativeMeshPosToCellPos,
     mapPosToRelativeCellPos = mapPosToRelativeCellPos,
-    realPosToViewportPos = realPosToViewportPos,
+    realPosToNormalizedViewportPos = realPosToNormalizedViewportPos,
     viewportPosToRealPos = viewportPosToRealPos,
     viewportPosToRelativeMeshPos = viewportPosToRelativeMeshPos,
 }

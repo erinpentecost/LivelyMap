@@ -41,7 +41,6 @@ settings.main.subscribe(async:callback(function(_, key)
 end))
 
 local debugIcons = {}
-local baseSize = util.vector2(32, 32)
 
 local function makeDebugPips()
     for x = -2, 2, 1 do
@@ -58,9 +57,9 @@ local function makeDebugPips()
                     type = ui.TYPE.Image,
                     props = {
                         visible = false,
-                        position = util.vector2(100, 100),
+                        relativePosition = util.vector2(0.2, 0.2),
                         anchor = util.vector2(0.5, 0.5),
-                        size = baseSize,
+                        relativeSize = iutil.iconSize(),
                         resource = ui.texture {
                             path = "textures/LivelyMap/debug.png"
                         }
@@ -89,7 +88,7 @@ local function makeDebugPips()
                             element.layout.props.visible = false
                             return
                         end
-                        element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                        element.layout.props.relativeSize = iutil.iconSize(posData)
                         element.layout.props.visible = true
                         element.layout.props.position = posData.viewportPos.pos
                         element:update()

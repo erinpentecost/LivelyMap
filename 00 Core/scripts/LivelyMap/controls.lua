@@ -110,17 +110,19 @@ local function currentControlSwitches()
     for _, v in pairs(pself.type.CONTROL_SWITCH) do
         out[v] = pself.type.getControlSwitch(pself, v)
     end
+    print("Saved control switches: " .. aux_util.deepToString(out, 4))
     return out
 end
 
 ---@param switches ControlSwitches
 local function applyControlSwitches(switches)
     if switches then
+        print("Applying control switches: " .. aux_util.deepToString(switches, 4))
         for k, v in pairs(switches) do
             pself.type.setControlSwitch(pself, k, v)
         end
     else
-        print("no stored control switches")
+        print("No saved control switches.")
     end
 end
 
@@ -170,6 +172,7 @@ end
 ---@type CameraData?
 local originalCameraState = nil
 local function startCamera()
+    print("Assuming control.")
     cameraInterface.disableModeControl(MOD_NAME)
     uiInterface.setHudVisibility(false)
     clearControls()
@@ -179,6 +182,10 @@ local function startCamera()
         -- endCamera() is called.
         originalCameraState = currentCameraData()
         originalCameraState.controlSwitches = currentControlSwitches()
+        if originalCameraState.mode == camera.MODE.Static then
+            originalCameraState.mode = camera.MODE.ThirdPerson
+        end
+        print("Saved original camera state: " .. aux_util.deepToString(originalCameraState, 4))
     end
     disableControlSwitches()
     camera.setMode(camera.MODE.Static, true)
@@ -187,12 +194,16 @@ end
 
 --- Restore the camera back to original state.
 local function endCamera()
+    print("Ending control.")
     cameraInterface.enableModeControl(MOD_NAME)
     uiInterface.setHudVisibility(true)
     clearControls()
     if originalCameraState then
+        print("Restoring camera state: " .. aux_util.deepToString(originalCameraState, 4))
         setCamera(originalCameraState)
         applyControlSwitches(originalCameraState.controlSwitches)
+    else
+        print("No camera state to restore!")
     end
     originalCameraState = nil
 end
@@ -651,12 +662,6 @@ local function onFrame(dt)
     end
     -- Only track inputs while the map is up.
     if not originalCameraState then
-        return
-    end
-    -- We lost the camera somehow.
-    if camera.getMode() ~= camera.MODE.Static then
-        print("Lost camera control. Quitting map.")
-        endCamera()
         return
     end
 

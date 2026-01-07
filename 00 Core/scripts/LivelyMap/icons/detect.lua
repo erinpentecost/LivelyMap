@@ -73,7 +73,6 @@ local animalPath      = "textures/LivelyMap/detect-animal.png"
 local keyPath         = "textures/LivelyMap/detect-key.png"
 local enchantmentPath = "textures/LivelyMap/detect-enchantment.png"
 
-local baseSize        = util.vector2(32, 32)
 -- creates an unattached icon and registers it.
 local function newDetectIcon(path, color)
     local element = ui.create {
@@ -81,9 +80,9 @@ local function newDetectIcon(path, color)
         type = ui.TYPE.Image,
         props = {
             visible = false,
-            position = util.vector2(100, 100),
+            relativePosition = util.vector2(0.2, 0.2),
             anchor = util.vector2(0.5, 0.5),
-            size = baseSize,
+            relativeSize = iutil.iconSize(),
             color = color,
             resource = ui.texture {
                 path = path,
@@ -103,7 +102,7 @@ local function newDetectIcon(path, color)
             if s.freed then
                 element.layout.props.visible = false
             else
-                element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                element.layout.props.relativeSize = iutil.iconSize(posData)
                 element.layout.props.visible = true
                 element.layout.props.position = posData.viewportPos.pos
             end

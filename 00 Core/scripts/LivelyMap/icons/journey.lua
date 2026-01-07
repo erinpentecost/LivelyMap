@@ -49,8 +49,6 @@ local minimumIndex = 1
 
 local pathIcon     = "textures/LivelyMap/journey.png"
 
-local baseSize     = util.vector2(16, 16)
-
 -- creates an unattached icon and registers it.
 local function newIcon()
     local element = ui.create {
@@ -58,9 +56,9 @@ local function newIcon()
         type = ui.TYPE.Image,
         props = {
             visible = false,
-            position = util.vector2(100, 100),
+            relativePosition = util.vector2(0.2, 0.2),
             anchor = util.vector2(0.5, 0.5),
-            size = baseSize,
+            relativeSize = iutil.iconSize(),
             color = settingCache.palleteColor2,
             resource = ui.texture {
                 path = pathIcon,
@@ -83,9 +81,9 @@ local function newIcon()
             if s.cachedPos == nil or (not posData.viewportPos.onScreen) then
                 s.element.layout.props.visible = false
             else
-                s.element.layout.props.size = baseSize * iutil.distanceScale(posData)
+                s.element.layout.props.relativeSize = iutil.iconSize(posData) / 2
                 s.element.layout.props.visible = true
-                s.element.layout.props.position = posData.viewportPos.pos
+                s.element.layout.props.relativePosition = posData.viewportPos.pos
             end
             s.element:update()
         end,

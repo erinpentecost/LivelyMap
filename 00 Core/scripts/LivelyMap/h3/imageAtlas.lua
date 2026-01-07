@@ -94,7 +94,7 @@ function ImageAtlas:spawn(elementData)
             position = elementData.position,
             relativePosition = elementData.relativePosition,
             relativeSize = elementData.relativeSize,
-            size = elementData.size or self.tileSize,
+            size = elementData.size,
             color = elementData.color,
             anchor = elementData.anchor,
             alpha = elementData.alpha or 1.0,
