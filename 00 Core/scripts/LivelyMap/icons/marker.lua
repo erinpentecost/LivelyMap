@@ -660,8 +660,10 @@ local function editMarkerWindow(data)
             interfaces.UI.removeMode('Interface')
             addedMode = false
         end
+        interfaces.LivelyMapDraw.setEnabled(true)
         return
     end
+    interfaces.LivelyMapDraw.setEnabled(false)
 
     stampMakerWindow = newStampMakerWindow()
 

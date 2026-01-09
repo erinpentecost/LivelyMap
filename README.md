@@ -55,4 +55,4 @@ If you are using a parallax shader and either `02 Normals` or `02 Extreme Normal
 
 *Why is my save file so big?* You might have a lot of path data saved in it. Run the sync tool to extract the path data from your save. The data will be moved into a json file under `00 Core/scripts/LivelyMap/data/paths`.
 
-*Why am I getting out of memory errors when running the sync file?* Edit the sync file and change `-threads=#` to `-threads=1` and try again.
+*I lost control of my character! What happened?* You encountered a bug that I haven't been able to reproduce. Open the console with `~` and type `lua unstuck`. Then please report the bug in the openmw Discord along with a log and your mod list.

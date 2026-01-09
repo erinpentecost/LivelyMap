@@ -683,6 +683,13 @@ local function summonMap(callbackId)
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 
+local enabled = true
+
+local function setEnabled(status)
+    print("Map Toggle enabled: " .. tostring(status))
+    enabled = status
+end
+
 ---@param open boolean? Nil to toggle. Otherwise, boolean indicating desired state.
 ---@param callback fun()? Called once the toggle is processed. This can take multiple frames, so this is the only way to know when it's done.
 local function toggleMap(open, callback)
@@ -690,12 +697,17 @@ local function toggleMap(open, callback)
         open = currentMapData == nil
     end
 
+    if not enabled then
+        print("Map toggle disabled.")
+        return
+    end
+
     local callbackId = nil
     if callback then
         callbackId = toggleCallbacks:add(callback)
     end
 
-    if open and currentMapData == nil then
+    if open and currentMapData == nil and interfaces.UI.getMode() == nil then
         if callbackId then print("Toggle on receipt ID: " .. callbackId) end
         summonMap(callbackId)
     elseif (not open) and (currentMapData ~= nil) then
@@ -796,6 +808,7 @@ return {
             return addHandler(fn, onMapHiddenHandlers)
         end,
         toggleMap = toggleMap,
+        setEnabled = setEnabled,
     },
     eventHandlers = {
         [MOD_NAME .. "onMapMoved"] = onMapMoved,

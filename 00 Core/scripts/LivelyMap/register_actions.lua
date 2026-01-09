@@ -15,18 +15,19 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local settings   = require("scripts.LivelyMap.settings")
-local storage    = require('openmw.storage')
-local ui         = require('openmw.ui')
-local async      = require("openmw.async")
-local interfaces = require('openmw.interfaces')
-local input      = require('openmw.input')
-local MOD_NAME   = require("scripts.LivelyMap.ns")
-local core       = require("openmw.core")
-local util       = require("openmw.util")
-local aux_util   = require('openmw_aux.util')
-local pself      = require("openmw.self")
-local settings   = require("scripts.LivelyMap.settings")
+local settings        = require("scripts.LivelyMap.settings")
+local storage         = require('openmw.storage')
+local ui              = require('openmw.ui')
+local async           = require("openmw.async")
+local interfaces      = require('openmw.interfaces')
+local input           = require('openmw.input')
+local MOD_NAME        = require("scripts.LivelyMap.ns")
+local core            = require("openmw.core")
+local util            = require("openmw.util")
+local aux_util        = require('openmw_aux.util')
+local pself           = require("openmw.self")
+local cameraInterface = require("openmw.interfaces").Camera
+local settings        = require("scripts.LivelyMap.settings")
 
 local function splitString(str)
     local out = {}
@@ -70,6 +71,17 @@ local function onConsoleCommand(mode, command, selectedObject)
         local trimmed = trim(markArea)
         print("Mark Area: " .. trimmed)
         interfaces.LivelyMapAreaMarker.markArea(trimmed)
+    end
+
+    local unstuck = getSuffixForCmd("lua unstuck")
+    if unstuck ~= nil then
+        print("Please report your bug in the Discord along with the logs.")
+        cameraInterface.enableModeControl(MOD_NAME)
+        for k, v in pairs(pself.type.CONTROL_SWITCH) do
+            local old = pself.type.getControlSwitch(pself, v)
+            print("Changing " .. tostring(k) .. " from " .. tostring(old) .. " to true.")
+            pself.type.setControlSwitch(pself, v, true)
+        end
     end
 end
 
