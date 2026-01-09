@@ -63,7 +63,7 @@ local toggleCallbacks = callbackcontainer.NewCallbackContainer()
 --- * an anchor value of (0.5,0.5)
 --- * position (not relativePosition)
 --- * size (not relativeSize)
---- @field onDraw fun(icon: Icon, posData : ViewportData)
+--- @field onDraw fun(icon: Icon, posData : ViewportData, parentAspectRatio : util.Vector2)
 --- @field onHide fun(icon: Icon)
 --- @field priority number? The higher the priority, the higher the layer.
 --- @field groupable boolean? If true, the icon may be grouped or adjusted if it collides with other icons.
@@ -466,6 +466,9 @@ local function renderIcons()
 
     local collisionFinder = overlapfinder.NewOverlapFinder(getIconExtent)
 
+    local uiSize = ui.layers[ui.layers.indexOf("FadeToBlack")].size
+    local parentAspectRatio = util.vector2(uiSize.x / uiSize.y, 1)
+
     -- Render all the icons.
     for _, icon in ipairs(icons) do
         -- Get world position.
@@ -478,7 +481,7 @@ local function renderIcons()
             if pos and pos.viewportPos then
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
-                    icon.ref.onDraw(icon.ref, pos)
+                    icon.ref.onDraw(icon.ref, pos, parentAspectRatio)
                     if icon.ref.groupable then
                         collisionFinder:AddElement(icon)
                     end
@@ -496,7 +499,7 @@ local function renderIcons()
                             tostring(pos.viewportPos.pos) ..
                             ", size: " .. tostring(icon.ref.element.layout.props.relativeSize))
                         icon.onScreen = true
-                        icon.ref.onDraw(icon.ref, pos)
+                        icon.ref.onDraw(icon.ref, pos, parentAspectRatio)
                         if icon.ref.groupable then
                             collisionFinder:AddElement(icon)
                         end

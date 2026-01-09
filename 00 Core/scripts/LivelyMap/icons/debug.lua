@@ -83,14 +83,14 @@ local function makeDebugPips()
                     element = element,
                     pos = worldPos,
                     ---@param posData ViewportData
-                    onDraw = function(_, posData)
+                    onDraw = function(_, posData, parentAspectRatio)
                         if not (debugEnabled or psoUnlocked) then
                             element.layout.props.visible = false
                             return
                         end
-                        element.layout.props.relativeSize = iutil.iconSize(posData)
+                        element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio)
                         element.layout.props.visible = true
-                        element.layout.props.position = posData.viewportPos.pos
+                        element.layout.props.relativePosition = posData.viewportPos.pos
                         element:update()
                     end,
                     onHide = function()

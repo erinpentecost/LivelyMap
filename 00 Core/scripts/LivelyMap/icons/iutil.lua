@@ -36,13 +36,16 @@ settings.automatic.subscribe(async:callback(function(_, key)
 end))
 
 local baseIconSize = util.vector2(0.05, 0.05)
-local function iconSize(posData)
+local function iconSize(posData, parentAspectRatio)
+    if not parentAspectRatio then
+        parentAspectRatio = util.vector2(1, 1)
+    end
     if posData then
         local dist = (camera.getPosition() - posData.mapWorldPos):length()
         dist = util.clamp(dist, 100, 500)
-        return baseIconSize * util.remap(dist, 100, 500, 1, 0.5) * settingCache.iconScale
+        return (baseIconSize * util.remap(dist, 100, 500, 1, 0.5) * settingCache.iconScale):ediv(parentAspectRatio)
     else
-        return baseIconSize
+        return baseIconSize:ediv(parentAspectRatio)
     end
 end
 

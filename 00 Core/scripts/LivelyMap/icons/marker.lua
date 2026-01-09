@@ -162,7 +162,7 @@ local function registerMarkerIcon(data)
             return icon.marker.worldPos
         end,
         ---@param posData ViewportData
-        onDraw = function(icon, posData)
+        onDraw = function(icon, posData, parentAspectRatio)
             if not posData.viewportPos.onScreen or icon.marker.hidden then
                 if icon.element.layout.props.visible then
                     icon.element.layout.props.visible = false
@@ -174,7 +174,7 @@ local function registerMarkerIcon(data)
             icon.element.layout.props.visible = true
             icon.element.layout.props.relativePosition = posData.viewportPos.pos
 
-            icon.element.layout.props.relativeSize = iutil.iconSize(posData)
+            icon.element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio)
 
             icon.element:update()
         end,
