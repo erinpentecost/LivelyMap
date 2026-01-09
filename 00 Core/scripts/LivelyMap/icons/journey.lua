@@ -76,12 +76,12 @@ local function newIcon()
             return s.cachedPos
         end,
         ---@param posData ViewportData
-        onDraw = function(s, posData)
+        onDraw = function(s, posData, parentAspectRatio)
             -- s is this icon.
             if s.cachedPos == nil or (not posData.viewportPos.onScreen) then
                 s.element.layout.props.visible = false
             else
-                s.element.layout.props.relativeSize = iutil.iconSize(posData) / 2
+                s.element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio) / 2
                 s.element.layout.props.visible = true
                 s.element.layout.props.relativePosition = posData.viewportPos.pos
             end

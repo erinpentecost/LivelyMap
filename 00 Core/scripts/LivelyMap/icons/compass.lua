@@ -73,7 +73,7 @@ local compassIcon = {
         return interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().facing
     end,
     ---@param posData ViewportData
-    onDraw = function(_, posData)
+    onDraw = function(_, posData, parentAspectRatio)
         compassAtlas:getElement().layout.props.visible = true
         compassAtlas:getElement().layout.props.relativePosition = posData.viewportPos.pos
 
@@ -83,7 +83,7 @@ local compassIcon = {
             return
         end
 
-        compassAtlas:getElement().layout.props.relativeSize = iutil.iconSize(posData)
+        compassAtlas:getElement().layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio)
 
         if posData.viewportFacing then
             local angle = math.atan2(posData.viewportFacing.x, -1 * posData.viewportFacing.y)

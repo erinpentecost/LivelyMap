@@ -97,14 +97,14 @@ local function newDetectIcon(path, color)
         freed = true,
         pos = function() return nil end,
         ---@param posData ViewportData
-        onDraw = function(s, posData)
+        onDraw = function(s, posData, parentAspectRatio)
             -- s is this icon.
             if s.freed then
                 element.layout.props.visible = false
             else
-                element.layout.props.relativeSize = iutil.iconSize(posData)
+                element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio)
                 element.layout.props.visible = true
-                element.layout.props.position = posData.viewportPos.pos
+                element.layout.props.relativePosition = posData.viewportPos.pos
             end
             element:update()
         end,
@@ -270,6 +270,11 @@ local function onUpdate(dt)
         return
     end
     delay = 1
+
+    if not pself.cell.isExterior then
+        freeIcons()
+        return
+    end
 
     -- get effects we care about
     local animalMagnitude = 0
