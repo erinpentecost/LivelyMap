@@ -171,12 +171,12 @@ end
 
 local displaying = false
 
-interfaces.LivelyMapDraw.onMapMoved(function(mapData)
+interfaces.LivelyMapToggler.onMapMoved(function(mapData)
     print("map up")
     mapUp = true
 end)
 
-interfaces.LivelyMapDraw.onMapHidden(function(mapData)
+interfaces.LivelyMapToggler.onMapHidden(function(mapData)
     print("map down")
     if not mapData.swapped then
         print("map closed")

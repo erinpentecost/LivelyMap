@@ -132,6 +132,11 @@ local function disableControlSwitches()
     end
 end
 
+---@class Rotation
+---@field z number
+---@field y number
+---@field x number
+
 ---@class CameraData
 ---@field pitch number?
 ---@field yaw number?
@@ -141,6 +146,7 @@ end
 ---@field mode any
 ---@field force boolean? Ignore validation!
 ---@field controlSwitches any? Used during restore only.
+---@field playerRotation Rotation? Used during restore only.
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -160,6 +166,7 @@ end
 ---Applies data changes to the actual camera.
 ---@param data CameraData
 local function setCamera(data)
+    print("setCamera: "..aux_util.deepToString(data, 4))
     camera.setMode(data.mode, true)
     camera.setPitch(data.pitch)
     camera.setYaw(data.yaw)
@@ -185,11 +192,21 @@ local function startCamera()
         if originalCameraState.mode == camera.MODE.Static then
             originalCameraState.mode = camera.MODE.ThirdPerson
         end
+
+        local z, y, x = pself.rotation:getAnglesZYX()
+        originalCameraState.playerRotation = {
+            z= z,
+            y= y,
+            x= x,
+        }
         print("Saved original camera state: " .. aux_util.deepToString(originalCameraState, 4))
     end
     disableControlSwitches()
     camera.setMode(camera.MODE.Static, true)
     camera.setYaw(0)
+    -- player position gets completely messed up
+    -- when we swap to static camera. we need to reset it.
+    core.sendGlobalEvent(MOD_NAME .. "onRotate", {object=pself, rotation=originalCameraState.playerRotation})
 end
 
 --- Restore the camera back to original state.
@@ -693,7 +710,7 @@ local function onFrame(dt)
 
     if keys.inventoryWindow.rise then
         print("Switching to inventory window.")
-        interfaces.LivelyMapDraw.toggleMap(false,
+        interfaces.LivelyMapToggler.toggleMap(false,
             function()
                 print("Done switching to inventory window.")
                 interfaces.UI.addMode('Interface', { windows = { "Inventory" } })
@@ -702,7 +719,7 @@ local function onFrame(dt)
     end
     if keys.statsWindow.rise then
         print("Switching to stats window.")
-        interfaces.LivelyMapDraw.toggleMap(false, function()
+        interfaces.LivelyMapToggler.toggleMap(false, function()
             print("Done switching to stats window.")
             if interfaces.StatsWindow then
                 interfaces.StatsWindow.show(true)
@@ -790,8 +807,8 @@ local function computeVisibilityCorrection(hits, bounds)
 end
 
 
-local function onMapMoved(data)
-    print("controls.onMapMoved")
+local function doOnMapMoved(data)
+    print("controls.doOnMapMoved")
     currentMapData = data
     newMapTileThisFrame = true
     -- If this is not a swap, then this is a brand new map session.
@@ -829,14 +846,18 @@ local function onMapMoved(data)
     end
 end
 
-local function onMapHidden(data)
-    print("controls.onMapHidden")
+interfaces.LivelyMapToggler.onMapMoved(doOnMapMoved)
+
+local function doOnMapHidden(data)
+    print("controls.doOnMapHidden")
     currentMapData = nil
     -- If it's not a swap, it means we are done looking at the map.
     if not data.swapped then
         endCamera()
     end
 end
+
+interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
 local function onLoad(data)
     originalCameraState = data
@@ -858,9 +879,5 @@ return {
         onFrame = onFrame,
         onSave = onSave,
         onLoad = onLoad,
-    },
-    eventHandlers = {
-        [MOD_NAME .. "onMapMoved"] = onMapMoved,
-        [MOD_NAME .. "onMapHidden"] = onMapHidden,
     },
 }

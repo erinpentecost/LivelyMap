@@ -31,7 +31,6 @@ local interfaces        = require('openmw.interfaces')
 local storage           = require('openmw.storage')
 local h3cam             = require("scripts.LivelyMap.h3.cam")
 local overlapfinder     = require("scripts.LivelyMap.overlapfinder")
-local callbackcontainer = require("scripts.LivelyMap.callbackcontainer")
 
 ---@type MeshAnnotatedMapData?
 local currentMapData    = nil
@@ -51,8 +50,6 @@ end))
 settings.pso.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.pso[key]
 end))
-
-local toggleCallbacks = callbackcontainer.NewCallbackContainer()
 
 ---@class Icon
 --- @field element any UI element.
@@ -554,27 +551,10 @@ local function renderIcons()
     --]]
 end
 
----@type fun(data :MeshAnnotatedMapData)[]
-local onMapMovedHandlers = {}
----@type fun(data :MeshAnnotatedMapData)[]
-local onMapHiddenHandlers = {}
-
----Don't process these events immediately, since their origin may be
----from a delayed action. Delayed actions can't be nested.
----@type {fn: fun(data : MeshAnnotatedMapData), data : MeshAnnotatedMapData}[]
-local pendingMapChangeEvents = {}
-
 ---@param data MeshAnnotatedMapData
 local function doOnMapMoved(data)
     print("doOnMapMoved: " .. aux_util.deepToString(data, 3))
     currentMapData = data
-
-    for _, fn in ipairs(onMapMovedHandlers) do
-        local status, err = pcall(function() fn(currentMapData) end)
-        if not status then
-            print("OnMapMoved(" .. aux_util.deepToString(currentMapData) .. ") callback error: " .. tostring(err))
-        end
-    end
 
     if not data.swapped then
         -- invoking addMode while in gamepad UI will result in registerWindow's
@@ -588,28 +568,18 @@ local function doOnMapMoved(data)
 
     setHoverBoxContent(nil)
 
-    interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
-
-    toggleCallbacks:invoke(data.callbackId)
+    --interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
 
     --this might be causing race condition issues
     --renderIcons()
 end
 
----@param data MeshAnnotatedMapData
-local function onMapMoved(data)
-    table.insert(pendingMapChangeEvents, { fn = doOnMapMoved, data = data })
-end
+interfaces.LivelyMapToggler.onMapMoved(doOnMapMoved)
+
 
 local function doOnMapHidden(data)
     print("doOnMapHidden: " .. aux_util.deepToString(data, 3))
 
-    for _, fn in ipairs(onMapHiddenHandlers) do
-        local status, err = pcall(function() fn(data) end)
-        if not status then
-            print("OnMapHidden(" .. aux_util.deepToString(data) .. ") callback error: " .. tostring(err))
-        end
-    end
 
     if not data.swapped then
         -- assumes we're exiting-to-gameplay
@@ -622,30 +592,11 @@ local function doOnMapHidden(data)
 
     currentMapData = nil
 
-    toggleCallbacks:invoke(data.callbackId)
 end
-
----@param data MeshAnnotatedMapData
-local function onMapHidden(data)
-    table.insert(pendingMapChangeEvents, { fn = doOnMapHidden, data = data })
-end
-
----
----@return boolean true if an event was processed.
-local function processPendingMapEvent()
-    local event = table.remove(pendingMapChangeEvents, 1)
-    if event then
-        event.fn(event.data)
-        return true
-    end
-    return false
-end
+interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
 --local lastCameraPos = nil
 local function onUpdate(dt)
-    if processPendingMapEvent() then
-        return
-    end
     if currentMapData == nil then
         return
     end
@@ -667,60 +618,6 @@ local function onUpdate(dt)
         end]]
     --- TODO: icons aren't being drawn on the first frame of map spawn,
     --- probably because the camera is not in the right spot.
-end
-
-local function summonMap(callbackId)
-    local mapData = mutil.getClosestMap(pself.cell.gridX, pself.cell.gridY)
-
-    local pos = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
-    local showData = mutil.shallowMerge(mapData, {
-        cellID = pself.cell.id,
-        player = pself,
-        startWorldPosition = {
-            x = pos.x,
-            y = pos.y,
-            z = pos.z,
-        },
-        callbackId = callbackId,
-    })
-    core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
-end
-
-local enabled = true
-
-local function setEnabled(status)
-    print("Map Toggle enabled: " .. tostring(status))
-    enabled = status
-end
-
----@param open boolean? Nil to toggle. Otherwise, boolean indicating desired state.
----@param callback fun()? Called once the toggle is processed. This can take multiple frames, so this is the only way to know when it's done.
-local function toggleMap(open, callback)
-    if open == nil then
-        open = currentMapData == nil
-    end
-
-    if not enabled then
-        print("Map toggle disabled.")
-        return
-    end
-
-    local callbackId = nil
-    if callback then
-        callbackId = toggleCallbacks:add(callback)
-    end
-
-    if open and currentMapData == nil and interfaces.UI.getMode() == nil then
-        if callbackId then print("Toggle on receipt ID: " .. callbackId) end
-        summonMap(callbackId)
-    elseif (not open) and (currentMapData ~= nil) then
-        if callbackId then print("Toggle off receipt ID: " .. callbackId) end
-        core.sendGlobalEvent(MOD_NAME .. "onHideMap", { player = pself, callbackId = callbackId })
-        interfaces.LivelyMapMarker.editMarkerWindow(nil)
-    elseif callback then
-        -- no change, so do callback
-        toggleCallbacks:invoke(callbackId)
-    end
 end
 
 local nextName = 0
@@ -780,14 +677,6 @@ local function registerIcon(icon)
     return name
 end
 
-
-local function addHandler(fn, list)
-    if type(fn) ~= "function" then
-        error("addHandler fn must be a function, not a " .. type(fn))
-    end
-    table.insert(list, fn)
-end
-
 local function getIcon(name)
     for _, icon in ipairs(icons) do
         if icon.name == name then
@@ -804,18 +693,6 @@ return {
         registerIcon = registerIcon,
         getIcon = getIcon,
         setHoverBoxContent = setHoverBoxContent,
-        onMapMoved = function(fn)
-            return addHandler(fn, onMapMovedHandlers)
-        end,
-        onMapHidden = function(fn)
-            return addHandler(fn, onMapHiddenHandlers)
-        end,
-        toggleMap = toggleMap,
-        setEnabled = setEnabled,
-    },
-    eventHandlers = {
-        [MOD_NAME .. "onMapMoved"] = onMapMoved,
-        [MOD_NAME .. "onMapHidden"] = onMapHidden,
     },
     engineHandlers = {
         onUpdate = onUpdate,

@@ -52,7 +52,7 @@ local function onConsoleCommand(mode, command, selectedObject)
 
     local showMap = getSuffixForCmd("lua map")
     if showMap ~= nil then
-        interfaces.LivelyMapDraw.toggleMap(true)
+        interfaces.LivelyMapToggler.toggleMap(true)
     end
 
     local editMarker = getSuffixForCmd("lua marker")
@@ -91,7 +91,7 @@ local function init()
 
     local actionCallback = async:callback(function(e)
         if e then
-            interfaces.LivelyMapDraw.toggleMap()
+            interfaces.LivelyMapToggler.toggleMap()
         end
     end)
     input.registerActionHandler(actionName, actionCallback)
@@ -99,7 +99,7 @@ local function init()
     -- Exit the map when one of these triggers goes off:
     for _, exitTrigger in ipairs { "GameMenu", "Journal", "Inventory" } do
         input.registerTriggerHandler(exitTrigger, async:callback(function()
-            interfaces.LivelyMapDraw.toggleMap(false,
+            interfaces.LivelyMapToggler.toggleMap(false,
                 function()
                     print("Trigger: Closed map because " .. exitTrigger .. " triggered.")
                 end)
@@ -109,7 +109,7 @@ local function init()
     --- Drop the map if the player is hit
     interfaces.Combat.addOnHitHandler(function(attackInfo)
         if attackInfo ~= nil then
-            interfaces.LivelyMapDraw.toggleMap(false)
+            interfaces.LivelyMapToggler.toggleMap(false)
         end
     end)
 end

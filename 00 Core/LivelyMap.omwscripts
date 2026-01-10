@@ -14,6 +14,7 @@ PLAYER: scripts/LivelyMap/doorcategorizer.lua
 # Core stuff
 GLOBAL: scripts/LivelyMap/global.lua
 PLAYER: scripts/LivelyMap/player.lua
+PLAYER: scripts/LivelyMap/toggler.lua
 PLAYER: scripts/LivelyMap/controls.lua
 PLAYER: scripts/LivelyMap/draw.lua
 CUSTOM: scripts/LivelyMap/mapnif.lua
