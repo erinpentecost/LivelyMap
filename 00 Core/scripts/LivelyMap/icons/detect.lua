@@ -50,12 +50,12 @@ local detectKeyId         = core.magic.EFFECT_TYPE.DetectKey
 local mapUp               = false
 local detectIcons         = {}
 
-interfaces.LivelyMapDraw.onMapMoved(function(_)
+interfaces.LivelyMapToggler.onMapMoved(function(_)
     print("map up")
     mapUp = true
 end)
 
-interfaces.LivelyMapDraw.onMapHidden(function(_)
+interfaces.LivelyMapToggler.onMapHidden(function(_)
     print("map down")
     mapUp = false
 end)

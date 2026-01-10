@@ -127,7 +127,7 @@ local function markFromJournal()
     end
 end
 
-interfaces.LivelyMapDraw.onMapMoved(function(data)
+interfaces.LivelyMapToggler.onMapMoved(function(data)
     if (not data.swapped) and (settingCache.autoMarkFromJournal) then
         markFromJournal()
     end
