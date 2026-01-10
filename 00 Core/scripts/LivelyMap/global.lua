@@ -37,7 +37,22 @@ local persist = {
     -- activeMaps is a table of player -> id -> object
     -- that are currently active.
     activeMaps = {},
+    skyBowlRecordId = nil,
 }
+
+local function getSkyBowlRecord()
+    if not persist.skyBowlRecordId then
+        local recordFields = {
+            model = "meshes\\livelymap\\sky_bowl.nif",
+        }
+        local draftRecord = types.Activator.createRecordDraft(recordFields)
+        -- createRecord can't be used until the game is actually started.
+        local record = world.createRecord(draftRecord)
+        persist.skyBowlRecordId = record.id
+        print("New activator record for sky bowl: " .. record.id)
+    end
+    return persist.skyBowlRecordId
+end
 
 -- getMapRecord gets or creates an activator with the given mesh name.
 local function getMapRecord(id)
@@ -58,6 +73,7 @@ end
 ---@class GloballyAnnotatedMapData : StoredMapData
 ---@field player userdata The player that owns this instance.
 ---@field object userdata The map mesh static object instance.
+---@field skyBowlObject userdata The sky bowl mesh static object instance.
 ---@field swapped boolean? Indicates the swap-in or swap-out state of the map.
 ---@field callbackId number? Optional event receipt.
 
@@ -78,13 +94,19 @@ local function newMapObject(data, player)
     local new = world.createObject(record, 1)
     new:addScript("scripts\\LivelyMap\\mapnif.lua", map)
 
+    -- make the sky bowl
+    local skyBowlRecord = getSkyBowlRecord()
+    local newSkyBowl = world.createObject(skyBowlRecord, 1)
+
     local extra = {
         player = player,
         object = new,
+        skyBowlObject = newSkyBowl,
     }
 
     -- scale the object
     new:setScale(mutil.getScale(map))
+    newSkyBowl:setScale(mutil.getScale(map))
 
     return mutil.shallowMerge(map, extra)
 end
@@ -175,6 +197,7 @@ local function onShowMap(data)
                     callbackId = data.callbackId,
                 }))
             v.object:remove()
+            v.skyBowlObject:remove()
             table.insert(toDelete, k)
         end
     end
@@ -184,12 +207,15 @@ local function onShowMap(data)
 
     -- attach the rendered object to the data
     data.object = activeMap.object
+    data.skyBowlObject = activeMap.skyBowlObject
 
     -- teleport enables the object for free
     activeMap.object:teleport(world.getCellById(data.cellID),
         mapPosition,
         nil)
-
+    activeMap.skyBowlObject:teleport(world.getCellById(data.cellID),
+        mapPosition,
+        nil)
     -- notify the map that it moved.
     -- the map is responsible for telling the player.
     activeMap.object:sendEvent(MOD_NAME .. "onMapMoved",
@@ -216,6 +242,7 @@ local function onHideMap(data)
         v.player:sendEvent(MOD_NAME .. "onMapHidden",
             mutil.shallowMerge(v, { swapped = false, callbackId = data.callbackId }))
         v.object:remove()
+        v.skyBowlObject:remove()
         table.insert(toDelete, k)
     end
     for _, k in ipairs(toDelete) do
