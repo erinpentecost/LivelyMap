@@ -441,6 +441,16 @@ local function getFacing(player)
     return v:length() > 0 and v:normalize() or v
 end
 
+local function onRotate(data)
+    -- populate with Transform:getAnglesZYX()
+    if not data or not data.object or not data.rotation then
+        error("onRotate bad params")
+    end
+    print("rotating "..aux_util.deepToString(data, 3))
+    local rot = util.transform.rotateZ(data.rotation.z) * util.transform.rotateX(data.rotation.x) * util.transform.rotateY(data.rotation.y)
+    data.object:teleport(data.object.cell, data.object.position, rot)
+end
+
 
 ---@class ExteriorLocationResult
 ---@field pos {x: number, y: number, z: number}?
@@ -496,6 +506,7 @@ return {
         [MOD_NAME .. "onShowMap"] = onShowMap,
         [MOD_NAME .. "onHideMap"] = onHideMap,
         [MOD_NAME .. "onGetExteriorLocation"] = onGetExteriorLocation,
+        [MOD_NAME .. "onRotate"] = onRotate,
     },
     engineHandlers = {
         onSave = onSave,

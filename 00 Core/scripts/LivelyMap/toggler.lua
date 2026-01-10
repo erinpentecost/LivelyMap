@@ -151,6 +151,7 @@ local function toggleMap(open, callback)
 
     if open then
         print("Opening map...")
+        interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
     else
         print("Closing map...")
     end

@@ -568,7 +568,7 @@ local function doOnMapMoved(data)
 
     setHoverBoxContent(nil)
 
-    interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
+    --interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
 
     --this might be causing race condition issues
     --renderIcons()

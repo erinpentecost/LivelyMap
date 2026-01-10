@@ -132,6 +132,11 @@ local function disableControlSwitches()
     end
 end
 
+---@class Rotation
+---@field z number
+---@field y number
+---@field x number
+
 ---@class CameraData
 ---@field pitch number?
 ---@field yaw number?
@@ -141,6 +146,7 @@ end
 ---@field mode any
 ---@field force boolean? Ignore validation!
 ---@field controlSwitches any? Used during restore only.
+---@field playerRotation Rotation? Used during restore only.
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -161,9 +167,6 @@ end
 ---@param data CameraData
 local function setCamera(data)
     print("setCamera: "..aux_util.deepToString(data, 4))
-    camera.setPitch(data.pitch)
-    camera.setYaw(data.yaw)
-    camera.setRoll(data.roll)
     camera.setMode(data.mode, true)
     camera.setPitch(data.pitch)
     camera.setYaw(data.yaw)
@@ -189,11 +192,21 @@ local function startCamera()
         if originalCameraState.mode == camera.MODE.Static then
             originalCameraState.mode = camera.MODE.ThirdPerson
         end
+
+        local z, y, x = pself.rotation:getAnglesZYX()
+        originalCameraState.playerRotation = {
+            z= z,
+            y= y,
+            x= x,
+        }
         print("Saved original camera state: " .. aux_util.deepToString(originalCameraState, 4))
     end
     disableControlSwitches()
     camera.setMode(camera.MODE.Static, true)
     camera.setYaw(0)
+    -- player position gets completely messed up
+    -- when we swap to static camera. we need to reset it.
+    core.sendGlobalEvent(MOD_NAME .. "onRotate", {object=pself, rotation=originalCameraState.playerRotation})
 end
 
 --- Restore the camera back to original state.
