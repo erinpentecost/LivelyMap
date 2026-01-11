@@ -51,6 +51,20 @@ settings.pso.subscribe(async:callback(function(_, key)
     settingCache[key] = settings.pso[key]
 end))
 
+local onRenderStartHandlers = {}
+local function invokeOnRenderStartHandlers()
+    for _, fn in ipairs(onRenderStartHandlers) do
+        local status, err = pcall(function() fn() end)
+        if not status then
+            print("invokeOnRenderStartHandlers() callback error: " .. tostring(err))
+        end
+    end
+end
+
+local function onRenderStart(fn)
+    table.insert(onRenderStartHandlers, fn)
+end
+
 ---@class Icon
 --- @field element any UI element.
 --- @field pos fun(icon: Icon): util.vector3?
@@ -454,6 +468,45 @@ local function pushOverlappingIcons(iconList)
     end
 end
 
+local corners = {
+    topLeft = { x = 0, y = 0 },
+    topRight = { x = ui.screenSize().x, y = 0 },
+    bottomLeft = { x = 0, y = ui.screenSize().y },
+    bottomRight = { x = ui.screenSize().x, y = ui.screenSize().y },
+}
+local lastVisibleExtent = nil
+---@return Extents
+local function getVisibleExtent()
+    if lastVisibleExtent ~= nil then
+        return lastVisibleExtent
+    end
+    local o = {
+        Top = -math.huge,
+        Bottom = math.huge,
+        Left = math.huge,
+        Right = -math.huge,
+    }
+    for k, v in pairs(corners) do
+        local rel = putil.viewportPosToRealPos(currentMapData, v)
+        --local rel = putil.viewportPosToRelativeMeshPos(currentMapData, v, true)
+        --putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
+        --local cellPos = mutil.worldPosToCellPos(mouseData.clickStartWorldPos)
+        if rel then
+            o.Right = math.max(o.Right, rel.x)
+            o.Left = math.min(o.Left, rel.x)
+            o.Top = math.max(o.Top, rel.y)
+            o.Bottom = math.min(o.Bottom, rel.y)
+        end
+    end
+
+    for k, v in pairs(o) do
+        o[k] = math.floor(v / mutil.CELL_SIZE)
+    end
+    lastVisibleExtent = o
+    --print("visible extents: " .. aux_util.deepToString(lastVisibleExtent, 3))
+    return lastVisibleExtent
+end
+
 local function applyPendingRegistrations()
     for _, icon in ipairs(iconsPendingRegister) do
         --- Determine where to insert the icon
@@ -499,7 +552,6 @@ local function renderIcons()
     -- Render all the icons.
     for i, icon in ipairs(icons) do
         if i % 50 == 0 and core.getRealFrameDuration() > MAX_FRAME_DURATION then
-            print("yielding")
             coroutine.yield()
         end
 
@@ -545,7 +597,6 @@ local function renderIcons()
     end
 
     if core.getRealFrameDuration() > MAX_FRAME_DURATION then
-        print("yielding")
         coroutine.yield()
     end
 
@@ -565,7 +616,6 @@ local function renderIcons()
     end
 
     if core.getRealFrameDuration() > MAX_FRAME_DURATION then
-        print("yielding")
         coroutine.yield()
     end
 
@@ -605,6 +655,7 @@ local function renderAdvance()
         renderCoroutine = coroutine.create(
             function()
                 while true do
+                    invokeOnRenderStartHandlers()
                     renderIcons()
                     coroutine.yield()
                 end
@@ -656,15 +707,22 @@ local function doOnMapHidden(data)
 end
 interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
---local lastCameraPos = nil
+local lastCameraPos = nil
 local function onUpdate(dt)
     if currentMapData == nil then
         return
     end
-    renderAdvance(dt)
+    renderAdvance()
     if mainWindow then
         applyPendingHoverBoxContent()
         mainWindow:update()
+    end
+
+    -- invalidate visible extents if the camera moved.
+    local currentCameraPos = camera.getPosition()
+    if currentCameraPos ~= lastCameraPos then
+        lastVisibleExtent = nil
+        lastCameraPos = currentCameraPos
     end
 end
 
@@ -725,6 +783,8 @@ return {
         registerIcon = registerIcon,
         getIcon = getIcon,
         setHoverBoxContent = setHoverBoxContent,
+        getVisibleExtent = getVisibleExtent,
+        onRenderStart = onRenderStart,
     },
     engineHandlers = {
         onUpdate = onUpdate,

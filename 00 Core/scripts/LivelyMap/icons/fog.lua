@@ -109,12 +109,11 @@ end
 ---@param extents Extents
 local function makeIcons(extents, seen)
     if not settingCache.fog then
-        print("no fog")
         return
     end
     for x = extents.Left - 1, extents.Right + 1 do
         for y = extents.Bottom - 1, extents.Top + 1 do
-            --print("Making for for x=" .. tostring(x) .. ", y=" .. tostring(y))
+            --print("Making for fr x=" .. tostring(x) .. ", y=" .. tostring(y))
             makeIcon(mutil.cellPosToWorldPos({ x = x + .5, y = y + .5, z = 0 }))
         end
     end
@@ -134,7 +133,7 @@ interfaces.LivelyMapToggler.onMapMoved(function(mapData)
     print("map up")
     currentMapData = mapData
     local seen = {}
-    makeIcons(currentMapData.Extents, seen)
+    makeIcons(interfaces.LivelyMapDraw.getVisibleExtent(), seen)
 end)
 
 interfaces.LivelyMapToggler.onMapHidden(function(mapData)
@@ -142,5 +141,25 @@ interfaces.LivelyMapToggler.onMapHidden(function(mapData)
     currentMapData = mapData
     freeIcons()
 end)
+
+---@type Extents
+local lastExtent = nil
+local function onRenderStart()
+    if not currentMapData then
+        return
+    end
+    ---@type Extents
+    local newExtent = interfaces.LivelyMapDraw.getVisibleExtent()
+    newExtent.Bottom = newExtent.Bottom - 1
+    if (not lastExtent) or lastExtent.Bottom ~= newExtent.Bottom or lastExtent.Left ~= newExtent.Left or lastExtent.Right ~= newExtent.Right or lastExtent.Top ~= newExtent.Top then
+        lastExtent = newExtent
+        freeIcons()
+        local seen = {}
+        makeIcons(newExtent, seen)
+    end
+end
+
+interfaces.LivelyMapDraw.onRenderStart(onRenderStart)
+
 
 return {}

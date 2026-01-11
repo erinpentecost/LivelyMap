@@ -167,9 +167,9 @@ local function init()
                 description = "fogDescription",
                 default = false,
                 renderer = "checkbox",
-                argument = {
+                --[[argument = {
                     disabled = true
-                },
+                    },]]
             },
             {
                 key = "drawLimitNeravarinesJourney",
