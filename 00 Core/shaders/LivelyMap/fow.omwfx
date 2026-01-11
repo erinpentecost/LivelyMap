@@ -1,0 +1,118 @@
+#version 100
+precision mediump float;
+
+/* ---------------------------------------------------------
+   OpenMW standard inputs
+--------------------------------------------------------- */
+uniform sampler2D colorTex;
+varying vec2 uv;
+
+/* ---------------------------------------------------------
+   Time (provided by OpenMW automatically)
+--------------------------------------------------------- */
+uniform float time;
+
+/* ---------------------------------------------------------
+   Fog of war grid
+   16x16 = 256 floats, row-major:
+   index = y * 16 + x
+--------------------------------------------------------- */
+uniform float fogGrid[256];
+
+/* ---------------------------------------------------------
+   Utility
+--------------------------------------------------------- */
+
+float saturate(float v)
+{
+    return clamp(v, 0.0, 1.0);
+}
+
+/* Simple hash-based noise (GLES-safe) */
+float hash(vec2 p)
+{
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+/* 2D value noise */
+float noise(vec2 p)
+{
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(a, b, u.x) +
+           (c - a) * u.y * (1.0 - u.x) +
+           (d - b) * u.x * u.y;
+}
+
+/* ---------------------------------------------------------
+   Sample fog grid with bilinear interpolation
+--------------------------------------------------------- */
+float sampleFog(vec2 screenUV)
+{
+    /* Map screen space to grid space */
+    vec2 gridPos = screenUV * 16.0;
+    vec2 cell = floor(gridPos);
+    vec2 frac = fract(gridPos);
+
+    int x = int(cell.x);
+    int y = int(cell.y);
+
+    /* Clamp manually (GLES-safe) */
+    x = clamp(x, 0, 15);
+    y = clamp(y, 0, 15);
+
+    int x1 = min(x + 1, 15);
+    int y1 = min(y + 1, 15);
+
+    int i00 = y  * 16 + x;
+    int i10 = y  * 16 + x1;
+    int i01 = y1 * 16 + x;
+    int i11 = y1 * 16 + x1;
+
+    float f00 = fogGrid[i00];
+    float f10 = fogGrid[i10];
+    float f01 = fogGrid[i01];
+    float f11 = fogGrid[i11];
+
+    float fx0 = mix(f00, f10, frac.x);
+    float fx1 = mix(f01, f11, frac.x);
+
+    return mix(fx0, fx1, frac.y);
+}
+
+/* ---------------------------------------------------------
+   Main
+--------------------------------------------------------- */
+void main()
+{
+    vec4 color = texture2D(colorTex, uv);
+
+    /* Sample fog amount */
+    float fog = saturate(sampleFog(uv));
+
+    /* Animated swirl distortion (stretch goal) */
+    vec2 swirlUV = uv * 6.0;
+    float n = noise(swirlUV + vec2(time * 0.05, time * 0.03));
+    float swirl = sin(n * 6.2831 + time * 0.6) * 0.04;
+
+    fog = saturate(fog + swirl * fog);
+
+    /* Desaturate toward grayscale */
+    float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 desat = mix(color.rgb, vec3(luminance), fog * 0.85);
+
+    /* Darken with fog */
+    float darkness = mix(1.0, 0.35, fog);
+    desat *= darkness;
+
+    gl_FragColor = vec4(desat, color.a);
+}
