@@ -31,6 +31,7 @@ local interfaces     = require('openmw.interfaces')
 local storage        = require('openmw.storage')
 local h3cam          = require("scripts.LivelyMap.h3.cam")
 local overlapfinder  = require("scripts.LivelyMap.overlapfinder")
+local fog            = require("scripts.LivelyMap.fog")
 
 ---@type MeshAnnotatedMapData?
 local currentMapData = nil
@@ -64,6 +65,8 @@ end
 local function onRenderStart(fn)
     table.insert(onRenderStartHandlers, fn)
 end
+
+local fogShader = fog.NewFogShader()
 
 ---@class Icon
 --- @field element any UI element.
@@ -709,9 +712,12 @@ interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
 local lastCameraPos = nil
 local function onUpdate(dt)
+    fogShader:update(currentMapData, dt)
+
     if currentMapData == nil then
         return
     end
+
     renderAdvance()
     if mainWindow then
         applyPendingHoverBoxContent()

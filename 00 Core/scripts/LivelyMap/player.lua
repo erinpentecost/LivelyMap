@@ -103,6 +103,18 @@ local function merge(a, b)
     }
 end
 
+local cellsVisited = {}
+
+---@param pathEntry PathEntry
+local function markCell(pathEntry)
+    local x = math.floor(pathEntry.x / mutil.CELL_SIZE)
+    local y = math.floor(pathEntry.y / mutil.CELL_SIZE)
+    if not cellsVisited[x] then
+        cellsVisited[x] = {}
+    end
+    cellsVisited[x][y] = true
+end
+
 -- fromSave contains the data from this savegame.
 local fromSave = {
     id = playerName,
@@ -115,7 +127,6 @@ local fromSave = {
 ---@field x number? Exterior world position component.
 ---@field y number? Exterior world position component.
 ---@field z number? Exterior world position component.
----@field c string? Interior cell ID.
 
 ---@class SavedPlayerData
 ---@field id string
@@ -205,6 +216,16 @@ local function onLoad(data)
             end
         end
     end
+
+    -- update cells visited
+    local count = 0
+    for _, pathEntry in ipairs(allData[playerName].paths) do
+        if pathEntry and pathEntry.x and pathEntry.y then
+            markCell(pathEntry)
+            count = count + 1
+        end
+    end
+    print("Marked " .. tostring(count) .. " cells as visited.")
 end
 
 ---@return PathEntry
@@ -224,11 +245,13 @@ local function addEntry(entry)
             id = playerName,
             paths = { entry }
         }
+        markCell(entry)
         print("Initialized new local storage with entry: " .. aux_util.deepToString(entry, 3))
         return
     end
     if not allData[playerName].paths or #allData[playerName].paths == 0 then
         allData[playerName].paths = { entry }
+        markCell(entry)
         return
     end
     local tail = allData[playerName].paths[#(allData[playerName].paths)]
@@ -241,6 +264,7 @@ local function addEntry(entry)
     end
 
     -- ok, now add to the end of the list.
+    markCell(entry)
     table.insert(allData[playerName].paths, entry)
     table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
@@ -326,6 +350,9 @@ return {
         playerName = playerName,
         getExteriorPositionAndFacing = getExteriorPositionAndFacing,
         renewExteriorPositionAndFacing = renewExteriorPositionAndFacing,
+        cellVisited = function(x, y)
+            return cellsVisited[x] and cellsVisited[x][y] or nil
+        end
     },
     eventHandlers = {
         [MOD_NAME .. "onReceiveExteriorLocation"] = onReceiveExteriorLocation,

@@ -42,6 +42,7 @@ settings.main.subscribe(async:callback(function(_, key)
 end))
 
 local TOTAL_TILES    = 30
+local FOG_SIZE       = 5
 
 local smokeAtlas     = imageAtlas.constructAtlas({
     totalTiles = TOTAL_TILES,
@@ -56,20 +57,108 @@ local currentMapData = nil
 
 local fogIcons       = {}
 
+---@class Vec2
+---@field x number
+---@field y number
+
+--- Return a set of non-overlapping Extents which don't contain any cells in "seen".
+--- The union of all returned Extents and "seen" should exactly equal the passed-in "extents".
+--- Every Extent should be as large as possible (best effort).
+---@param extents Extents
+---@param seen Vec2[]
+---@return Extents[]
+local function mergeVisibleCells(extents, seen)
+    -- Build a lookup of blocked (seen) cells
+    local blocked = {}
+    for _, v in ipairs(seen) do
+        blocked[v.y] = blocked[v.y] or {}
+        blocked[v.y][v.x] = true
+    end
+
+    -- Track remaining free cells
+    local free = {}
+    for y = extents.Bottom, extents.Top do
+        free[y] = {}
+        for x = extents.Left, extents.Right do
+            free[y][x] = not (blocked[y] and blocked[y][x])
+        end
+    end
+
+    local results = {}
+
+    for y = extents.Bottom, extents.Top do
+        for x = extents.Left, extents.Right do
+            if free[y][x] then
+                -- Find maximum square size
+                local size = 1
+
+                while true do
+                    local next = size + 1
+                    local maxX = x + next - 1
+                    local maxY = y + next - 1
+
+                    if maxX > extents.Right or maxY > extents.Top then
+                        break
+                    end
+
+                    -- Check new row
+                    for ix = x, maxX do
+                        if not free[maxY][ix] then
+                            goto stop
+                        end
+                    end
+
+                    -- Check new column
+                    for iy = y, maxY - 1 do
+                        if not free[iy][maxX] then
+                            goto stop
+                        end
+                    end
+
+                    size = next
+                end
+                ::stop::
+
+                local right = x + size - 1
+                local top   = y + size - 1
+
+                -- Consume the square
+                for iy = y, top do
+                    for ix = x, right do
+                        free[iy][ix] = false
+                    end
+                end
+
+                results[#results + 1] = {
+                    Left   = x,
+                    Right  = right,
+                    Bottom = y,
+                    Top    = top,
+                }
+            end
+        end
+    end
+
+    --print(aux_util.deepToString(results, 3))
+    return results
+end
+
+
 -- creates an unattached icon and registers it.
-local idxSeed        = 1
+local idxSeed = 1
 local function newIcon()
     idxSeed = ((idxSeed + 7) % TOTAL_TILES) + 1
     local element = smokeAtlas:spawn({
         visible = false,
         relativePosition = util.vector2(0.7, 0.7),
         anchor = util.vector2(0.5, 0.5),
-        relativeSize = iutil.iconSize() * 10,
+        relativeSize = iutil.iconSize() * FOG_SIZE,
     }, idxSeed)
 
     local icon = {
         element = element,
         cachedPos = nil,
+        size = 1,
         pos = function(s)
             return s.cachedPos
         end,
@@ -79,7 +168,7 @@ local function newIcon()
             if s.cachedPos == nil or (not posData.viewportPos.onScreen) then
                 s.element.layout.props.visible = false
             else
-                s.element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio) * 10
+                s.element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio) * FOG_SIZE * s.size
                 s.element.layout.props.visible = true
                 s.element.layout.props.relativePosition = posData.viewportPos.pos
             end
@@ -99,15 +188,16 @@ end
 
 local iconPool = pool.create(newIcon, settingCache.fog and 100 or 0)
 
-local function makeIcon(cachedPos)
+local function makeIcon(cachedPos, size)
     local icon = iconPool:obtain()
     icon.pool = iconPool
     icon.cachedPos = cachedPos
+    icon.size = size
     table.insert(fogIcons, icon)
 end
 
 ---@param extents Extents
-local function makeIcons(extents, seen)
+local function makeIconsPerCell(extents)
     if not settingCache.fog then
         return
     end
@@ -117,6 +207,19 @@ local function makeIcons(extents, seen)
             makeIcon(mutil.cellPosToWorldPos({ x = x + .5, y = y + .5, z = 0 }))
         end
     end
+end
+
+---@param extents Extents
+local function makeIcons(extents)
+    if not settingCache.fog then
+        return
+    end
+    local center = {
+        x = (extents.Left + extents.Right) / 2,
+        y = (extents.Bottom + extents.Top) / 2,
+        z = 0,
+    }
+    makeIcon(mutil.cellPosToWorldPos(center), 1 + extents.Right - extents.Left)
 end
 
 local function freeIcons()
@@ -142,6 +245,14 @@ interfaces.LivelyMapToggler.onMapHidden(function(mapData)
     freeIcons()
 end)
 
+local seen = {
+    {
+        -- todo: this position is bad, get it from global
+        x = math.floor(pself.position.x / mutil.CELL_SIZE),
+        y = math.floor(pself.position.y / mutil.CELL_SIZE),
+    }
+}
+
 ---@type Extents
 local lastExtent = nil
 local function onRenderStart()
@@ -154,8 +265,9 @@ local function onRenderStart()
     if (not lastExtent) or lastExtent.Bottom ~= newExtent.Bottom or lastExtent.Left ~= newExtent.Left or lastExtent.Right ~= newExtent.Right or lastExtent.Top ~= newExtent.Top then
         lastExtent = newExtent
         freeIcons()
-        local seen = {}
-        makeIcons(newExtent, seen)
+        for _, block in ipairs(mergeVisibleCells(newExtent, seen)) do
+            makeIcons(block)
+        end
     end
 end
 

@@ -34,6 +34,7 @@ local eps = 1e-12
 ---@field south number?
 ---@field north number?
 
+---Extents are inclusive!
 ---@class Extents
 ---@field Top number
 ---@field Bottom number
