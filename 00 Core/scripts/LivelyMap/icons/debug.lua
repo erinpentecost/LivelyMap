@@ -91,11 +91,11 @@ local function makeDebugPips()
                         element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio)
                         element.layout.props.visible = true
                         element.layout.props.relativePosition = posData.viewportPos.pos
-                        element:update()
+                        --element:update()
                     end,
                     onHide = function()
                         element.layout.props.visible = false
-                        element:update()
+                        --element:update()
                     end,
                     priority = -1000,
                 })

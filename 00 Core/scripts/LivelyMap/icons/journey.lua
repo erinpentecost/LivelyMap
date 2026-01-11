@@ -85,12 +85,12 @@ local function newIcon()
                 s.element.layout.props.visible = true
                 s.element.layout.props.relativePosition = posData.viewportPos.pos
             end
-            s.element:update()
+            --s.element:update()
         end,
         onHide = function(s)
             -- s is this icon.
             s.element.layout.props.visible = false
-            s.element:update()
+            --s.element:update()
         end,
         priority = -900,
     }

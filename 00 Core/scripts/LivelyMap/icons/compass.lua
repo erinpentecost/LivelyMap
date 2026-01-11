@@ -94,12 +94,12 @@ local compassIcon = {
 
             compassAtlas:setTile(deg)
         end
-        compassAtlas:getElement():update()
+        --compassAtlas:getElement():update()
         --print("compass onDraw done: " .. aux_util.deepToString(compassAtlas:getElement().layout.props))
     end,
     onHide = function()
         compassAtlas:getElement().layout.props.visible = false
-        compassAtlas:getElement():update()
+        --compassAtlas:getElement():update()
     end,
     priority = 100,
 }
