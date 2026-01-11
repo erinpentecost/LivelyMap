@@ -1,12 +1,20 @@
+uniform_float Time
+{
+    static = false;
+}
+
+uniform_float FogGrid
+{
+    size = 256;
+    static = false;
+}
+
 shared
 {
     #define float2 vec2
     #define float3 vec3
     #define float4 vec4
     #define saturate(x) clamp(x, 0.0f, 1.0f)
-
-    /* Lua-fed uniform */
-    uniform float FogGrid[256];
 
     float hash(float2 p)
     {
@@ -70,10 +78,11 @@ fragment fow
 
         float fog = saturate(SampleFog(omw_TexCoord));
 
-        /* Animated swirl */
-        float t = omw_GetTime();
-        float n = noise(omw_TexCoord * 6.0f + t * 0.05f);
-        fog = saturate(fog + sin(n * 6.2831f + t * 0.6f) * 0.04f * fog);
+        /* Animated swirl using Time uniform */
+        float n = noise(omw_TexCoord * 6.0f + Time * 0.05f);
+        fog = saturate(
+            fog + sin(n * 6.2831f + Time * 0.6f) * 0.04f * fog
+        );
 
         /* Desaturate */
         float luma = dot(scene.rgb, float3(0.299f, 0.587f, 0.114f));
@@ -89,6 +98,6 @@ fragment fow
 technique
 {
     passes = fow;
-    description = "Fog of War (Lua-driven 16x16 grid)";
+    description = "Fog of War (Lua-driven 16x16 grid, GLES)";
     version = "1.0";
 }

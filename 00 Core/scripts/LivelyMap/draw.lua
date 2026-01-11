@@ -712,9 +712,12 @@ interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
 local lastCameraPos = nil
 local function onUpdate(dt)
+    fogShader:update(currentMapData, dt)
+
     if currentMapData == nil then
         return
     end
+
     renderAdvance()
     if mainWindow then
         applyPendingHoverBoxContent()

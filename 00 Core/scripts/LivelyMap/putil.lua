@@ -289,17 +289,27 @@ local function realPosToNormalizedViewportPos(currentMapData, psoSettings, pos, 
 end
 
 local planeNormal = util.vector3(0, 0, 1)
-local function viewportPosToRelativeMeshPos(currentMapData, viewportPos, ignoreBounds)
+local function viewportPosToRelativeMeshPos(currentMapData, viewportPos, ignoreBounds, normalizedViewportPos)
     if not currentMapData or not currentMapData.bounds then
         error("missing map data")
     end
 
     -- 1. Ray from viewport
     local rayOrigin = camera.getPosition()
-    local rayDir = h3cam.viewportPosToWorldRay(viewportPos)
-    if not rayDir then
-        print("no rayDir")
-        return nil
+    local rayDir = nil
+    if viewportPos then
+        rayDir = h3cam.viewportPosToWorldRay(viewportPos)
+        if not rayDir then
+            print("no rayDir")
+            return nil
+        end
+    elseif normalizedViewportPos then
+        local dir = camera.viewportToWorldVector(normalizedViewportPos)
+        if not dir then
+            print("no normalized rayDir")
+            return nil
+        end
+        rayDir = dir:normalize()
     end
 
     -- 2. Intersect ray with map plane
