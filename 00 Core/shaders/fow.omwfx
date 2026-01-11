@@ -64,7 +64,7 @@ shared
         float fx0 = mix(f00, f10, frac.x);
         float fx1 = mix(f01, f11, frac.x);
 
-        return mix(fx0, fx1, frac.y);
+        return 1-mix(fx0, fx1, frac.y);
     }
 }
 
@@ -76,8 +76,12 @@ fragment fow
     {
         float4 scene = omw_GetLastShader(omw_TexCoord);
 
-        /* Animated swirl using Time uniform */
+        /*float sampled = SampleFog(omw_TexCoord)*/
+
+        /* Animation */
         float n = noise( omw_TexCoord * 6.0f + 3.0f*DT);
+        /* the animation should have less effect the more visible the cell is*/
+
 
         float fog = clampNormal(SampleFog(omw_TexCoord) - 3*n/10);
 
