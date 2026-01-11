@@ -41,6 +41,7 @@ local settingCache   = {
     psoDepth        = settings.pso.psoDepth,
     psoPushdownOnly = settings.pso.psoPushdownOnly,
     debug           = settings.main.debug,
+    fog             = settings.main.fog,
     palleteColor4   = settings.main.palleteColor4,
     palleteColor5   = settings.main.palleteColor5,
 }
@@ -66,7 +67,11 @@ local function onRenderStart(fn)
     table.insert(onRenderStartHandlers, fn)
 end
 
-local fogShader = fog.NewFogShader()
+--- Shaders aren't available on all platforms, so do a hard hide on it.
+local fogShader = nil
+if settingCache.fog then
+    fogShader = fog.NewFogShader()
+end
 
 ---@class Icon
 --- @field element any UI element.
@@ -721,7 +726,9 @@ interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
 local lastCameraPos = nil
 local function onUpdate(dt)
-    fogShader:update(currentMapData, dt)
+    if fogShader then
+        fogShader:update(currentMapData, dt)
+    end
 
     if currentMapData == nil then
         return

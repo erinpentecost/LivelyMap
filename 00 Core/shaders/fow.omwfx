@@ -88,7 +88,7 @@ fragment fow
         float n = noise( omw_TexCoord * 6.0f + 3.0f*DT) * sampled * (1 - sampled);
 
         /* Only make cells lighter */
-        float fog = clampNormal(sampled - 3*n/10);
+        float fog = clampNormal(sampled - n/2);
 
         /* Desaturate */
         float luma = dot(scene.rgb, float3(0.299f, 0.587f, 0.114f));
