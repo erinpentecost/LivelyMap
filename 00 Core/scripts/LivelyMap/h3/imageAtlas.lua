@@ -84,13 +84,14 @@ end
 ---@field propagateEvents boolean?
 
 ---@param elementData AtlasSpawnerData
-function ImageAtlas:spawn(elementData)
-    self.element = ui.create {
+---@return uiElement
+function ImageAtlas:spawn(elementData, idx)
+    local out = ui.create {
         type = ui.TYPE.Image,
         layer = elementData.layer,
         name = elementData.name,
         props = {
-            resource = self.textureArray[1],
+            resource = self.textureArray[idx or 1],
             position = elementData.position,
             relativePosition = elementData.relativePosition,
             relativeSize = elementData.relativeSize,
@@ -103,6 +104,8 @@ function ImageAtlas:spawn(elementData)
         },
         events = elementData.events or {},
     }
+    self.element = out
+    return out
 end
 
 function ImageAtlas:getElement()

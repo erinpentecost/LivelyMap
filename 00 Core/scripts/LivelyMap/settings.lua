@@ -162,6 +162,13 @@ local function init()
                 renderer = "checkbox",
             },
             {
+                key = "fog",
+                name = "fogName",
+                description = "fogDescription",
+                default = false,
+                renderer = "checkbox",
+            },
+            {
                 key = "drawLimitNeravarinesJourney",
                 name = "drawLimitNeravarinesJourneyName",
                 description = "drawLimitNeravarinesJourneyDescription",

@@ -15,27 +15,27 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME          = require("scripts.LivelyMap.ns")
-local mutil             = require("scripts.LivelyMap.mutil")
-local putil             = require("scripts.LivelyMap.putil")
-local core              = require("openmw.core")
-local util              = require("openmw.util")
-local pself             = require("openmw.self")
-local aux_util          = require('openmw_aux.util')
-local myui              = require('scripts.LivelyMap.pcp.myui')
-local camera            = require("openmw.camera")
-local ui                = require("openmw.ui")
-local settings          = require("scripts.LivelyMap.settings")
-local async             = require("openmw.async")
-local interfaces        = require('openmw.interfaces')
-local storage           = require('openmw.storage')
-local h3cam             = require("scripts.LivelyMap.h3.cam")
-local overlapfinder     = require("scripts.LivelyMap.overlapfinder")
+local MOD_NAME       = require("scripts.LivelyMap.ns")
+local mutil          = require("scripts.LivelyMap.mutil")
+local putil          = require("scripts.LivelyMap.putil")
+local core           = require("openmw.core")
+local util           = require("openmw.util")
+local pself          = require("openmw.self")
+local aux_util       = require('openmw_aux.util')
+local myui           = require('scripts.LivelyMap.pcp.myui')
+local camera         = require("openmw.camera")
+local ui             = require("openmw.ui")
+local settings       = require("scripts.LivelyMap.settings")
+local async          = require("openmw.async")
+local interfaces     = require('openmw.interfaces')
+local storage        = require('openmw.storage')
+local h3cam          = require("scripts.LivelyMap.h3.cam")
+local overlapfinder  = require("scripts.LivelyMap.overlapfinder")
 
 ---@type MeshAnnotatedMapData?
-local currentMapData    = nil
+local currentMapData = nil
 
-local settingCache      = {
+local settingCache   = {
     psoUnlock       = settings.pso.psoUnlock,
     psoDepth        = settings.pso.psoDepth,
     psoPushdownOnly = settings.pso.psoPushdownOnly,
@@ -74,6 +74,9 @@ end))
 
 ---@type RegisteredIcon[]
 local icons = {}
+---@type RegisteredIcon[]
+local iconsPendingRegister = {}
+
 
 local function hideIcon(icon)
     if icon.onScreen then
@@ -450,7 +453,32 @@ local function pushOverlappingIcons(iconList)
     end
 end
 
+local function applyPendingRegistrations()
+    for _, icon in ipairs(iconsPendingRegister) do
+        --- Determine where to insert the icon
+        if icon.ref.priority == nil then
+            icon.ref.priority = 0
+        elseif type(icon.ref.priority) ~= "number" then
+            error("icon.priority must be a number")
+        end
+        local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.ref.priority end)
+
+        if settingCache.debug then
+            print("Inserted at index " .. tostring(insertIndex) .. " of " .. tostring(#icons) .. ".")
+        end
+
+        table.insert(icons, insertIndex, icon)
+
+        icon.ref.onHide(icon.ref)
+        iconContainer.layout.content:insert(insertIndex, icon.ref.element)
+    end
+    iconContainer:update()
+    iconsPendingRegister = {}
+end
+
 local function renderIcons()
+    applyPendingRegistrations()
+
     -- If there is no map, hide all icons.
     if currentMapData == nil then
         for _, icon in ipairs(icons) do
@@ -491,10 +519,10 @@ local function renderIcons()
 
                     if max.x >= 0 and max.y >= 0 and
                         min.x <= 1 and min.y <= 1 then
-                        print(aux_util.deepToString(icon.ref.element.layout, 10))
+                        --[[print(aux_util.deepToString(icon.ref.element.layout, 10))
                         print("partially visible. pos: " ..
                             tostring(pos.viewportPos.pos) ..
-                            ", size: " .. tostring(icon.ref.element.layout.props.relativeSize))
+                            ", size: " .. tostring(icon.ref.element.layout.props.relativeSize))]]
                         icon.onScreen = true
                         icon.ref.onDraw(icon.ref, pos, parentAspectRatio)
                         if icon.ref.groupable then
@@ -567,11 +595,6 @@ local function doOnMapMoved(data)
     end
 
     setHoverBoxContent(nil)
-
-    --interfaces.LivelyMapPlayer.renewExteriorPositionAndFacing()
-
-    --this might be causing race condition issues
-    --renderIcons()
 end
 
 interfaces.LivelyMapToggler.onMapMoved(doOnMapMoved)
@@ -591,7 +614,6 @@ local function doOnMapHidden(data)
     end
 
     currentMapData = nil
-
 end
 interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
@@ -649,19 +671,7 @@ local function registerIcon(icon)
         print("Registering icon '" .. name .. "': " .. aux_util.deepToString(icon, 4))
     end
 
-    --- Determine where to insert the icon
-    if icon.priority == nil then
-        icon.priority = 0
-    elseif type(icon.priority) ~= "number" then
-        error("icon.priority must be a number")
-    end
-    local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.priority end)
-
-    if settingCache.debug then
-        print("Inserted at index " .. tostring(insertIndex) .. " of " .. tostring(#icons) .. ".")
-    end
-
-    table.insert(icons, insertIndex, {
+    table.insert(iconsPendingRegister, {
         -- onScreen exists so we don't call onHide every frame.
         onScreen = false,
         -- remove is used to signal deletion
@@ -669,11 +679,6 @@ local function registerIcon(icon)
         ref = icon,
         name = name,
     })
-
-    icon.onHide(icon)
-    iconContainer.layout.content:insert(insertIndex, icon.element)
-    iconContainer:update()
-
     return name
 end
 
