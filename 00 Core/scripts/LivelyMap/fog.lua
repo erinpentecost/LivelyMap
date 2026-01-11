@@ -47,6 +47,7 @@ function NewFogShader()
         enabled = false,
         shader = postprocessing.load("fow"),
         updateCoroutine = nil,
+        elapsedTime = 0,
     }
     for i = 1, 256 do
         new.fogValues[i] = 1
@@ -184,11 +185,22 @@ function FogShaderFunctions.update(self, currentMapData, dt)
     if currentMapData == nil then
         self:setEnabled(false)
         lag = 0
+        self.elapsedTime = 0
         return
     else
         self:setEnabled(true)
     end
+
+    -- Fake a duration if we're paused.
+    if dt <= 0 then
+        dt = core.getRealFrameDuration()
+    end
+
     lag = lag + dt
+
+    self.elapsedTime = self.elapsedTime + dt
+    self.shader:setFloat("DT", self.elapsedTime)
+
     local ok
     if not self.updateCoroutine then
         print("new coroutine")
