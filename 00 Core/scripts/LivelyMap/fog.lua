@@ -97,14 +97,12 @@ function FogShaderFunctions.setEnabled(self, status)
     if status then
         print("enabling fog shader")
         for i = 1, 256 do
-            self.fogValues[i] = 1
+            self.fogValues[i] = 0
         end
+        self.shader:setFloatArray("FogGrid", self.fogValues)
         self.shader:enable()
     else
         print("disabling fog shader")
-        for i = 1, 256 do
-            self.fogValues[i] = 0
-        end
         self.shader:disable()
     end
 end
@@ -144,25 +142,30 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
             return nil
         end
 
-        local cellPos = putil.relativeMeshPosToCellPos(currentMapData, rel)
-        if not cellPos then
-            print("cellPos is nil")
-            return nil
+        local offMesh = (rel.x < 0 or rel.x > 1 or rel.y < 0 or rel.y > 1)
+        if offMesh then
+            self:setCell(gp.x, gp.y, -1, dt)
+        else
+            local cellPos = putil.relativeMeshPosToCellPos(currentMapData, rel)
+            if not cellPos then
+                print("cellPos is nil")
+                return nil
+            end
+
+            local x = math.floor(cellPos.x)
+            local y = math.floor(cellPos.y)
+
+            -- check if cellpos is in fog
+            local seenStrength = interfaces.LivelyMapPlayer.cellVisited(x, y)
+            self:setCell(gp.x, gp.y, seenStrength, dt)
         end
-
-        local x = math.floor(cellPos.x)
-        local y = math.floor(cellPos.y)
-
-        -- check if cellpos is in fog
-        local seenStrength = interfaces.LivelyMapPlayer.cellVisited(x, y)
-        self:setCell(gp.x, gp.y, seenStrength, dt)
 
         --print("update shader")
         -- update shader
 
         -- pause every 16 updates. must be divisible by 256
         if i % 16 == 0 then
-            if seenStrength > 0 then
+            --[[if seenStrength > 0 then
                 print("fog step " ..
                     i ..
                     "/" ..
@@ -170,7 +173,7 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
                     ". GP: " ..
                     tostring(gp) ..
                     "; cell: " .. tostring(x) .. ", " .. tostring(y) .. "; seen: " .. tostring(seenStrength))
-            end
+                    end--]]
             self.shader:setFloatArray("FogGrid", self.fogValues)
             coroutine.yield()
         end
@@ -204,7 +207,7 @@ function FogShaderFunctions.update(self, currentMapData, dt)
 
     local ok
     if not self.updateCoroutine then
-        print("new coroutine")
+        --print("new coroutine")
         self.updateCoroutine = coroutine.create(FogShaderFunctions.updateStep)
         ok = coroutine.resume(self.updateCoroutine, self, currentMapData, lag)
         lag = 0

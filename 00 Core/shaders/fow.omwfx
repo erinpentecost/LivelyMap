@@ -77,7 +77,12 @@ fragment fow
         float4 scene = omw_GetLastShader(omw_TexCoord);
 
         /* sampled is 1 if fully fogged out */
+        /* and 2 if off-mesh */
+        /* and 0 if fully visible */
         float sampled = SampleFog(omw_TexCoord);
+
+        /* offMesh is 1 if off mesh, 0 otherwise */
+        /*float offMesh = clamp(sampled, 1.0f, 2.0f)-1.0f;*/
 
         /* Animation val is strongest on mid-strength cells */
         float n = noise( omw_TexCoord * 6.0f + 3.0f*DT) * sampled * (1 - sampled);

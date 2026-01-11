@@ -122,11 +122,17 @@ local function mapClicked(mouseEvent, data)
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos, 1)
 end
 local function mapClickPress(mouseEvent, data)
+    if not currentMapData then
+        return
+    end
     mouseData.clickStartViewportPos          = mouseEvent.position
     mouseData.clickStartWorldPos             = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
     mouseData.clickStartCenterCameraWorldPos = putil.viewportPosToRealPos(currentMapData, ui.screenSize() / 2)
 end
 local function mapClickRelease(mouseEvent, data)
+    if not currentMapData then
+        return
+    end
     if (mouseEvent.position - mouseData.clickStartViewportPos):length2() < mouseData.dragThreshold then
         mapClicked(mouseEvent, data)
     end
@@ -169,6 +175,9 @@ local function mapDragging(mouseEvent, data)
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartCenterCameraWorldPos + deltaWorld, 0)
 end
 local function mapMouseMove(mouseEvent, data)
+    if not currentMapData then
+        return
+    end
     if not mouseData.clickStartViewportPos then
         return
     end
