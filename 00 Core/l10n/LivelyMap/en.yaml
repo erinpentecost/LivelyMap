@@ -39,6 +39,9 @@ drawLimitNeravarinesJourneyDescription: "Only draw the last 4 hours of the Nerav
 volatileNeravarinesJourneyName: "Volatile Neravarine's Journey"
 volatileNeravarinesJourneyDescription: "Don't load or save path data. This will speed up loading and saving your game."
 
+fogName: "Fog"
+fogDescription: "Hide parts of the map you haven't been to yet."
+
 iconScaleName: "Scale Icon Size"
 iconScaleDescription: "Change icons by this scaling factor. Requires reload."
 

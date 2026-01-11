@@ -166,7 +166,7 @@ local function registerMarkerIcon(data)
             if not posData.viewportPos.onScreen or icon.marker.hidden then
                 if icon.element.layout.props.visible then
                     icon.element.layout.props.visible = false
-                    icon.element:update()
+                    --icon.element:update()
                 end
                 return
             end
@@ -176,11 +176,11 @@ local function registerMarkerIcon(data)
 
             icon.element.layout.props.relativeSize = iutil.iconSize(posData, parentAspectRatio)
 
-            icon.element:update()
+            --icon.element:update()
         end,
         onHide = function(icon)
             icon.element.layout.props.visible = false
-            icon.element:update()
+            --icon.element:update()
         end,
         priority = 200,
         groupable = true,

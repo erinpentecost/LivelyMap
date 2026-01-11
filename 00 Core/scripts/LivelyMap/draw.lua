@@ -495,7 +495,12 @@ local function renderIcons()
     local parentAspectRatio = util.vector2(uiSize.x / uiSize.y, 1)
 
     -- Render all the icons.
-    for _, icon in ipairs(icons) do
+    for i, icon in ipairs(icons) do
+        if i % 50 == 0 and core.getRealFrameDuration() > 1 / 30 then
+            print("yielding")
+            coroutine.yield()
+        end
+
         -- Get world position.
         local iPos = icon.ref.pos(icon.ref)
         -- Get optional world facing vector.
@@ -537,6 +542,10 @@ local function renderIcons()
         :: continue ::
     end
 
+    if core.getRealFrameDuration() > 1 / 30 then
+        print("yielding")
+        coroutine.yield()
+    end
 
     --- do we need to combine any?
     ---@type RegisteredIcon[][]
@@ -553,11 +562,16 @@ local function renderIcons()
         end
     end
 
+    if core.getRealFrameDuration() > 1 / 30 then
+        print("yielding")
+        coroutine.yield()
+    end
 
     if mainWindow then
-        applyPendingHoverBoxContent()
+        for _, icon in ipairs(icons) do
+            icon.ref.element:update()
+        end
         iconContainer:update()
-        mainWindow:update()
     end
 
     --print("iconContainer: " .. aux_util.deepToString(iconContainer.layout.props))
@@ -577,6 +591,26 @@ local function renderIcons()
         end
     end
     --]]
+end
+
+local renderCoroutine = nil
+local function renderAdvance()
+    local ok
+    if not renderCoroutine then
+        renderCoroutine = coroutine.create(
+            function()
+                while true do
+                    renderIcons()
+                    coroutine.yield()
+                end
+            end)
+        ok = coroutine.resume(renderCoroutine)
+    else
+        ok = coroutine.resume(renderCoroutine)
+    end
+    if not ok then
+        renderCoroutine = nil
+    end
 end
 
 ---@param data MeshAnnotatedMapData
@@ -622,24 +656,11 @@ local function onUpdate(dt)
     if currentMapData == nil then
         return
     end
-    renderIcons()
-    --[[if settingsChanged then
-        renderIcons()
-        settingsChanged = false
-        return
+    renderAdvance()
+    if mainWindow then
+        applyPendingHoverBoxContent()
+        mainWindow:update()
     end
-    if lastCameraPos == nil then
-        lastCameraPos = camera.getPosition()
-        renderIcons()
-    else
-        local curPos = camera.getPosition()
-        if lastCameraPos ~= curPos then
-            lastCameraPos = curPos
-            renderIcons()
-        end
-        end]]
-    --- TODO: icons aren't being drawn on the first frame of map spawn,
-    --- probably because the camera is not in the right spot.
 end
 
 local nextName = 0

@@ -106,13 +106,13 @@ local function newDetectIcon(path, color)
                 element.layout.props.visible = true
                 element.layout.props.relativePosition = posData.viewportPos.pos
             end
-            element:update()
+            --element:update()
         end,
         onHide = function(s)
             -- s is this icon.
             --print("hiding " .. getRecord(s.entity).name)
             element.layout.props.visible = false
-            element:update()
+            --element:update()
         end,
         groupable = true,
     }

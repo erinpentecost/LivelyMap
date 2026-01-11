@@ -81,7 +81,7 @@ local function newIcon()
                 s.element.layout.props.visible = true
                 s.element.layout.props.relativePosition = posData.viewportPos.pos
             end
-            s.element:update()
+            --s.element:update()
         end,
         onHide = function(s)
             -- s is this icon.
@@ -108,6 +108,7 @@ end
 local function makeIcons(extents, seen)
     if not settingCache.fog then
         print("no fog")
+        return
     end
     for x = extents.Left - 1, extents.Right + 1 do
         for y = extents.Bottom - 1, extents.Top + 1 do
