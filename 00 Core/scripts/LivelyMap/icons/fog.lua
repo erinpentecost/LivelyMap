@@ -31,6 +31,8 @@ local imageAtlas   = require('scripts.LivelyMap.h3.imageAtlas')
 local aux_util     = require('openmw_aux.util')
 local MOD_NAME     = require("scripts.LivelyMap.ns")
 
+--- Fog is horribly, horribly inefficient right now.
+
 local settingCache = {
     fog = settings.main.fog,
     debug = settings.main.debug,

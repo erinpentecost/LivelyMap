@@ -68,6 +68,7 @@ end))
 
 ---@class RegisteredIcon
 --- @field onScreen boolean Exists so we don't call onHide every frame.
+--- @field onScreenLastRender boolean
 --- @field remove boolean Remove is used to signal deletion.
 --- @field ref Icon
 --- @field name string Matches the layout name.
@@ -476,6 +477,7 @@ local function applyPendingRegistrations()
     iconsPendingRegister = {}
 end
 
+local MAX_FRAME_DURATION = 1 / 30
 local function renderIcons()
     applyPendingRegistrations()
 
@@ -496,7 +498,7 @@ local function renderIcons()
 
     -- Render all the icons.
     for i, icon in ipairs(icons) do
-        if i % 50 == 0 and core.getRealFrameDuration() > 1 / 30 then
+        if i % 50 == 0 and core.getRealFrameDuration() > MAX_FRAME_DURATION then
             print("yielding")
             coroutine.yield()
         end
@@ -542,7 +544,7 @@ local function renderIcons()
         :: continue ::
     end
 
-    if core.getRealFrameDuration() > 1 / 30 then
+    if core.getRealFrameDuration() > MAX_FRAME_DURATION then
         print("yielding")
         coroutine.yield()
     end
@@ -562,14 +564,17 @@ local function renderIcons()
         end
     end
 
-    if core.getRealFrameDuration() > 1 / 30 then
+    if core.getRealFrameDuration() > MAX_FRAME_DURATION then
         print("yielding")
         coroutine.yield()
     end
 
     if mainWindow then
         for _, icon in ipairs(icons) do
-            icon.ref.element:update()
+            if icon.onScreenLastRender or icon.onScreen then
+                icon.ref.element:update()
+            end
+            icon.onScreenLastRender = icon.onScreen
         end
         iconContainer:update()
     end
@@ -656,7 +661,7 @@ local function onUpdate(dt)
     if currentMapData == nil then
         return
     end
-    renderAdvance()
+    renderAdvance(dt)
     if mainWindow then
         applyPendingHoverBoxContent()
         mainWindow:update()
@@ -695,6 +700,7 @@ local function registerIcon(icon)
     table.insert(iconsPendingRegister, {
         -- onScreen exists so we don't call onHide every frame.
         onScreen = false,
+        onScreenLastRender = true,
         -- remove is used to signal deletion
         remove = false,
         ref = icon,
