@@ -19,6 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 local core                 = require("openmw.core")
 local util                 = require("openmw.util")
 local pself                = require("openmw.self")
+local interfaces           = require('openmw.interfaces')
+local mutil                = require('scripts.LivelyMap.mutil')
 local aux_util             = require('openmw_aux.util')
 local postprocessing       = require('openmw.postprocessing')
 local putil                = require("scripts.LivelyMap.putil")
@@ -26,7 +28,7 @@ local camera               = require("openmw.camera")
 
 local GRID_SIZE            = 16
 local GRID_ELEMS           = GRID_SIZE * GRID_SIZE
-local BLEND_SPEED          = 0.3
+local BLEND_SPEED          = 100
 
 local FogShaderFunctions   = {}
 FogShaderFunctions.__index = FogShaderFunctions
@@ -75,8 +77,9 @@ function FogShaderFunctions.setCell(self, x, y, strength, dt)
     -- find point in 2d array
     local idx = index2DTo1D(x, y)
     -- blend in the new value
-    local step = util.clamp(BLEND_SPEED * dt, 0, 1)
-    self.fogValues[idx] = (strength * step) + (self.fogValues[idx] * (1 - step))
+    --local step = util.clamp(BLEND_SPEED * dt, 0, 1)
+    --self.fogValues[idx] = (strength * step) + (self.fogValues[idx] * (1 - step))
+    self.fogValues[idx] = strength
 end
 
 ---@param status boolean
@@ -120,14 +123,9 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
 
     local randomizedGridPoints = {}
     for i, gp in ipairs(normalizedGridPoints) do
-        print(i .. " - " .. aux_util.deepToString(gp, 3))
-        -- pause every ten updates
-        if i % 10 == 0 then
-            print("fog step " .. i .. "/" .. #normalizedGridPoints)
-            coroutine.yield()
-        end
+        --print(i .. " - " .. aux_util.deepToString(gp, 3))
 
-        local newIdx = math.random(1, #randomizedGridPoints) + 1
+        local newIdx = math.random(0, #randomizedGridPoints) + 1
         table.insert(randomizedGridPoints, newIdx, gp)
 
         local rel = putil.viewportPosToRelativeMeshPos(currentMapData, nil, true, gp)
@@ -142,17 +140,38 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
             return nil
         end
 
-        -- TODO: determine if cell pos is visible
+        local x = math.floor(cellPos.x)
+        local y = math.floor(cellPos.y)
+
         -- check if cellpos is in fog
-        self:setCell(gp.x, gp.y, 1, dt)
+        local seen = false
+        if interfaces.LivelyMapPlayer.cellVisited(x, y) then
+            seen = true
+            self:setCell(gp.x, gp.y, 0, dt)
+        else
+            self:setCell(gp.x, gp.y, 1, dt)
+        end
 
         --print("update shader")
         -- update shader
-        self.shader:setFloatArray("FogGrid", self.fogValues)
-        print(aux_util.deepToString(self.fogValues, 3))
+
+        -- pause every 16 updates. must be divisible by 256
+        if i % 16 == 0 then
+            if seen then
+                print("fog step " ..
+                    i ..
+                    "/" ..
+                    #normalizedGridPoints ..
+                    ". GP: " ..
+                    tostring(gp) .. "; cell: " .. tostring(x) .. ", " .. tostring(y) .. "; seen: " .. tostring(seen))
+            end
+            self.shader:setFloatArray("FogGrid", self.fogValues)
+            coroutine.yield()
+        end
     end
 
     normalizedGridPoints = randomizedGridPoints
+    --print(aux_util.deepToString(normalizedGridPoints, 3))
 end
 
 local lag = 0

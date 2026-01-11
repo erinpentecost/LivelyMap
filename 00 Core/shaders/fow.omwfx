@@ -1,8 +1,3 @@
-uniform_float Time
-{
-    static = false;
-}
-
 uniform_float FogGrid
 {
     size = 256;
@@ -79,9 +74,9 @@ fragment fow
         float fog = saturate(SampleFog(omw_TexCoord));
 
         /* Animated swirl using Time uniform */
-        float n = noise(omw_TexCoord * 6.0f + Time * 0.05f);
+        float n = noise(omw_TexCoord * 6.0f + omw.simulationTime * 0.05f);
         fog = saturate(
-            fog + sin(n * 6.2831f + Time * 0.6f) * 0.04f * fog
+            fog + sin(n * 6.2831f + omw.simulationTime * 0.6f) * 0.04f * fog
         );
 
         /* Desaturate */
