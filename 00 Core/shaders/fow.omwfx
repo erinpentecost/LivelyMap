@@ -79,11 +79,10 @@ fragment fow
         /* sampled is 1 if fully fogged out */
         float sampled = SampleFog(omw_TexCoord);
 
-        /* Animation */
-        float n = noise( omw_TexCoord * 6.0f + 3.0f*DT) * sampled;
-        /* the animation should have less effect the more visible the cell is*/
+        /* Animation val is strongest on mid-strength cells */
+        float n = noise( omw_TexCoord * 6.0f + 3.0f*DT) * sampled * (1 - sampled);
 
-
+        /* Only make cells lighter */
         float fog = clampNormal(sampled - 3*n/10);
 
         /* Desaturate */
