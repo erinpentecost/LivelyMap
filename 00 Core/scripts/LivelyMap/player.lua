@@ -112,7 +112,17 @@ local function markCell(pathEntry)
     if not cellsVisited[x] then
         cellsVisited[x] = {}
     end
-    cellsVisited[x][y] = true
+    cellsVisited[x][y] = 1
+    for xi = x - 1, x + 1, 2 do
+        for yi = y - 1, y + 1, 2 do
+            if not cellsVisited[xi] then
+                cellsVisited[xi] = {}
+            end
+            if not cellsVisited[xi][yi] then
+                cellsVisited[xi][yi] = 0.5
+            end
+        end
+    end
 end
 
 -- fromSave contains the data from this savegame.
@@ -351,7 +361,7 @@ return {
         getExteriorPositionAndFacing = getExteriorPositionAndFacing,
         renewExteriorPositionAndFacing = renewExteriorPositionAndFacing,
         cellVisited = function(x, y)
-            return cellsVisited[x] and cellsVisited[x][y] or nil
+            return cellsVisited[x] and cellsVisited[x][y] or 0
         end
     },
     eventHandlers = {

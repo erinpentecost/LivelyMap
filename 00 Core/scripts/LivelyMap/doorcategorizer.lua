@@ -40,6 +40,8 @@ local category       = {
 local doorToCategory = {
     ["meshes/d/ex_velothi_loaddoor_01.nif"] = category.velothi,
     ["ex_velothi_loaddoor_01"] = category.velothi,
+    ["meshes/d/ex_v_cantondoor_01.nif"] = category.velothi,
+    ["Ex_V_cantondoor_01"] = category.velothi,
 
     ["meshes/d/hlaalu_loaddoor_ 02.nif,"] = category.hlaalu,
     ["hlaalu_loaddoor_ 02"] = category.hlaalu,
@@ -163,7 +165,7 @@ local function getTemplateForDoors(doorInfos)
     end
 
     if highScore(category.velothi) then
-        if scores[category.velothi] > 2 then
+        if scores[category.velothi] >= 2 then
             return templates.canton
         end
         return templates.tomb

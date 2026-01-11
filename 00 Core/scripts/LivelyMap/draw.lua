@@ -41,6 +41,7 @@ local settingCache   = {
     psoDepth        = settings.pso.psoDepth,
     psoPushdownOnly = settings.pso.psoPushdownOnly,
     debug           = settings.main.debug,
+    fog             = settings.main.fog,
     palleteColor4   = settings.main.palleteColor4,
     palleteColor5   = settings.main.palleteColor5,
 }
@@ -66,7 +67,11 @@ local function onRenderStart(fn)
     table.insert(onRenderStartHandlers, fn)
 end
 
-local fogShader = fog.NewFogShader()
+--- Shaders aren't available on all platforms, so do a hard hide on it.
+local fogShader = nil
+if settingCache.fog then
+    fogShader = fog.NewFogShader()
+end
 
 ---@class Icon
 --- @field element any UI element.
@@ -122,11 +127,17 @@ local function mapClicked(mouseEvent, data)
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartWorldPos, 1)
 end
 local function mapClickPress(mouseEvent, data)
+    if not currentMapData then
+        return
+    end
     mouseData.clickStartViewportPos          = mouseEvent.position
     mouseData.clickStartWorldPos             = putil.viewportPosToRealPos(currentMapData, mouseEvent.position)
     mouseData.clickStartCenterCameraWorldPos = putil.viewportPosToRealPos(currentMapData, ui.screenSize() / 2)
 end
 local function mapClickRelease(mouseEvent, data)
+    if not currentMapData then
+        return
+    end
     if (mouseEvent.position - mouseData.clickStartViewportPos):length2() < mouseData.dragThreshold then
         mapClicked(mouseEvent, data)
     end
@@ -169,6 +180,9 @@ local function mapDragging(mouseEvent, data)
     interfaces.LivelyMapControls.trackToWorldPosition(mouseData.clickStartCenterCameraWorldPos + deltaWorld, 0)
 end
 local function mapMouseMove(mouseEvent, data)
+    if not currentMapData then
+        return
+    end
     if not mouseData.clickStartViewportPos then
         return
     end
@@ -712,7 +726,9 @@ interfaces.LivelyMapToggler.onMapHidden(doOnMapHidden)
 
 local lastCameraPos = nil
 local function onUpdate(dt)
-    fogShader:update(currentMapData, dt)
+    if fogShader then
+        fogShader:update(currentMapData, dt)
+    end
 
     if currentMapData == nil then
         return

@@ -64,7 +64,7 @@ shared
         float fx0 = mix(f00, f10, frac.x);
         float fx1 = mix(f01, f11, frac.x);
 
-        return mix(fx0, fx1, frac.y);
+        return 1-mix(fx0, fx1, frac.y);
     }
 }
 
@@ -76,10 +76,19 @@ fragment fow
     {
         float4 scene = omw_GetLastShader(omw_TexCoord);
 
-        /* Animated swirl using Time uniform */
-        float n = noise( omw_TexCoord * 6.0f + 3.0f*DT);
+        /* sampled is 1 if fully fogged out */
+        /* and 2 if off-mesh */
+        /* and 0 if fully visible */
+        float sampled = SampleFog(omw_TexCoord);
 
-        float fog = clampNormal(SampleFog(omw_TexCoord) - 3*n/10);
+        /* offMesh is 1 if off mesh, 0 otherwise */
+        /*float offMesh = clamp(sampled, 1.0f, 2.0f)-1.0f;*/
+
+        /* Animation val is strongest on mid-strength cells */
+        float n = noise( omw_TexCoord * 6.0f + 3.0f*DT) * sampled * (1 - sampled);
+
+        /* Only make cells lighter */
+        float fog = clampNormal(sampled - n/2);
 
         /* Desaturate */
         float luma = dot(scene.rgb, float3(0.299f, 0.587f, 0.114f));
