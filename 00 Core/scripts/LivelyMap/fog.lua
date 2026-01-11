@@ -103,17 +103,21 @@ function FogShaderFunctions.setEnabled(self, status)
     end
 end
 
-local normalizedGridPoints = {}
-local function populateNormalizedGridPoints()
+local gridSamplePoints = {}
+local function populateGridSamplePoints()
     for x = 1, GRID_SIZE do
         for y = 1, GRID_SIZE do
             local idx = index2DTo1D(x, y)
             -- TODO: this might not be what the shader expects. could be off by 1
-            normalizedGridPoints[idx] = util.vector2((x - 1) / GRID_SIZE, (y - 1) / GRID_SIZE)
+            gridSamplePoints[idx] = {
+                normalized = util.vector2((x - 1) / GRID_SIZE, 1 - (y - 1) / GRID_SIZE),
+                x = x,
+                y = y
+            }
         end
     end
 end
-populateNormalizedGridPoints()
+populateGridSamplePoints()
 
 ---@param currentMapData MeshAnnotatedMapData
 function FogShaderFunctions.updateStep(self, currentMapData, dt)
@@ -122,13 +126,13 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
     end
 
     local randomizedGridPoints = {}
-    for i, gp in ipairs(normalizedGridPoints) do
+    for i, gp in ipairs(gridSamplePoints) do
         --print(i .. " - " .. aux_util.deepToString(gp, 3))
 
         local newIdx = math.random(0, #randomizedGridPoints) + 1
         table.insert(randomizedGridPoints, newIdx, gp)
 
-        local rel = putil.viewportPosToRelativeMeshPos(currentMapData, nil, true, gp)
+        local rel = putil.viewportPosToRelativeMeshPos(currentMapData, nil, true, gp.normalized)
         if not rel then
             print("rel is bad")
             return nil
@@ -161,7 +165,7 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
                 print("fog step " ..
                     i ..
                     "/" ..
-                    #normalizedGridPoints ..
+                    #gridSamplePoints ..
                     ". GP: " ..
                     tostring(gp) .. "; cell: " .. tostring(x) .. ", " .. tostring(y) .. "; seen: " .. tostring(seen))
             end
@@ -170,8 +174,8 @@ function FogShaderFunctions.updateStep(self, currentMapData, dt)
         end
     end
 
-    normalizedGridPoints = randomizedGridPoints
-    --print(aux_util.deepToString(normalizedGridPoints, 3))
+    gridSamplePoints = randomizedGridPoints
+    --print(aux_util.deepToString(gridSamplePoints, 3))
 end
 
 local lag = 0
