@@ -79,7 +79,7 @@ fragment fow
         /* Animated swirl using Time uniform */
         float n = noise( omw_TexCoord * 6.0f + 3.0f*DT);
 
-        float fog = clampNormal((5*SampleFog(omw_TexCoord) + 5*n)/10);
+        float fog = clampNormal(SampleFog(omw_TexCoord) - 3*n/10);
 
         /* Desaturate */
         float luma = dot(scene.rgb, float3(0.299f, 0.587f, 0.114f));

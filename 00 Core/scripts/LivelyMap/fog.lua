@@ -28,7 +28,7 @@ local camera               = require("openmw.camera")
 
 local GRID_SIZE            = 16
 local GRID_ELEMS           = GRID_SIZE * GRID_SIZE
-local BLEND_SPEED          = 100
+local BLEND_SPEED          = 1
 
 local FogShaderFunctions   = {}
 FogShaderFunctions.__index = FogShaderFunctions
@@ -78,9 +78,9 @@ function FogShaderFunctions.setCell(self, x, y, strength, dt)
     -- find point in 2d array
     local idx = index2DTo1D(x, y)
     -- blend in the new value
-    --local step = util.clamp(BLEND_SPEED * dt, 0, 1)
-    --self.fogValues[idx] = (strength * step) + (self.fogValues[idx] * (1 - step))
-    self.fogValues[idx] = strength
+    local step = util.clamp(BLEND_SPEED * dt, 0, 1)
+    self.fogValues[idx] = (strength * step) + (self.fogValues[idx] * (1 - step))
+    --self.fogValues[idx] = strength
 end
 
 ---@param status boolean
