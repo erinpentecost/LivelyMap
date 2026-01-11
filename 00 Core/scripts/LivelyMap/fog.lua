@@ -19,6 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 local core                 = require("openmw.core")
 local util                 = require("openmw.util")
 local pself                = require("openmw.self")
+local postprocessing       = require('openmw.postprocessing')
+local putil                = require("scripts.LivelyMap.putil")
 
 local GRID_SIZE            = 16
 local GRID_ELEMS           = GRID_SIZE * GRID_SIZE
@@ -32,12 +34,14 @@ FogShaderFunctions.__index = FogShaderFunctions
 ---@field update fun()
 ---@field setEnabled fun(status: boolean)
 
+---@return FogShader
 function NewFogShader()
     local new = {
         ---@type number[]
         fogValues = {},
         ---@type boolean
         enabled = false,
+        shader = postprocessing.load("fow"),
     }
     for i = 1, 256 do
         new.fogValues[i] = 1
@@ -66,7 +70,8 @@ function FogShaderFunctions.setCell(self, x, y, strength, dt)
     self.fogValues[idx] = (strength * step) + (self.fogValues[idx] * (1 - step))
 end
 
-function FogShaderFunctions.update(self)
+--- @param currentMapData MeshAnnotatedMapData
+function FogShaderFunctions.update(self, currentMapData)
     if not self.enabled then
         return
     end
@@ -74,19 +79,54 @@ end
 
 ---@param status boolean
 function FogShaderFunctions.setEnabled(self, status)
+    if self.enabled == status then
+        return
+    end
     self.enabled = status
     if status then
         for i = 1, 256 do
             self.fogValues[i] = 1
         end
+        self.shader:enable()
     else
         for i = 1, 256 do
             self.fogValues[i] = 0
         end
+        self.shader:disable()
     end
+end
+
+--- @param currentMapData MeshAnnotatedMapData
+function FogShaderFunctions.update(self, currentMapData)
+    if currentMapData == nil then
+        self:setEnabled(false)
+        return
+    else
+        self:setEnabled(true)
+    end
+
+    --- update fog values
+    for x = 1, GRID_SIZE do
+        for y = 1, GRID_SIZE do
+            local rel = putil.viewportPosToRelativeMeshPos(currentMapData, viewportPos, true)
+            if not rel then
+                return nil
+            end
+
+            -- 4. Relative mesh → cell
+            local cellPos = putil.relativeMeshPosToCellPos(currentMapData, rel)
+            if not cellPos then
+                print("cellPos is nil")
+                return nil
+            end
+        end
+    end
+
+    self.shader:setFloatArray("fogGrid", self.fogValues)
 end
 
 return {
     ---@type fun() FogShader
-    NewFogShader = NewFogShader
+    NewFogShader = NewFogShader,
+    GRID_SIZE = GRID_SIZE,
 }

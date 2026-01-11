@@ -288,6 +288,7 @@ local function realPosToNormalizedViewportPos(currentMapData, psoSettings, pos, 
     }
 end
 
+local planeNormal = util.vector3(0, 0, 1)
 local function viewportPosToRelativeMeshPos(currentMapData, viewportPos, ignoreBounds)
     if not currentMapData or not currentMapData.bounds then
         error("missing map data")
@@ -307,7 +308,7 @@ local function viewportPosToRelativeMeshPos(currentMapData, viewportPos, ignoreB
     local tl = currentMapData.bounds.topLeft
 
     --local planeNormal = (br - bl):cross(tl - bl):normalize()
-    local planeNormal = util.vector3(0, 0, 1)
+    --local planeNormal = util.vector3(0, 0, 1)
     local denom = planeNormal:dot(rayDir)
     if math.abs(denom) < 1e-6 then
         print("denom is near 0")

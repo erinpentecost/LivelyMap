@@ -1,0 +1,94 @@
+shared
+{
+    #define float2 vec2
+    #define float3 vec3
+    #define float4 vec4
+    #define saturate(x) clamp(x, 0.0f, 1.0f)
+
+    /* Lua-fed uniform */
+    uniform float FogGrid[256];
+
+    float hash(float2 p)
+    {
+        p = fract(p * float2(123.34f, 456.21f));
+        p += dot(p, p + 45.32f);
+        return fract(p.x * p.y);
+    }
+
+    float noise(float2 p)
+    {
+        float2 i = floor(p);
+        float2 f = fract(p);
+
+        float a = hash(i);
+        float b = hash(i + float2(1.0f, 0.0f));
+        float c = hash(i + float2(0.0f, 1.0f));
+        float d = hash(i + float2(1.0f, 1.0f));
+
+        float2 u = f * f * (3.0f - 2.0f * f);
+
+        return mix(a, b, u.x) +
+               (c - a) * u.y * (1.0f - u.x) +
+               (d - b) * u.x * u.y;
+    }
+
+    float SampleFog(float2 uv)
+    {
+        float2 gridPos = uv * 16.0f;
+        float2 cell = floor(gridPos);
+        float2 frac = fract(gridPos);
+
+        int x  = int(clamp(cell.x, 0.0f, 15.0f));
+        int y  = int(clamp(cell.y, 0.0f, 15.0f));
+        int x1 = min(x + 1, 15);
+        int y1 = min(y + 1, 15);
+
+        int i00 = y  * 16 + x;
+        int i10 = y  * 16 + x1;
+        int i01 = y1 * 16 + x;
+        int i11 = y1 * 16 + x1;
+
+        float f00 = FogGrid[i00];
+        float f10 = FogGrid[i10];
+        float f01 = FogGrid[i01];
+        float f11 = FogGrid[i11];
+
+        float fx0 = mix(f00, f10, frac.x);
+        float fx1 = mix(f01, f11, frac.x);
+
+        return mix(fx0, fx1, frac.y);
+    }
+}
+
+fragment fow
+{
+    omw_In float2 omw_TexCoord;
+
+    void main()
+    {
+        float4 scene = omw_GetLastShader(omw_TexCoord);
+
+        float fog = saturate(SampleFog(omw_TexCoord));
+
+        /* Animated swirl */
+        float t = omw_GetTime();
+        float n = noise(omw_TexCoord * 6.0f + t * 0.05f);
+        fog = saturate(fog + sin(n * 6.2831f + t * 0.6f) * 0.04f * fog);
+
+        /* Desaturate */
+        float luma = dot(scene.rgb, float3(0.299f, 0.587f, 0.114f));
+        scene.rgb = mix(scene.rgb, float3(luma), fog * 0.85f);
+
+        /* Darken */
+        scene.rgb *= mix(1.0f, 0.35f, fog);
+
+        omw_FragColor = scene;
+    }
+}
+
+technique
+{
+    passes = fow;
+    description = "Fog of War (Lua-driven 16x16 grid)";
+    version = "1.0";
+}
