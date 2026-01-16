@@ -159,8 +159,14 @@ local function onShowMap(data)
         end
     end
 
+    local centerCell = function(n)
+        return (math.floor(n / mutil.CELL_SIZE) + 0.5) * mutil.CELL_SIZE
+    end
     local mapPosition = data.mapPosition or
-        util.vector3(data.player.position.x, data.player.position.y, data.player.position.z + 5 * mutil.CELL_SIZE)
+        util.vector3(
+            centerCell(data.player.position.x),
+            centerCell(data.player.position.y),
+            data.player.position.z + 5 * mutil.CELL_SIZE)
 
     local playerID = data.player.id
     if persist.activeMaps[playerID] == nil then
@@ -446,8 +452,9 @@ local function onRotate(data)
     if not data or not data.object or not data.rotation then
         error("onRotate bad params")
     end
-    print("rotating "..aux_util.deepToString(data, 3))
-    local rot = util.transform.rotateZ(data.rotation.z) * util.transform.rotateX(data.rotation.x) * util.transform.rotateY(data.rotation.y)
+    print("rotating " .. aux_util.deepToString(data, 3))
+    local rot = util.transform.rotateZ(data.rotation.z) * util.transform.rotateX(data.rotation.x) *
+        util.transform.rotateY(data.rotation.y)
     data.object:teleport(data.object.cell, data.object.position, rot)
 end
 
