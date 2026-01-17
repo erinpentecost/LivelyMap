@@ -14,7 +14,7 @@ import (
 
 type colorSampler struct {
 	source image.Image
-	avgHue float64
+	avgHSL hue.HSL
 	dx     int
 	dy     int
 }
@@ -28,7 +28,7 @@ func newColorSampler(source image.Image) *colorSampler {
 
 	return &colorSampler{
 		source: source,
-		avgHue: hue.GetAverageHue(source),
+		avgHSL: hue.GetAverageHSL(source),
 		dx:     x,
 		dy:     y,
 	}

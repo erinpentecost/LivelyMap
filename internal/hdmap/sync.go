@@ -55,6 +55,10 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	if err != nil {
 		return err
 	}
+	colorTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "01 Color Map", "textures", "LivelyMap"))
+	if err != nil {
+		return err
+	}
 	normalsTexturePath, err := newAnnotatedDirectory(filepath.Join(rootPath, "02 Normals", "textures", "LivelyMap"))
 	if err != nil {
 		return err
@@ -68,6 +72,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 		classicTexturePath,
 		detailTexturePath,
 		potatoTexturePath,
+		colorTexturePath,
 	}
 
 	fmt.Printf("Parsing %d plugins...\n", len(env.Plugins))
@@ -91,8 +96,8 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	if err != nil {
 		return fmt.Errorf("new classic renderer")
 	}
-	classicColorCells := NewCellMapper(parsedLands, renderer)
-	if err := classicColorCells.Generate(ctx); err != nil {
+	classicCells := NewCellMapper(parsedLands, renderer)
+	if err := classicCells.Generate(ctx); err != nil {
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
 
@@ -126,6 +131,17 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
 
+	// Render color/texture-based "color" cells
+	fmt.Printf("Rendering %d color cells...\n", len(parsedLands.Lands))
+	colorRenderer, err := NewColorRenderer(rampPath, parsedLands.LandTextures)
+	if err != nil {
+		return fmt.Errorf("new color renderer: %w", err)
+	}
+	colorCells := NewCellMapper(parsedLands, colorRenderer)
+	if err := colorCells.Generate(ctx); err != nil {
+		return fmt.Errorf("generate cell maps: %w", err)
+	}
+
 	fmt.Printf("Setting up world map joiners...\n")
 
 	// Set up jobs to join the sub-images together.
@@ -140,7 +156,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: classicTexturePath.path,
 				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     classicColorCells,
+				Cells:     classicCells,
 				PostProcessors: []PostProcessor{
 					&postprocessors.SMAA{},
 					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
@@ -198,7 +214,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: potatoTexturePath.path,
 				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     classicColorCells,
+				Cells:     classicCells,
 				PostProcessors: []PostProcessor{
 					&postprocessors.SMAA{},
 					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
@@ -232,6 +248,30 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 			})
 			mapJobs = append(mapJobs, &mapRenderJob{
 				Directory: detailTexturePath.path,
+				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     specularCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				},
+				Codec: dds.DXT5,
+			})
+		}
+		if colorTexturePath.available {
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: colorTexturePath.path,
+				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
+				Extents:   extents.Extents,
+				Cells:     colorCells,
+				PostProcessors: []PostProcessor{
+					&postprocessors.SMAA{},
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				},
+				Codec: dds.Lossless,
+			})
+			mapJobs = append(mapJobs, &mapRenderJob{
+				Directory: colorTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 				Extents:   extents.Extents,
 				Cells:     specularCells,

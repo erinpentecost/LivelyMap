@@ -57,7 +57,15 @@ func RGBToHSL(c color.Color) HSL {
 // GetAverageHue calculates the average hue of an image.
 // Uses vector averaging to handle circular wrap-around at 360°.
 func GetAverageHue(img image.Image) float64 {
+	return GetAverageHSL(img).H
+}
+
+// GetAverageHSL calculates the average Hue, Saturation, and Lightness of an image.
+// Hue is averaged using vector averaging to handle circular wrap-around.
+// Saturation and Lightness are averaged linearly.
+func GetAverageHSL(img image.Image) HSL {
 	var sumX, sumY float64
+	var sumS, sumL float64
 	count := 0
 
 	b := img.Bounds()
@@ -65,26 +73,37 @@ func GetAverageHue(img image.Image) float64 {
 		for x := b.Min.X; x < b.Max.X; x++ {
 			hsl := RGBToHSL(img.At(x, y))
 
-			rad := hsl.H * math.Pi / 180
+			// Hue: circular mean
+			rad := hsl.H * math.Pi / 180.0
 			sumX += math.Cos(rad)
 			sumY += math.Sin(rad)
+
+			// Saturation & Lightness: linear mean
+			sumS += hsl.S
+			sumL += hsl.L
+
 			count++
 		}
 	}
 
 	if count == 0 {
-		return 0
+		return HSL{}
 	}
 
+	// Compute average hue
 	avgX := sumX / float64(count)
 	avgY := sumY / float64(count)
 
-	angle := math.Atan2(avgY, avgX) * 180 / math.Pi
+	angle := math.Atan2(avgY, avgX) * 180.0 / math.Pi
 	if angle < 0 {
-		angle += 360
+		angle += 360.0
 	}
 
-	return angle
+	return HSL{
+		H: angle,
+		S: sumS / float64(count),
+		L: sumL / float64(count),
+	}
 }
 
 // HSLToRGB converts an HSL value to an RGBA color.
