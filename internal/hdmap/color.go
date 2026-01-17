@@ -89,8 +89,11 @@ func (d *ColorRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 					texIndex := p.vtex[dy][dx]
 					tex, ok := d.textures[texIndex]
 					if ok {
+
+						// hue and value from texture.
 						baseHSL := hue.RGBToHSL(baseColor)
-						baseHSL.H = tex.avgHue
+						baseHSL.H = tex.avgHSL.H
+						baseHSL.S = tex.avgHSL.S
 						baseColor = hue.HSLToRGB(baseHSL)
 					}
 				}
