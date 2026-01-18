@@ -72,6 +72,7 @@ type ParsedLandRecord struct {
 	normals [][]land.VertexField
 	vtex    [][]uint16
 	colors  [][]land.ColorField
+	faked   bool
 }
 
 func NewFallbackLandRecord() *ParsedLandRecord {
@@ -211,6 +212,7 @@ func (l *LandParser) ParsePlugins() error {
 					heights: fallbackHeights,
 					normals: fallbackNormals,
 					vtex:    fallbackVtex,
+					faked:   true,
 				})
 			}
 		}

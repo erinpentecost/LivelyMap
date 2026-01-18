@@ -89,11 +89,16 @@ func (d *ColorRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 					texIndex := p.vtex[dy][dx]
 					tex, ok := d.textures[texIndex]
 					if ok {
-						// hue and value from texture.
+						// hue and saturation from texture.
 						baseHSL := hue.RGBToHSL(baseColor)
 						baseHSL.H = tex.avgHSL.H
 						baseHSL.S = tex.avgHSL.S
-						baseHSL.L = math.Min(baseHSL.L+.1, 1)
+						baseHSL.L = baseHSL.L*.8 + .15
+						/*
+						* normalizedHeight := (p.heights[y][x] - d.waterHeight) / (d.maxHeight - d.waterHeight)
+						* reclampedHeight := float64(1-normalizedHeight)*.3 + .1
+						* baseHSL.L = -(math.Cos(math.Pi*reclampedHeight) - 1) / 2
+						 */
 						baseColor = hue.HSLToRGB(baseHSL)
 					}
 				}
