@@ -157,7 +157,7 @@ func HSLToRGB(hsl HSL) color.RGBA {
 	}
 }
 
-func MulColor(a, b color.Color) color.RGBA {
+func MulColor(a, b color.RGBA) color.RGBA {
 	ar, ag, ab, _ := a.RGBA()
 	br, bg, bb, _ := b.RGBA()
 

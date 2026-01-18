@@ -8,15 +8,15 @@ import (
 	"math"
 	"slices"
 
-	"github.com/anthonynsimon/bild/blend"
-	"github.com/erinpentecost/LivelyMap/internal/blur"
 	"github.com/erinpentecost/LivelyMap/internal/hdmap/ramp"
 	"github.com/erinpentecost/LivelyMap/internal/hue"
+	"github.com/erinpentecost/LivelyMap/internal/imgutil"
 
 	_ "embed"
 )
 
-// VecTexLayerRenderer is still broken.
+// VecTexLayerRenderer is an image of just landscape textures.
+// Water is fully white and transparent.
 type VecTexLayerRenderer struct {
 	minHeight   float32
 	maxHeight   float32
@@ -67,12 +67,6 @@ func (d *VecTexLayerRenderer) SetHeightExtents(heightStats Stats, waterHeight fl
 }
 
 func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
-	/* Notes from Qlonever:
-	* VTEX 0 indicates the default ground texture, and plugin-defined textures come after
-	* though it would be more convenient if LTEX just started at 1
-	* the way VTEX correspond to the actual positions of textures in the cell:
-	* the first 16 indices in the VTEX correspond to a 4x4 square of textures in the cell, then the next 16 indices make another 4x4 square, etc
-	 */
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
 	waterColor := color.RGBA{
@@ -122,7 +116,7 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 	return img
 }
 
-// VecDetailLayerRenderer is still broken.
+// VecDetailLayerRenderer is an image with fully rendered water, and land vertex colors on white.
 type VecDetailLayerRenderer struct {
 	minHeight   float32
 	maxHeight   float32
@@ -173,24 +167,17 @@ func (d *VecDetailLayerRenderer) SetHeightExtents(heightStats Stats, waterHeight
 }
 
 func (d *VecDetailLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
-	/* Notes from Qlonever:
-	* VTEX 0 indicates the default ground texture, and plugin-defined textures come after
-	* though it would be more convenient if LTEX just started at 1
-	* the way VTEX correspond to the actual positions of textures in the cell:
-	* the first 16 indices in the VTEX correspond to a 4x4 square of textures in the cell, then the next 16 indices make another 4x4 square, etc
-	 */
 	img := image.NewRGBA(image.Rect(0, 0, gridSize, gridSize))
 
-	// Throw away the last column and row.
-	// This is how I'm sampling a quad into a single pixel.
 	for y := range gridSize {
 		for x := range gridSize {
 			// Need to invert y
 			iy := gridSize - y - 1
 			baseColor := d.ramp.Color(p.heights[y][x], d.minHeight, d.maxHeight, d.waterHeight)
 			if p.heights[y][x] >= d.waterHeight {
-				// multiply vertex color onto the heightmap color
+				// Overwrite land color
 				if len(p.colors) == 65 && len(p.colors[y]) == 65 {
+					// just get raw vertex color
 					baseColor = color.RGBA{
 						R: p.colors[y][x].R,
 						G: p.colors[y][x].G,
@@ -206,7 +193,12 @@ func (d *VecDetailLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 	return img
 }
 
-func ProcessColorMapper(ctx context.Context, extents SubmapNode, rampPath string, parsedLands *LandParser, postProcs []PostProcessor) (*WorldMapper, error) {
+type ColorMapGenerator struct {
+	colorCells  *CellMapper
+	detailCells *CellMapper
+}
+
+func NewColorMapGenerator(ctx context.Context, rampPath string, parsedLands *LandParser) (*ColorMapGenerator, error) {
 	// Build up flat color image
 	colorRenderer, err := NewVecTexLayerRenderer(rampPath, parsedLands.LandTextures)
 	if err != nil {
@@ -216,19 +208,7 @@ func ProcessColorMapper(ctx context.Context, extents SubmapNode, rampPath string
 	if err := colorCells.Generate(ctx); err != nil {
 		return nil, fmt.Errorf("generate cell maps: %w", err)
 	}
-	colorWorldMapper := NewWorldMapper()
-	err = colorWorldMapper.Process(ctx,
-		extents.Extents,
-		slices.Values(colorCells.Cells),
-		postProcs,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("process world map %s %d: %w", extents.Extents, extents.ID, err)
-	}
-	colorWorldMapper.outImage = blur.BlurRGBIgnoreTransparent(colorWorldMapper.outImage, 4, 1)
-
 	// Buld up detail layer
-	// Build up flat color image
 	detailRenderer, err := NewVecDetailLayerRenderer(rampPath, parsedLands.LandTextures)
 	if err != nil {
 		return nil, fmt.Errorf("new color renderer: %w", err)
@@ -237,10 +217,28 @@ func ProcessColorMapper(ctx context.Context, extents SubmapNode, rampPath string
 	if err := detailCells.Generate(ctx); err != nil {
 		return nil, fmt.Errorf("generate cell maps: %w", err)
 	}
+	return &ColorMapGenerator{
+		colorCells:  colorCells,
+		detailCells: detailCells,
+	}, nil
+}
+
+func (cmg *ColorMapGenerator) ProcessColorMapper(ctx context.Context, extents SubmapNode, postProcs []PostProcessor) (*WorldMapper, error) {
+	colorWorldMapper := NewWorldMapper()
+	err := colorWorldMapper.Process(ctx,
+		extents.Extents,
+		slices.Values(cmg.colorCells.Cells),
+		postProcs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("process world map %s %d: %w", extents.Extents, extents.ID, err)
+	}
+	colorWorldMapper.outImage = imgutil.BlurRGBIgnoreTransparent(colorWorldMapper.outImage, 8, 3)
+
 	detailWorldMapper := NewWorldMapper()
 	err = detailWorldMapper.Process(ctx,
 		extents.Extents,
-		slices.Values(colorCells.Cells),
+		slices.Values(cmg.detailCells.Cells),
 		postProcs,
 	)
 	if err != nil {
@@ -248,7 +246,8 @@ func ProcessColorMapper(ctx context.Context, extents SubmapNode, rampPath string
 	}
 
 	// Multiply them together
-	detailWorldMapper.outImage = blend.Multiply(colorWorldMapper.outImage, detailWorldMapper.outImage)
+	//detailWorldMapper.outImage = blend.Multiply(colorWorldMapper.outImage, detailWorldMapper.outImage)
+	detailWorldMapper.outImage = imgutil.Blend(detailWorldMapper.outImage, colorWorldMapper.outImage, hue.MulColor)
 
 	return detailWorldMapper, nil
 }

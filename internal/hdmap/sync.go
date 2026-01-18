@@ -130,15 +130,9 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 		return fmt.Errorf("generate cell maps: %w", err)
 	}
 
-	// Render color/texture-based "color" cells
-	fmt.Printf("Rendering %d color cells...\n", len(parsedLands.Lands))
-	colorRenderer, err := NewColorRenderer(rampPath, parsedLands.LandTextures)
+	colorMapMaker, err := NewColorMapGenerator(ctx, rampPath, parsedLands)
 	if err != nil {
-		return fmt.Errorf("new color renderer: %w", err)
-	}
-	colorCells := NewCellMapper(parsedLands, colorRenderer)
-	if err := colorCells.Generate(ctx); err != nil {
-		return fmt.Errorf("generate cell maps: %w", err)
+		return fmt.Errorf("new color map generator: %w", err)
 	}
 
 	fmt.Printf("Setting up world map joiners...\n")
@@ -258,16 +252,17 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 			})
 		}
 		if colorTexturePath.available {
+			cm := func() (*WorldMapper, error) {
+				return colorMapMaker.ProcessColorMapper(ctx, extents, []PostProcessor{
+					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+				})
+			}
 			mapJobs = append(mapJobs, &mapRenderJob{
-				Directory: colorTexturePath.path,
-				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
-				Extents:   extents.Extents,
-				ProcessedWorldFn: simpleMapper(ctx, colorCells, extents.Extents,
-					[]PostProcessor{
-						&postprocessors.SMAA{},
-						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-					}),
-				Codec: dds.Lossless,
+				Directory:        colorTexturePath.path,
+				Name:             fmt.Sprintf("world_%d.dds", extents.ID),
+				Extents:          extents.Extents,
+				ProcessedWorldFn: cm,
+				Codec:            dds.Lossless,
 			})
 			mapJobs = append(mapJobs, &mapRenderJob{
 				Directory: colorTexturePath.path,

@@ -1,4 +1,4 @@
-package blur
+package imgutil
 
 import (
 	"image"
