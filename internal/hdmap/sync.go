@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"image"
 	"os"
 	"path"
 	"path/filepath"
@@ -156,22 +155,22 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: classicTexturePath.path,
 				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     classicCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, classicCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					}),
 				Codec: dds.Lossless,
 			})
 			mapJobs = append(mapJobs, &mapRenderJob{
 				Directory: classicTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     specularCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, specularCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					}),
 				Codec: dds.DXT5,
 			})
 		}
@@ -180,13 +179,13 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: normalsTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     normalCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-					&postprocessors.MinimumEdgeTransparencyProcessor{
-						Minimum: 255,
-					},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, normalCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+						&postprocessors.MinimumEdgeTransparencyProcessor{
+							Minimum: 255,
+						},
+					}),
 				Codec: dds.DXT5,
 			})
 		}
@@ -195,16 +194,16 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: extremeNormalsTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_nh.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     normalCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-					&postprocessors.LocalToneMapAlpha{
-						WindowRadiusDenom: 10,
-					},
-					&postprocessors.MinimumEdgeTransparencyProcessor{
-						Minimum: 255,
-					},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, normalCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+						&postprocessors.LocalToneMapAlpha{
+							WindowRadiusDenom: 10,
+						},
+						&postprocessors.MinimumEdgeTransparencyProcessor{
+							Minimum: 255,
+						},
+					}),
 				Codec: dds.DXT5,
 			})
 		}
@@ -214,22 +213,22 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: potatoTexturePath.path,
 				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     classicCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, classicCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+					}),
 				Codec: dds.DXT1,
 			})
 			mapJobs = append(mapJobs, &mapRenderJob{
 				Directory: potatoTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     specularCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, specularCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 8},
+					}),
 				Codec: dds.DXT5,
 			})
 		}
@@ -239,22 +238,22 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: detailTexturePath.path,
 				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     texturedCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, texturedCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					}),
 				Codec: dds.Lossless,
 			})
 			mapJobs = append(mapJobs, &mapRenderJob{
 				Directory: detailTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     specularCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, specularCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					}),
 				Codec: dds.DXT5,
 			})
 		}
@@ -263,22 +262,22 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 				Directory: colorTexturePath.path,
 				Name:      fmt.Sprintf("world_%d.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     colorCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, colorCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					}),
 				Codec: dds.Lossless,
 			})
 			mapJobs = append(mapJobs, &mapRenderJob{
 				Directory: colorTexturePath.path,
 				Name:      fmt.Sprintf("world_%d_spec.dds", extents.ID),
 				Extents:   extents.Extents,
-				Cells:     specularCells,
-				PostProcessors: []PostProcessor{
-					&postprocessors.SMAA{},
-					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
-				},
+				ProcessedWorldFn: simpleMapper(ctx, specularCells, extents.Extents,
+					[]PostProcessor{
+						&postprocessors.SMAA{},
+						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
+					}),
 				Codec: dds.DXT5,
 			})
 		}
@@ -290,10 +289,10 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 			Directory: rootPath,
 			Name:      "vanity.png",
 			Extents:   parsedLands.MapExtents,
-			Cells:     texturedCells,
-			PostProcessors: []PostProcessor{
-				&postprocessors.SMAA{},
-			},
+			ProcessedWorldFn: simpleMapper(ctx, specularCells, parsedLands.MapExtents,
+				[]PostProcessor{
+					&postprocessors.SMAA{},
+				}),
 		})
 	}
 
@@ -360,34 +359,41 @@ func printMapInfo(path string, parsedLands *LandParser, maps map[string]SubmapNo
 }
 
 type mapRenderJob struct {
-	Directory      string
-	Name           string
-	Extents        MapCoords
-	Cells          *CellMapper
-	Codec          dds.Codec
-	PostProcessors []PostProcessor
-	PostFunction   func(img *image.RGBA) error
+	Directory        string
+	Name             string
+	Extents          MapCoords
+	ProcessedWorldFn func() (*WorldMapper, error)
+	//Cells          *CellMapper
+	Codec dds.Codec
+	//PostProcessors []PostProcessor
 }
 
 func (m *mapRenderJob) Draw(ctx context.Context) error {
 	fullPath := path.Join(m.Directory, m.Name)
 	fmt.Printf("Combining cells for %q...\n", fullPath)
-	classicWorldMapper := NewWorldMapper()
-	err := classicWorldMapper.Write(ctx,
-		m.Extents,
-		slices.Values(m.Cells.Cells),
-		path.Join(m.Directory, m.Name),
-		m.PostProcessors,
-		m.Codec,
-	)
+	mapper, err := m.ProcessedWorldFn()
+	if err != nil {
+		return fmt.Errorf("process world map %s %q: %w", m.Extents, m.Name, err)
+	}
+
+	err = mapper.WriteOut(path.Join(m.Directory, m.Name), m.Codec)
 	if err != nil {
 		return fmt.Errorf("write world map %s %q: %w", m.Extents, m.Name, err)
 	}
-	if m.PostFunction != nil {
-		err := m.PostFunction(classicWorldMapper.outImage)
-		if err != nil {
-			return fmt.Errorf("PostFunction: %w", err)
-		}
-	}
 	return nil
+}
+
+func simpleMapper(ctx context.Context, cells *CellMapper, extents MapCoords, postProcs []PostProcessor) func() (*WorldMapper, error) {
+	return func() (*WorldMapper, error) {
+		classicWorldMapper := NewWorldMapper()
+		err := classicWorldMapper.Process(ctx,
+			extents,
+			slices.Values(cells.Cells),
+			postProcs,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("process world mapper: %w", err)
+		}
+		return classicWorldMapper, nil
+	}
 }
