@@ -39,7 +39,7 @@ func BlurRGBIgnoreTransparent(src *image.RGBA, radius int, sigma float64) *image
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			var r, g, b, wsum float64
-			a := src.RGBAAt(x, y).A
+			srcPx := src.RGBAAt(x, y)
 
 			for k := -radius; k <= radius; k++ {
 				nx := x + k
@@ -63,14 +63,16 @@ func BlurRGBIgnoreTransparent(src *image.RGBA, radius int, sigma float64) *image
 				r /= wsum
 				g /= wsum
 				b /= wsum
+				tmp.SetRGBA(x, y, color.RGBA{
+					R: uint8(clamp(r)),
+					G: uint8(clamp(g)),
+					B: uint8(clamp(b)),
+					A: srcPx.A, // alpha untouched
+				})
+			} else {
+				// IMPORTANT: preserve original pixel
+				tmp.SetRGBA(x, y, srcPx)
 			}
-
-			tmp.SetRGBA(x, y, color.RGBA{
-				R: uint8(clamp(r)),
-				G: uint8(clamp(g)),
-				B: uint8(clamp(b)),
-				A: a, // alpha untouched
-			})
 		}
 	}
 
@@ -78,7 +80,7 @@ func BlurRGBIgnoreTransparent(src *image.RGBA, radius int, sigma float64) *image
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			var r, g, b, wsum float64
-			a := src.RGBAAt(x, y).A
+			srcPx := tmp.RGBAAt(x, y)
 
 			for k := -radius; k <= radius; k++ {
 				ny := y + k
@@ -102,14 +104,16 @@ func BlurRGBIgnoreTransparent(src *image.RGBA, radius int, sigma float64) *image
 				r /= wsum
 				g /= wsum
 				b /= wsum
+				dst.SetRGBA(x, y, color.RGBA{
+					R: uint8(clamp(r)),
+					G: uint8(clamp(g)),
+					B: uint8(clamp(b)),
+					A: srcPx.A,
+				})
+			} else {
+				// IMPORTANT: preserve original pixel
+				dst.SetRGBA(x, y, srcPx)
 			}
-
-			dst.SetRGBA(x, y, color.RGBA{
-				R: uint8(clamp(r)),
-				G: uint8(clamp(g)),
-				B: uint8(clamp(b)),
-				A: a, // alpha untouched
-			})
 		}
 	}
 

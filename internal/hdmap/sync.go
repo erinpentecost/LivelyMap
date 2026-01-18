@@ -253,7 +253,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 		}
 		if colorTexturePath.available {
 			cm := func() (*WorldMapper, error) {
-				return colorMapMaker.ProcessColorMapper(ctx, extents, []PostProcessor{
+				return colorMapMaker.ProcessColorMapper(ctx, extents.Extents, []PostProcessor{
 					&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 				})
 			}
@@ -280,14 +280,14 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 
 	// vanity map
 	if vanity {
+		cm := func() (*WorldMapper, error) {
+			return colorMapMaker.ProcessColorMapper(ctx, parsedLands.MapExtents, []PostProcessor{})
+		}
 		mapJobs = append(mapJobs, &mapRenderJob{
-			Directory: rootPath,
-			Name:      "vanity.png",
-			Extents:   parsedLands.MapExtents,
-			ProcessedWorldFn: simpleMapper(ctx, specularCells, parsedLands.MapExtents,
-				[]PostProcessor{
-					&postprocessors.SMAA{},
-				}),
+			Directory:        rootPath,
+			Name:             "vanity.png",
+			Extents:          parsedLands.MapExtents,
+			ProcessedWorldFn: cm,
 		})
 	}
 

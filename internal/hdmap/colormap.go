@@ -98,7 +98,7 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 						baseHSL := hue.RGBToHSL(baseColor)
 						baseHSL.H = tex.avgHSL.H
 						baseHSL.S = tex.avgHSL.S
-						baseHSL.L = baseHSL.L*.8 + .1
+						baseHSL.L = baseHSL.L*.9 + .05
 						/*
 						* normalizedHeight := (p.heights[y][x] - d.waterHeight) / (d.maxHeight - d.waterHeight)
 						* reclampedHeight := float64(1-normalizedHeight)*.3 + .1
@@ -223,31 +223,30 @@ func NewColorMapGenerator(ctx context.Context, rampPath string, parsedLands *Lan
 	}, nil
 }
 
-func (cmg *ColorMapGenerator) ProcessColorMapper(ctx context.Context, extents SubmapNode, postProcs []PostProcessor) (*WorldMapper, error) {
+func (cmg *ColorMapGenerator) ProcessColorMapper(ctx context.Context, extents MapCoords, postProcs []PostProcessor) (*WorldMapper, error) {
 	colorWorldMapper := NewWorldMapper()
 	err := colorWorldMapper.Process(ctx,
-		extents.Extents,
+		extents,
 		slices.Values(cmg.colorCells.Cells),
 		postProcs,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("process world map %s %d: %w", extents.Extents, extents.ID, err)
+		return nil, fmt.Errorf("process world map %s: %w", extents, err)
 	}
-	colorWorldMapper.outImage = imgutil.BlurRGBIgnoreTransparent(colorWorldMapper.outImage, 8, 3)
+	colorWorldMapper.outImage = imgutil.BlurRGBIgnoreTransparent(colorWorldMapper.outImage, 4, 2)
 
 	detailWorldMapper := NewWorldMapper()
 	err = detailWorldMapper.Process(ctx,
-		extents.Extents,
+		extents,
 		slices.Values(cmg.detailCells.Cells),
 		postProcs,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("process world map %s %d: %w", extents.Extents, extents.ID, err)
+		return nil, fmt.Errorf("process world map %s: %w", extents, err)
 	}
 
 	// Multiply them together
-	//detailWorldMapper.outImage = blend.Multiply(colorWorldMapper.outImage, detailWorldMapper.outImage)
-	detailWorldMapper.outImage = imgutil.Blend(detailWorldMapper.outImage, colorWorldMapper.outImage, hue.MulColor)
+	detailWorldMapper.outImage = imgutil.Blend(detailWorldMapper.outImage, colorWorldMapper.outImage, hue.StraightMulColor)
 
 	return detailWorldMapper, nil
 }

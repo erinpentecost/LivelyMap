@@ -87,7 +87,7 @@ func (d *DetailRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 			if p.heights[y][x] >= d.waterHeight {
 				// multiply vertex color onto the heightmap color
 				if len(p.colors) == 65 && len(p.colors[y]) == 65 {
-					baseColor = hue.MulColor(baseColor, color.RGBA{
+					baseColor = hue.MulColorWithoutAlphaAwareness(baseColor, color.RGBA{
 						R: p.colors[y][x].R,
 						G: p.colors[y][x].G,
 						B: p.colors[y][x].B,
