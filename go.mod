@@ -3,12 +3,15 @@ module github.com/erinpentecost/LivelyMap
 go 1.25.1
 
 require (
+	github.com/anthonynsimon/bild v0.14.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dblezek/tga v0.0.0-20150626111426-80720cbc1017 // indirect
 	github.com/ernmw/omwpacker v0.3.1 // indirect
 	github.com/galaco/dxt v0.0.0-20190227194637-c61fd9851f0b // indirect
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/mauserzjeh/dxt v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/spf13/cobra v0.0.5 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	go.coder.com/cli v0.6.0 // indirect

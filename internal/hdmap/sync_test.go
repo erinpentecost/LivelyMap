@@ -23,6 +23,6 @@ func BenchmarkGeneration(b *testing.B) {
 	b.Logf("root: %q", rootPath)
 
 	for b.Loop() {
-		require.NoError(b, DrawMaps(b.Context(), rootPath, env, 12, false, ""))
+		require.NoError(b, DrawMaps(b.Context(), rootPath, env, 12, true, ""))
 	}
 }

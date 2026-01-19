@@ -28,6 +28,8 @@ local localization = core.l10n(MOD_NAME)
 local storage = require('openmw.storage')
 local mapData = storage.globalSection(MOD_NAME .. "_mapData")
 
+local farMapPos = util.vector3(0.5 * mutil.CELL_SIZE, 30.5 * mutil.CELL_SIZE, mutil.CELL_SIZE)
+
 -- persist is saved to disk
 local persist = {
     -- map id to static record id
@@ -126,10 +128,7 @@ local function onShowMap(data)
     if not data then
         error("onShowMap has nil data parameter.")
     end
-    if not data.cellID then
-        error("onShowMap data parameter has nil cellID field.")
-        return
-    end
+
     if not data.player then
         error("onShowMap data parameter has nil player field.")
         return
@@ -159,14 +158,28 @@ local function onShowMap(data)
         end
     end
 
+
     local centerCell = function(n)
         return (math.floor(n / mutil.CELL_SIZE) + 0.5) * mutil.CELL_SIZE
     end
-    local mapPosition = data.mapPosition or
-        util.vector3(
-            centerCell(data.player.position.x),
-            centerCell(data.player.position.y),
-            data.player.position.z + 5 * mutil.CELL_SIZE)
+
+    -- always has to be the player cell because the mesh won't render
+    -- if it's not in the active grid.
+    local mapCell = data.player.cell
+
+    -- Pick a spot for the mesh within mapCell.
+    local mapPosition = data.mapPosition
+    if not mapPosition then
+        if mapCell.isExterior then
+            -- try to contain it within just one cell
+            mapPosition = util.vector3(
+                centerCell(data.player.position.x),
+                centerCell(data.player.position.y),
+                data.player.position.z + 4 * mutil.CELL_SIZE)
+        else
+            mapPosition = farMapPos
+        end
+    end
 
     local playerID = data.player.id
     if persist.activeMaps[playerID] == nil then
@@ -216,10 +229,10 @@ local function onShowMap(data)
     data.skyBowlObject = activeMap.skyBowlObject
 
     -- teleport enables the object for free
-    activeMap.object:teleport(world.getCellById(data.cellID),
+    activeMap.object:teleport(mapCell,
         mapPosition,
         nil)
-    activeMap.skyBowlObject:teleport(world.getCellById(data.cellID),
+    activeMap.skyBowlObject:teleport(mapCell,
         mapPosition,
         nil)
     -- notify the map that it moved.

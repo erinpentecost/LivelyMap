@@ -48,19 +48,37 @@ func (h *CellMapper) Generate(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(4)
 
+	// Special handling for faked cells
+	var faked *image.RGBA
+
 	for _, parsed := range h.LP.Lands {
-		g.Go(func() error {
-			//fmt.Printf("Rendering cell %d,%d\n", parsed.x, parsed.y)
-			outCell := &CellInfo{
-				X:     parsed.x,
-				Y:     parsed.y,
-				Image: h.Renderer.Render(parsed),
+
+		// Cache faked cells
+		if parsed.faked {
+			if faked == nil {
+				faked = h.Renderer.Render(parsed)
 			}
 			h.mux.Lock()
-			defer h.mux.Unlock()
-			h.Cells = append(h.Cells, outCell)
-			return nil
-		})
+			h.Cells = append(h.Cells, &CellInfo{
+				X:     parsed.x,
+				Y:     parsed.y,
+				Image: faked,
+			})
+			h.mux.Unlock()
+		} else {
+			g.Go(func() error {
+				//fmt.Printf("Rendering cell %d,%d\n", parsed.x, parsed.y)
+				outCell := &CellInfo{
+					X:     parsed.x,
+					Y:     parsed.y,
+					Image: h.Renderer.Render(parsed),
+				}
+				h.mux.Lock()
+				defer h.mux.Unlock()
+				h.Cells = append(h.Cells, outCell)
+				return nil
+			})
+		}
 	}
 
 	if err := g.Wait(); err != nil {

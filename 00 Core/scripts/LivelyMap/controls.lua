@@ -166,7 +166,7 @@ end
 ---Applies data changes to the actual camera.
 ---@param data CameraData
 local function setCamera(data)
-    print("setCamera: "..aux_util.deepToString(data, 4))
+    print("setCamera: " .. aux_util.deepToString(data, 4))
     camera.setMode(data.mode, true)
     camera.setPitch(data.pitch)
     camera.setYaw(data.yaw)
@@ -195,9 +195,9 @@ local function startCamera()
 
         local z, y, x = pself.rotation:getAnglesZYX()
         originalCameraState.playerRotation = {
-            z= z,
-            y= y,
-            x= x,
+            z = z,
+            y = y,
+            x = x,
         }
         print("Saved original camera state: " .. aux_util.deepToString(originalCameraState, 4))
     end
@@ -206,7 +206,7 @@ local function startCamera()
     camera.setYaw(0)
     -- player position gets completely messed up
     -- when we swap to static camera. we need to reset it.
-    core.sendGlobalEvent(MOD_NAME .. "onRotate", {object=pself, rotation=originalCameraState.playerRotation})
+    core.sendGlobalEvent(MOD_NAME .. "onRotate", { object = pself, rotation = originalCameraState.playerRotation })
 end
 
 --- Restore the camera back to original state.
@@ -396,7 +396,6 @@ local function handleCollision(res)
         --- This will cause any current tracking to be offset, so I also need to cancel tracking.
 
         local showData = mutil.shallowMerge(newMap, {
-            cellID = pself.cell.id,
             player = pself,
             mapPosition = absNewMapCenter,
         })

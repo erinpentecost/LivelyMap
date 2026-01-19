@@ -157,7 +157,7 @@ func HSLToRGB(hsl HSL) color.RGBA {
 	}
 }
 
-func MulColor(a, b color.Color) color.RGBA {
+func MulColorWithoutAlphaAwareness(a, b color.RGBA) color.RGBA {
 	ar, ag, ab, _ := a.RGBA()
 	br, bg, bb, _ := b.RGBA()
 
@@ -175,5 +175,27 @@ func MulColor(a, b color.Color) color.RGBA {
 		G: uint8((ag8 * bg8 / 255.0) + 0.5),
 		B: uint8((ab8 * bb8 / 255.0) + 0.5),
 		A: 255,
+	}
+}
+
+func StraightMulColor(a, b color.RGBA) color.RGBA {
+	// If the multiplier is transparent, do nothing
+	if b.A == 0 {
+		return a
+	}
+
+	ar := float64(a.R)
+	ag := float64(a.G)
+	ab := float64(a.B)
+
+	br := float64(b.R)
+	bg := float64(b.G)
+	bb := float64(b.B)
+
+	return color.RGBA{
+		R: uint8((ar * br / 255.0) + 0.5),
+		G: uint8((ag * bg / 255.0) + 0.5),
+		B: uint8((ab * bb / 255.0) + 0.5),
+		A: a.A, // preserve alpha
 	}
 }

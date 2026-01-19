@@ -15,33 +15,33 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME          = require("scripts.LivelyMap.ns")
-local mutil             = require("scripts.LivelyMap.mutil")
-local putil             = require("scripts.LivelyMap.putil")
-local core              = require("openmw.core")
-local util              = require("openmw.util")
-local pself             = require("openmw.self")
-local aux_util          = require('openmw_aux.util')
-local myui              = require('scripts.LivelyMap.pcp.myui')
-local camera            = require("openmw.camera")
-local ui                = require("openmw.ui")
-local settings          = require("scripts.LivelyMap.settings")
-local async             = require("openmw.async")
-local interfaces        = require('openmw.interfaces')
-local storage           = require('openmw.storage')
-local h3cam             = require("scripts.LivelyMap.h3.cam")
-local overlapfinder     = require("scripts.LivelyMap.overlapfinder")
-local callbackcontainer = require("scripts.LivelyMap.callbackcontainer")
+local MOD_NAME               = require("scripts.LivelyMap.ns")
+local mutil                  = require("scripts.LivelyMap.mutil")
+local putil                  = require("scripts.LivelyMap.putil")
+local core                   = require("openmw.core")
+local util                   = require("openmw.util")
+local pself                  = require("openmw.self")
+local aux_util               = require('openmw_aux.util')
+local myui                   = require('scripts.LivelyMap.pcp.myui')
+local camera                 = require("openmw.camera")
+local ui                     = require("openmw.ui")
+local settings               = require("scripts.LivelyMap.settings")
+local async                  = require("openmw.async")
+local interfaces             = require('openmw.interfaces')
+local storage                = require('openmw.storage')
+local h3cam                  = require("scripts.LivelyMap.h3.cam")
+local overlapfinder          = require("scripts.LivelyMap.overlapfinder")
+local callbackcontainer      = require("scripts.LivelyMap.callbackcontainer")
 
 ---@type MeshAnnotatedMapData?
-local currentMapData    = nil
+local currentMapData         = nil
 
-local toggleCallbacks = callbackcontainer.NewCallbackContainer()
+local toggleCallbacks        = callbackcontainer.NewCallbackContainer()
 
 ---@type fun(data :MeshAnnotatedMapData)[]
-local onMapMovedHandlers = {}
+local onMapMovedHandlers     = {}
 ---@type fun(data :MeshAnnotatedMapData)[]
-local onMapHiddenHandlers = {}
+local onMapHiddenHandlers    = {}
 
 ---Don't process these events immediately, since their origin may be
 ---from a delayed action. Delayed actions can't be nested.
@@ -92,7 +92,7 @@ end
 local function processPendingMapEvent()
     local event = table.remove(pendingMapChangeEvents, 1)
     if event then
-        print("Processing map change event: "..aux_util.deepToString(event.data, 3))
+        print("Processing map change event: " .. aux_util.deepToString(event.data, 3))
         event.fn(event.data)
         return true
     end
@@ -108,7 +108,7 @@ local function addHandler(fn, list)
     if type(fn) ~= "function" then
         error("addHandler fn must be a function, not a " .. type(fn))
     end
-    print("Added new handler: "..aux_util.deepToString(fn, 3))
+    print("Added new handler: " .. aux_util.deepToString(fn, 3))
     table.insert(list, fn)
 end
 
@@ -117,7 +117,6 @@ local function summonMap(callbackId)
 
     local pos = interfaces.LivelyMapPlayer.getExteriorPositionAndFacing().pos
     local showData = mutil.shallowMerge(mapData, {
-        cellID = pself.cell.id,
         player = pself,
         startWorldPosition = {
             x = pos.x,
@@ -126,7 +125,7 @@ local function summonMap(callbackId)
         },
         callbackId = callbackId,
     })
-    print("sendGlobalEvent: "..aux_util.deepToString(showData, 3))
+    print("sendGlobalEvent: " .. aux_util.deepToString(showData, 3))
     core.sendGlobalEvent(MOD_NAME .. "onShowMap", showData)
 end
 

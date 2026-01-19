@@ -38,13 +38,11 @@ func previousPoT(n uint64) uint64 {
 	return 1 << (63 - bits.LeadingZeros64(n))
 }
 
-func (w *WorldMapper) Write(
+func (w *WorldMapper) Process(
 	ctx context.Context,
 	mapExtents MapCoords,
 	cells iter.Seq[*CellInfo],
-	path string,
 	postProcessors []PostProcessor,
-	codec dds.Codec,
 ) error {
 	w.outImage = nil
 	w.mapExtents = mapExtents
@@ -68,6 +66,10 @@ func (w *WorldMapper) Write(
 		}
 	}
 
+	return nil
+}
+
+func (w *WorldMapper) WriteOut(path string, codec dds.Codec) error {
 	fmt.Printf("Writing map to %q\n", path)
 	out, err := os.Create(path)
 	if err != nil {
@@ -84,7 +86,6 @@ func (w *WorldMapper) Write(
 	default:
 		return fmt.Errorf("bad extension %q", ext)
 	}
-
 }
 
 // handleCell copies cell.Image (must be *image.RGBA) into w.outImage.
