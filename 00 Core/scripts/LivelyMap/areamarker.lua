@@ -38,15 +38,6 @@ local localization      = core.l10n(MOD_NAME)
 local cellFuzzyNameToId = storage.globalSection(MOD_NAME .. "_cellFuzzyNameToId")
 local cellIdToName      = storage.globalSection(MOD_NAME .. "_cellIdToName")
 
-local settingCache      = {
-    autoMarkNamedExteriorCells = settings.automatic.autoMarkNamedExteriorCells,
-    autoMarkFromJournal = settings.automatic.autoMarkFromJournal
-}
-
-settings.automatic.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.automatic[key]
-end))
-
 ---@param cellName string
 ---@param cellId string
 local function markArea(cellName, cellId)
@@ -128,7 +119,7 @@ local function markFromJournal()
 end
 
 interfaces.LivelyMapToggler.onMapMoved(function(data)
-    if (not data.swapped) and (settingCache.autoMarkFromJournal) then
+    if (not data.swapped) and (settings.automatic.autoMarkFromJournal) then
         markFromJournal()
     end
 end)
@@ -140,7 +131,7 @@ local function onUpdate(dt)
         -- don't do anything if paused.
         return
     end
-    if not settingCache.autoMarkNamedExteriorCells then
+    if not settings.automatic.autoMarkNamedExteriorCells then
         return
     end
     delta = delta - dt

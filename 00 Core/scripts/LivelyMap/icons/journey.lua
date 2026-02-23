@@ -30,17 +30,6 @@ local async        = require("openmw.async")
 local aux_util     = require('openmw_aux.util')
 local MOD_NAME     = require("scripts.LivelyMap.ns")
 
-local settingCache = {
-    palleteColor1 = settings.main.palleteColor1,
-    palleteColor2 = settings.main.palleteColor2,
-    drawLimitNeravarinesJourney = settings.main.drawLimitNeravarinesJourney,
-    debug = settings.main.debug,
-}
-settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
-end))
-
-
 local mapUp        = false
 local pathIcons    = {}
 
@@ -59,7 +48,7 @@ local function newIcon()
             relativePosition = util.vector2(0.2, 0.2),
             anchor = util.vector2(0.5, 0.5),
             relativeSize = iutil.iconSize(),
-            color = settingCache.palleteColor2,
+            color = settings.main.palleteColor2,
             resource = ui.texture {
                 path = pathIcon,
             }
@@ -102,7 +91,7 @@ end
 local iconPool = pool.create(newIcon, 0)
 
 local function color(currentIdx)
-    return mutil.lerpColor(settingCache.palleteColor2, settingCache.palleteColor1,
+    return mutil.lerpColor(settings.main.palleteColor2, settings.main.palleteColor1,
         currentIdx / (1 + #myPaths - minimumIndex))
 end
 
@@ -130,7 +119,7 @@ local function makeIcons()
         [interfaces.LivelyMapPlayer.playerName].paths
 
 
-    if settingCache.drawLimitNeravarinesJourney then
+    if settings.main.drawLimitNeravarinesJourney then
         local oldDuration = 4 * 60 * 60 * core.getGameTimeScale()
         local oldestTime = core.getGameTime() - oldDuration
         minimumIndex = mutil.binarySearchFirst(myPaths, function(p) return p.t > oldestTime end)

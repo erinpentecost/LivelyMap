@@ -13,6 +13,7 @@ PLAYER: scripts/LivelyMap/doorcategorizer.lua
 
 # Core stuff
 GLOBAL: scripts/LivelyMap/global.lua
+PLAYER: scripts/LivelyMap/areavisitedtracker.lua
 PLAYER: scripts/LivelyMap/player.lua
 PLAYER: scripts/LivelyMap/toggler.lua
 PLAYER: scripts/LivelyMap/controls.lua
@@ -25,7 +26,6 @@ PLAYER: scripts/LivelyMap/icons/debug.lua
 PLAYER: scripts/LivelyMap/icons/detect.lua
 PLAYER: scripts/LivelyMap/icons/journey.lua
 PLAYER: scripts/LivelyMap/icons/marker.lua
-#PLAYER: scripts/LivelyMap/icons/fog.lua
 
 # Systems that require icon providers
 PLAYER: scripts/LivelyMap/markermarker.lua

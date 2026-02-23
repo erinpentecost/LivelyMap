@@ -45,49 +45,42 @@ local maxCameraHeight = 600
 
 local stickDeadzone   = 0.3
 
-local settingCache    = {
-    controllerButtons = settings.controls.controllerButtons,
-}
-settings.controls.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.controls[key]
-end))
-
 -- Track inputs we need for navigating the map.
-local keys = {
+local keys            = {
     forward         = keytrack.NewKey("forward", function(dt)
         return input.isKeyPressed(input.KEY.UpArrow) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
+            (settings.controls.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) < -1 * stickDeadzone)
     end),
     backward        = keytrack.NewKey("backward", function(dt)
         return input.isKeyPressed(input.KEY.DownArrow) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
+            (settings.controls.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightY) > stickDeadzone)
     end),
     left            = keytrack.NewKey("left", function(dt)
         return input.isKeyPressed(input.KEY.LeftArrow) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) < -1 * stickDeadzone)
+            (settings.controls.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) < -1 * stickDeadzone)
     end),
     right           = keytrack.NewKey("right", function(dt)
         return input.isKeyPressed(input.KEY.RightArrow) or
-            (settingCache.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) > stickDeadzone)
+            (settings.controls.controllerButtons and input.getAxisValue(input.CONTROLLER_AXIS.RightX) > stickDeadzone)
     end),
 
     zoomIn          = keytrack.NewKey("zoomIn", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
+            (settings.controls.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadDown))
     end),
     zoomOut         = keytrack.NewKey("zoomOut", function(dt)
         return input.isKeyPressed(input.KEY.Equals) or
             input.isKeyPressed(input.KEY.NP_Plus) or
-            (settingCache.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
+            (settings.controls.controllerButtons and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.DPadUp))
     end),
 
     statsWindow     = keytrack.NewKey("statsWindow", function(dt)
-        return settingCache.controllerButtons and
+        return settings.controls.controllerButtons and
             input.getAxisValue(input.CONTROLLER_AXIS.TriggerLeft) > stickDeadzone
     end),
     inventoryWindow = keytrack.NewKey("inventoryWindow", function(dt)
-        return settingCache.controllerButtons and
+        return settings.controls.controllerButtons and
             input.getAxisValue(input.CONTROLLER_AXIS.TriggerRight) > stickDeadzone
     end),
 }

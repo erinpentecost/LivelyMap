@@ -15,33 +15,20 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local interfaces   = require('openmw.interfaces')
-local ui           = require('openmw.ui')
-local util         = require('openmw.util')
-local pself        = require("openmw.self")
-local types        = require("openmw.types")
-local core         = require("openmw.core")
-local nearby       = require("openmw.nearby")
-local iutil        = require("scripts.LivelyMap.icons.iutil")
-local pool         = require("scripts.LivelyMap.pool.pool")
-local mutil        = require("scripts.LivelyMap.mutil")
-local async        = require("openmw.async")
-local aux_util     = require('openmw_aux.util')
+local interfaces          = require('openmw.interfaces')
+local ui                  = require('openmw.ui')
+local util                = require('openmw.util')
+local pself               = require("openmw.self")
+local types               = require("openmw.types")
+local core                = require("openmw.core")
+local nearby              = require("openmw.nearby")
+local iutil               = require("scripts.LivelyMap.icons.iutil")
+local pool                = require("scripts.LivelyMap.pool.pool")
+local mutil               = require("scripts.LivelyMap.mutil")
+local async               = require("openmw.async")
+local aux_util            = require('openmw_aux.util')
 
-local settings     = require("scripts.LivelyMap.settings")
-
-local settingCache = {
-    palleteColor2 = settings.main.palleteColor2,
-    palleteColor3 = settings.main.palleteColor3,
-    palleteColor4 = settings.main.palleteColor4,
-    extendDetectRange = settings.main.extendDetectRange,
-    debug = settings.main.debug,
-}
-
-settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
-end))
-
+local settings            = require("scripts.LivelyMap.settings")
 
 local detectAnimalId      = core.magic.EFFECT_TYPE.DetectAnimal
 local detectEnchantmentId = core.magic.EFFECT_TYPE.DetectEnchantment
@@ -141,13 +128,13 @@ local function newDetectIcon(path, color)
 end
 
 local iconPoolAnimal = pool.create(function()
-    return newDetectIcon(animalPath, settingCache.palleteColor2)
+    return newDetectIcon(animalPath, settings.main.palleteColor2)
 end, 0)
 local iconPoolEnchantment = pool.create(function()
-    return newDetectIcon(enchantmentPath, settingCache.palleteColor3)
+    return newDetectIcon(enchantmentPath, settings.main.palleteColor3)
 end, 0)
 local iconPoolKey = pool.create(function()
-    return newDetectIcon(keyPath, settingCache.palleteColor4)
+    return newDetectIcon(keyPath, settings.main.palleteColor4)
 end, 0)
 
 local function makeIcon(iconPool, entity, pos)
@@ -164,7 +151,7 @@ local function makeIcon(iconPool, entity, pos)
 end
 
 local function magnitudeToSqDist(mag)
-    if settingCache.extendDetectRange then
+    if settings.main.extendDetectRange then
         -- 8192 at 100 mag
         local v = mag * mutil.CELL_SIZE / 100
         return v * v
@@ -300,7 +287,7 @@ local function onUpdate(dt)
         end
     end
     -- DEBUG!
-    if settingCache.debug then
+    if settings.main.debug then
         animalMagnitude = 100
         enchantmentMagnitude = 100
         keyMagnitude = 100

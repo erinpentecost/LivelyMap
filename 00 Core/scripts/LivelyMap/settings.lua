@@ -20,6 +20,7 @@ local storage                  = require("openmw.storage")
 local MOD_NAME                 = require("scripts.LivelyMap.ns")
 local util                     = require('openmw.util')
 local input                    = require('openmw.input')
+local async                    = require("openmw.async")
 
 local psoGroupKey              = "Settings/" .. MOD_NAME .. "/pso"
 local controlsGroupKey         = "Settings/" .. MOD_NAME .. "/controls"
@@ -246,39 +247,45 @@ local lookupFuncTable = {
         elseif key == "groupKey" then
             return table.groupKey
         end
-        -- fall through to settings section
-        local val = table.section:get(key)
+        -- fall through to cached settings section
+        local val = table.cached[key]
         if val ~= nil then
             return val
         else
-            error("unknown setting " .. tostring(key))
+            --print("cached settings: " .. aux_util.deepToString(table.cached, 3))
+            --print("current settings: " .. aux_util.deepToString(table.section:asTable(), 3))
+            error("unknown setting: " .. tostring(table.groupKey) .. " - " .. tostring(key))
+            return nil
         end
     end,
 }
 
-local mainContainer = {
-    groupKey = mainGroupKey,
-    section = storage.playerSection(mainGroupKey)
-}
-setmetatable(mainContainer, lookupFuncTable)
+---@param groupKeyParam string
+---@return table
+local function newContainer(groupKeyParam)
+    local container = {
+        groupKey = groupKeyParam,
+        section = storage.playerSection(groupKeyParam),
+        cached = {}
+    }
+    container.cached = container.section:asTable()
 
-local psoContainer = {
-    groupKey = psoGroupKey,
-    section = storage.playerSection(psoGroupKey)
-}
-setmetatable(psoContainer, lookupFuncTable)
+    setmetatable(container, lookupFuncTable)
 
-local controlsContainer = {
-    groupKey = controlsGroupKey,
-    section = storage.playerSection(controlsGroupKey)
-}
-setmetatable(controlsContainer, lookupFuncTable)
+    container.subscribe(async:callback(function(_, key)
+        container.cached[key] = container.section:get(key)
+    end))
 
-local automaticContainer = {
-    groupKey = automaticGroupKey,
-    section = storage.playerSection(automaticGroupKey)
-}
-setmetatable(automaticContainer, lookupFuncTable)
+    return container
+end
+
+local mainContainer = newContainer(mainGroupKey)
+
+local psoContainer = newContainer(psoGroupKey)
+
+local controlsContainer = newContainer(controlsGroupKey)
+
+local automaticContainer = newContainer(automaticGroupKey)
 
 ---@alias SettingContainer table
 
