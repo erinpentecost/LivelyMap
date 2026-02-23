@@ -27,14 +27,6 @@ local interfaces   = require('openmw.interfaces')
 local ui           = require('openmw.ui')
 local async        = require("openmw.async")
 
-local settingCache = {
-    iconScale = settings.main.iconScale,
-}
-
-settings.automatic.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
-end))
-
 local baseIconSize = util.vector2(0.05, 0.05)
 local function iconSize(posData, parentAspectRatio)
     if not parentAspectRatio then
@@ -43,7 +35,7 @@ local function iconSize(posData, parentAspectRatio)
     if posData then
         local dist = (camera.getPosition() - posData.mapWorldPos):length()
         dist = util.clamp(dist, 100, 500)
-        return (baseIconSize * util.remap(dist, 100, 500, 1, 0.5) * settingCache.iconScale):ediv(parentAspectRatio)
+        return (baseIconSize * util.remap(dist, 100, 500, 1, 0.5) * settings.main.iconScale):ediv(parentAspectRatio)
     else
         return baseIconSize:ediv(parentAspectRatio)
     end

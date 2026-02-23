@@ -28,10 +28,6 @@ local settings     = require("scripts.LivelyMap.settings")
 local core         = require('openmw.core')
 local types        = require('openmw.types')
 
-local settingCache = {
-    palleteColor1 = settings.main.palleteColor1,
-}
-
 local compassAtlas = imageAtlas.constructAtlas({
     totalTiles = 360,
     tilesPerRow = 18,
@@ -41,15 +37,14 @@ local compassAtlas = imageAtlas.constructAtlas({
 })
 compassAtlas:spawn({
     anchor = util.vector2(0.5, 0.5),
-    color = settingCache.palleteColor1,
+    color = settings.main.palleteColor1,
     events = {},
     relativeSize = iutil.iconSize(),
 })
 
 settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
     if key == "palleteColor1" then
-        compassAtlas:getElement().layout.props.color = settingCache.palleteColor1
+        compassAtlas:getElement().layout.props.color = settings.main.palleteColor1
         compassAtlas:getElement():update()
     end
 end))

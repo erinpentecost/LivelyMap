@@ -40,17 +40,6 @@ local localization = core.l10n(MOD_NAME)
 --- Prison Markers
 
 
-local settingCache = {
-    autoMarkTemplesAndCults = settings.automatic.autoMarkTemplesAndCults,
-    autoMarkPrisons = settings.automatic.autoMarkPrisons,
-}
-
-print("settings.automatic: " .. aux_util.deepToString(settings.automatic, 4))
-
-settings.automatic.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.automatic[key]
-end))
-
 ---@class MarkerTemplate
 ---@field iconName string Basename of the stamp.
 ---@field nameRecord string
@@ -64,7 +53,7 @@ local markerBasicInfo = {
         nameRecord = "markerTemple",
         color = 3,
         allowed = function()
-            return settingCache.autoMarkTemplesAndCults
+            return settings.automatic.autoMarkTemplesAndCults
         end
     },
     divinemarker = {
@@ -72,7 +61,7 @@ local markerBasicInfo = {
         nameRecord = "markerImperialCult",
         color = 3,
         allowed = function()
-            return settingCache.autoMarkTemplesAndCults
+            return settings.automatic.autoMarkTemplesAndCults
         end
     },
     prisonmarker = {
@@ -80,7 +69,7 @@ local markerBasicInfo = {
         nameRecord = "markerPrison",
         color = 4,
         allowed = function()
-            return settingCache.autoMarkPrisons
+            return settings.automatic.autoMarkPrisons
         end
     },
 }

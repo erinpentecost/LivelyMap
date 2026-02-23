@@ -15,43 +15,26 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ]]
-local MOD_NAME       = require("scripts.LivelyMap.ns")
-local mutil          = require("scripts.LivelyMap.mutil")
-local putil          = require("scripts.LivelyMap.putil")
-local core           = require("openmw.core")
-local util           = require("openmw.util")
-local pself          = require("openmw.self")
-local aux_util       = require('openmw_aux.util')
-local myui           = require('scripts.LivelyMap.pcp.myui')
-local camera         = require("openmw.camera")
-local ui             = require("openmw.ui")
-local settings       = require("scripts.LivelyMap.settings")
-local async          = require("openmw.async")
-local interfaces     = require('openmw.interfaces')
-local storage        = require('openmw.storage')
-local h3cam          = require("scripts.LivelyMap.h3.cam")
-local overlapfinder  = require("scripts.LivelyMap.overlapfinder")
-local fog            = require("scripts.LivelyMap.fog")
+local MOD_NAME              = require("scripts.LivelyMap.ns")
+local mutil                 = require("scripts.LivelyMap.mutil")
+local putil                 = require("scripts.LivelyMap.putil")
+local core                  = require("openmw.core")
+local util                  = require("openmw.util")
+local pself                 = require("openmw.self")
+local aux_util              = require('openmw_aux.util')
+local myui                  = require('scripts.LivelyMap.pcp.myui')
+local camera                = require("openmw.camera")
+local ui                    = require("openmw.ui")
+local settings              = require("scripts.LivelyMap.settings")
+local async                 = require("openmw.async")
+local interfaces            = require('openmw.interfaces')
+local storage               = require('openmw.storage')
+local h3cam                 = require("scripts.LivelyMap.h3.cam")
+local overlapfinder         = require("scripts.LivelyMap.overlapfinder")
+local fog                   = require("scripts.LivelyMap.fog")
 
 ---@type MeshAnnotatedMapData?
-local currentMapData = nil
-
-local settingCache   = {
-    psoUnlock       = settings.pso.psoUnlock,
-    psoDepth        = settings.pso.psoDepth,
-    psoPushdownOnly = settings.pso.psoPushdownOnly,
-    debug           = settings.main.debug,
-    fog             = settings.main.fog,
-    palleteColor4   = settings.main.palleteColor4,
-    palleteColor5   = settings.main.palleteColor5,
-}
-
-settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
-end))
-settings.pso.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.pso[key]
-end))
+local currentMapData        = nil
 
 local onRenderStartHandlers = {}
 local function invokeOnRenderStartHandlers()
@@ -69,7 +52,7 @@ end
 
 --- Shaders aren't available on all platforms, so do a hard hide on it.
 local fogShader = nil
-if settingCache.fog then
+if settings.main.fog then
     fogShader = fog.NewFogShader()
 end
 
@@ -212,14 +195,14 @@ local iconContainer = ui.create {
 }
 
 local normalButtonColors = {
-    default = settingCache.palleteColor5,
-    over = mutil.lerpColor(settingCache.palleteColor5, util.color.rgb(1, 1, 1), 0.3),
-    pressed = mutil.lerpColor(settingCache.palleteColor5, util.color.rgb(1, 1, 1), 0.5),
+    default = settings.main.palleteColor5,
+    over = mutil.lerpColor(settings.main.palleteColor5, util.color.rgb(1, 1, 1), 0.3),
+    pressed = mutil.lerpColor(settings.main.palleteColor5, util.color.rgb(1, 1, 1), 0.5),
 }
 local psoButtonColors = {
-    default = settingCache.palleteColor4,
-    over = mutil.lerpColor(settingCache.palleteColor4, util.color.rgb(1, 1, 1), 0.3),
-    pressed = mutil.lerpColor(settingCache.palleteColor4, util.color.rgb(1, 1, 1), 0.5),
+    default = settings.main.palleteColor4,
+    over = mutil.lerpColor(settings.main.palleteColor4, util.color.rgb(1, 1, 1), 0.3),
+    pressed = mutil.lerpColor(settings.main.palleteColor4, util.color.rgb(1, 1, 1), 0.5),
 }
 
 local menuBarButtonSize = util.vector2(32, 32)
@@ -266,19 +249,19 @@ local journeyButton = makeMenuButton("journeyButton", "textures/LivelyMap/journe
 
 local psoReduceDepthButton = makeMenuButton("psoReduceDepthButton", "textures/LivelyMap/minus-button.png",
     function()
-        settings.pso.section:set("psoDepth", math.max(0, settingCache.psoDepth - 1))
+        settings.pso.section:set("psoDepth", math.max(0, settings.pso.psoDepth - 1))
     end,
     psoButtonColors
 )
 local psoIncreaseDepthButton = makeMenuButton("psoIncreaseDepthButton", "textures/LivelyMap/plus-button.png",
     function()
-        settings.pso.section:set("psoDepth", math.min(300, settingCache.psoDepth + 1))
+        settings.pso.section:set("psoDepth", math.min(300, settings.pso.psoDepth + 1))
     end,
     psoButtonColors
 )
 local psoTogglePushdownButton = makeMenuButton("psoTogglePushdownButton", "textures/LivelyMap/pushdown-button.png",
     function()
-        settings.pso.section:set("psoPushdownOnly", not settingCache.psoPushdownOnly)
+        settings.pso.section:set("psoPushdownOnly", not settings.pso.psoPushdownOnly)
     end,
     psoButtonColors
 )
@@ -321,7 +304,7 @@ local menuBar = ui.create {
                 newMarkerButton,
                 myui.padWidget(10, 10),
                 journeyButton,
-                settingCache.psoUnlock and psoMenuButtons or nil,
+                settings.pso.psoUnlock and psoMenuButtons or nil,
             }
         }
     }
@@ -433,7 +416,7 @@ local function purgeRemovedIcons()
             table.insert(remainingIcons, icon)
             table.insert(remainingContent, icon.ref.element)
             -- icon is responsible for destroying the UI element
-        elseif settingCache.debug then
+        elseif settings.main.debug then
             print("Removing icon '" .. icon.name .. "'.")
         end
     end
@@ -534,7 +517,7 @@ local function applyPendingRegistrations()
         end
         local insertIndex = mutil.binarySearchFirst(icons, function(p) return p.ref.priority > icon.ref.priority end)
 
-        if settingCache.debug then
+        if settings.main.debug then
             print("Inserted at index " .. tostring(insertIndex) .. " of " .. tostring(#icons) .. ".")
         end
 
@@ -578,7 +561,13 @@ local function renderIcons()
         local iFacing = icon.ref.facing and icon.ref.facing(icon.ref) or nil
 
         if iPos then
-            local pos = putil.realPosToNormalizedViewportPos(currentMapData, settingCache, iPos, iFacing)
+            local pso = {
+                psoUnlock       = settings.pso.psoUnlock,
+                psoDepth        = settings.pso.psoDepth,
+                psoPushdownOnly = settings.pso.psoPushdownOnly,
+            }
+
+            local pos = putil.realPosToNormalizedViewportPos(currentMapData, pso, iPos, iFacing)
             if pos and pos.viewportPos then
                 if pos.viewportPos.pos and pos.viewportPos.onScreen then
                     icon.onScreen = true
@@ -773,7 +762,7 @@ local function registerIcon(icon)
     local name = "icon_" .. tostring(nextName)
     icon.element.layout.name = name
 
-    if settingCache.debug then
+    if settings.main.debug then
         print("Registering icon '" .. name .. "': " .. aux_util.deepToString(icon, 4))
     end
 

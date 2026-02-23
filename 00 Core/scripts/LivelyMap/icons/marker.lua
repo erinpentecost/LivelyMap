@@ -32,17 +32,6 @@ local pself        = require("openmw.self")
 local localization = core.l10n(MOD_NAME)
 local ambient      = require('openmw.ambient')
 
-local settingCache = {
-    palleteColor1 = settings.main.palleteColor1,
-    palleteColor2 = settings.main.palleteColor2,
-    palleteColor3 = settings.main.palleteColor3,
-    palleteColor4 = settings.main.palleteColor4,
-    palleteColor5 = settings.main.palleteColor5,
-    debug = settings.main.debug,
-}
-settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
-end))
 
 ---This is persisted in the savefile.
 ---@type {[string]: MarkerData}
@@ -69,15 +58,15 @@ local markerIcons = {}
 
 local function resolveColor(colorID)
     if colorID == 1 then
-        return settingCache.palleteColor1
+        return settings.main.palleteColor1
     elseif colorID == 2 then
-        return settingCache.palleteColor2
+        return settings.main.palleteColor2
     elseif colorID == 3 then
-        return settingCache.palleteColor3
+        return settings.main.palleteColor3
     elseif colorID == 4 then
-        return settingCache.palleteColor4
+        return settings.main.palleteColor4
     elseif colorID == 5 then
-        return settingCache.palleteColor5
+        return settings.main.palleteColor5
     else
         error("unknown color ID " .. colorID)
     end

@@ -19,26 +19,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 -- This file is in charge of tracking and exposing path information.
 -- Interact with it via the interface it exposes.
 
-local MOD_NAME = require("scripts.LivelyMap.ns")
-local types    = require('openmw.types')
-local json     = require('scripts.LivelyMap.json.json')
-local mutil    = require('scripts.LivelyMap.mutil')
-local core     = require('openmw.core')
-local pself    = require("openmw.self")
-local util     = require("openmw.util")
-local vfs      = require('openmw.vfs')
-local aux_util = require('openmw_aux.util')
-local settings = require("scripts.LivelyMap.settings")
-local async    = require("openmw.async")
-
-
-local settingCache = {
-    volatileNeravarinesJourney = settings.main.volatileNeravarinesJourney,
-}
-settings.main.subscribe(async:callback(function(_, key)
-    settingCache[key] = settings.main[key]
-end))
-
+local MOD_NAME    = require("scripts.LivelyMap.ns")
+local types       = require('openmw.types')
+local json        = require('scripts.LivelyMap.json.json')
+local mutil       = require('scripts.LivelyMap.mutil')
+local core        = require('openmw.core')
+local pself       = require("openmw.self")
+local util        = require("openmw.util")
+local vfs         = require('openmw.vfs')
+local aux_util    = require('openmw_aux.util')
+local settings    = require("scripts.LivelyMap.settings")
+local async       = require("openmw.async")
+local interfaces  = require('openmw.interfaces')
 
 local magicPrefix = "!!" .. MOD_NAME .. "!!STARTOFENTRY!!"
 local magicSuffix = "!!" .. MOD_NAME .. "!!ENDOFENTRY!!"
@@ -103,28 +95,6 @@ local function merge(a, b)
     }
 end
 
-local cellsVisited = {}
-
----@param pathEntry PathEntry
-local function markCell(pathEntry)
-    local x = math.floor(pathEntry.x / mutil.CELL_SIZE)
-    local y = math.floor(pathEntry.y / mutil.CELL_SIZE)
-    if not cellsVisited[x] then
-        cellsVisited[x] = {}
-    end
-    cellsVisited[x][y] = 1
-    for xi = x - 1, x + 1, 2 do
-        for yi = y - 1, y + 1, 2 do
-            if not cellsVisited[xi] then
-                cellsVisited[xi] = {}
-            end
-            if not cellsVisited[xi][yi] then
-                cellsVisited[xi][yi] = 0.5
-            end
-        end
-    end
-end
-
 -- fromSave contains the data from this savegame.
 local fromSave = {
     id = playerName,
@@ -154,7 +124,7 @@ allData[playerName] = {
 }
 
 local function onSave()
-    if settingCache.volatileNeravarinesJourney then
+    if settings.main.volatileNeravarinesJourney then
         return nil
     end
     -- debug
@@ -186,7 +156,7 @@ end
 
 local loadDone = false
 local function onLoad(data)
-    if settingCache.volatileNeravarinesJourney then
+    if settings.main.volatileNeravarinesJourney then
         return nil
     end
 
@@ -231,7 +201,7 @@ local function onLoad(data)
     local count = 0
     for _, pathEntry in ipairs(allData[playerName].paths) do
         if pathEntry and pathEntry.x and pathEntry.y then
-            markCell(pathEntry)
+            interfaces.LivelyMapAreaVisitedTracker.markCell(pathEntry)
             count = count + 1
         end
     end
@@ -255,13 +225,13 @@ local function addEntry(entry)
             id = playerName,
             paths = { entry }
         }
-        markCell(entry)
+        interfaces.LivelyMapAreaVisitedTracker.markCell(entry)
         print("Initialized new local storage with entry: " .. aux_util.deepToString(entry, 3))
         return
     end
     if not allData[playerName].paths or #allData[playerName].paths == 0 then
         allData[playerName].paths = { entry }
-        markCell(entry)
+        interfaces.LivelyMapAreaVisitedTracker.markCell(entry)
         return
     end
     local tail = allData[playerName].paths[#(allData[playerName].paths)]
@@ -274,7 +244,7 @@ local function addEntry(entry)
     end
 
     -- ok, now add to the end of the list.
-    markCell(entry)
+    interfaces.LivelyMapAreaVisitedTracker.markCell(entry)
     table.insert(allData[playerName].paths, entry)
     table.insert(fromSave.paths, entry)
     print("Added new entry: " .. aux_util.deepToString(entry, 3))
@@ -361,7 +331,7 @@ return {
         getExteriorPositionAndFacing = getExteriorPositionAndFacing,
         renewExteriorPositionAndFacing = renewExteriorPositionAndFacing,
         cellVisited = function(x, y)
-            return cellsVisited[x] and cellsVisited[x][y] or 0
+            return interfaces.LivelyMapAreaVisitedTracker.cellVisited(x, y)
         end
     },
     eventHandlers = {
