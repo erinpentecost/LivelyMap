@@ -259,12 +259,6 @@ local psoIncreaseDepthButton = makeMenuButton("psoIncreaseDepthButton", "texture
     end,
     psoButtonColors
 )
-local psoTogglePushdownButton = makeMenuButton("psoTogglePushdownButton", "textures/LivelyMap/pushdown-button.png",
-    function()
-        settings.pso.section:set("psoPushdownOnly", not settings.pso.psoPushdownOnly)
-    end,
-    psoButtonColors
-)
 
 local psoMenuButtons = ui.create {
     name = 'psoMenuButtons',
@@ -276,7 +270,6 @@ local psoMenuButtons = ui.create {
         myui.padWidget(10, 10),
         psoReduceDepthButton,
         psoIncreaseDepthButton,
-        psoTogglePushdownButton,
     }
 }
 
@@ -562,9 +555,8 @@ local function renderIcons()
 
         if iPos then
             local pso = {
-                psoUnlock       = settings.pso.psoUnlock,
-                psoDepth        = settings.pso.psoDepth,
-                psoPushdownOnly = settings.pso.psoPushdownOnly,
+                psoUnlock = settings.pso.psoUnlock,
+                psoDepth  = settings.pso.psoDepth,
             }
 
             local pos = putil.realPosToNormalizedViewportPos(currentMapData, pso, iPos, iFacing)

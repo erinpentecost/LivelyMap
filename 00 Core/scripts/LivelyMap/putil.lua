@@ -208,7 +208,6 @@ end
 
 
 ---@class PsoSettings
----@field psoPushdownOnly boolean
 ---@field psoDepth number
 
 ---@class ViewportData
@@ -242,9 +241,6 @@ local function realPosToNormalizedViewportPos(currentMapData, psoSettings, pos, 
     local maxHeight = heightData:get("MaxHeight")
     local height = util.clamp(cellPos.z * mutil.CELL_SIZE, 0, maxHeight)
     local heightMax = 0.5
-    if psoSettings.psoPushdownOnly then
-        heightMax = 1.0
-    end
     local heightRatio = heightMax - (height / maxHeight)
     local camPos = camera.getPosition()
     local viewDir = (camPos - mapWorldPos):normalize()

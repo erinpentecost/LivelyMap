@@ -71,13 +71,6 @@ local function init()
                     max = 300,
                 }
             },
-            {
-                key = "psoPushdownOnly",
-                name = "psoPushdownOnlyName",
-                description = "psoPushdownOnlyDescription",
-                default = true,
-                renderer = "checkbox",
-            },
         }
     }
 
