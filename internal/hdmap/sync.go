@@ -177,7 +177,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 					[]PostProcessor{
 						&postprocessors.PowerOfTwoProcessor{DownScaleFactor: 1},
 						&postprocessors.MinimumEdgeTransparencyProcessor{
-							Minimum: 255,
+							Minimum: 129,
 						},
 					}),
 				Codec: dds.DXT5,
@@ -195,7 +195,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 							WindowRadiusDenom: 10,
 						},
 						&postprocessors.MinimumEdgeTransparencyProcessor{
-							Minimum: 255,
+							Minimum: 129,
 						},
 					}),
 				Codec: dds.DXT5,
