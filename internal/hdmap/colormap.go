@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"math"
 	"slices"
+	"sync"
 
 	"github.com/erinpentecost/LivelyMap/internal/hdmap/ramp"
 	"github.com/erinpentecost/LivelyMap/internal/hue"
@@ -22,12 +23,17 @@ type VecTexLayerRenderer struct {
 	maxHeight   float32
 	waterHeight float32
 	// ramp is still used for water and as a fallback
-	ramp     *ramp.ColorRamp
-	textures map[uint16]*colorSampler
+	ramp   *ramp.ColorRamp
+	texMux *sync.RWMutex
+	// map of plugin -> ltex index -> sampler
+	textures map[string](map[uint16]*colorSampler)
 }
 
-func NewVecTexLayerRenderer(rampFilePath string, textures map[uint16]image.Image) (*VecTexLayerRenderer, error) {
-	out := &VecTexLayerRenderer{}
+func NewVecTexLayerRenderer(rampFilePath string) (*VecTexLayerRenderer, error) {
+	out := &VecTexLayerRenderer{
+		texMux:   &sync.RWMutex{},
+		textures: map[string]map[uint16]*colorSampler{},
+	}
 
 	// load rampfile
 	rmp, err := ramp.LoadRamp(rampFilePath)
@@ -35,17 +41,6 @@ func NewVecTexLayerRenderer(rampFilePath string, textures map[uint16]image.Image
 		return nil, fmt.Errorf("loading default ramp: %w", err)
 	}
 	out.ramp = rmp
-
-	// textures
-	out.textures = map[uint16]*colorSampler{}
-	for idx, img := range textures {
-		if idx != math.MaxUint16 {
-			sampler := newColorSampler(img)
-			if sampler != nil {
-				out.textures[idx] = sampler
-			}
-		}
-	}
 
 	return out, nil
 }
@@ -76,6 +71,27 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 		A: 0,
 	}
 
+	//var sampler map[uint16]*colorSampler
+
+	d.texMux.RLock()
+	samplerMap := d.textures[p.PluginName]
+	d.texMux.RUnlock()
+	if samplerMap == nil {
+		d.texMux.Lock()
+		// load up textures
+		samplerMap = map[uint16]*colorSampler{}
+		for idx, img := range p.LTEXmap {
+			if idx != math.MaxUint16 {
+				sampler := newColorSampler(img)
+				if sampler != nil {
+					samplerMap[idx] = sampler
+				}
+			}
+		}
+		d.textures[p.PluginName] = samplerMap
+		d.texMux.Unlock()
+	}
+
 	// Throw away the last column and row.
 	// This is how I'm sampling a quad into a single pixel.
 	for y := range gridSize {
@@ -92,7 +108,7 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 
 				if len(p.vtex) == 16 && len(p.vtex[dy]) == 16 {
 					texIndex := p.vtex[dy][dx]
-					tex, ok := d.textures[texIndex]
+					tex, ok := d.textures[p.PluginName][texIndex]
 					if ok {
 						// hue and saturation from texture.
 						baseHSL := hue.RGBToHSL(baseColor)
@@ -122,11 +138,10 @@ type VecDetailLayerRenderer struct {
 	maxHeight   float32
 	waterHeight float32
 	// ramp is still used for water and as a fallback
-	ramp     *ramp.ColorRamp
-	textures map[uint16]*colorSampler
+	ramp *ramp.ColorRamp
 }
 
-func NewVecDetailLayerRenderer(rampFilePath string, textures map[uint16]image.Image) (*VecDetailLayerRenderer, error) {
+func NewVecDetailLayerRenderer(rampFilePath string) (*VecDetailLayerRenderer, error) {
 	out := &VecDetailLayerRenderer{}
 
 	// load rampfile
@@ -135,18 +150,6 @@ func NewVecDetailLayerRenderer(rampFilePath string, textures map[uint16]image.Im
 		return nil, fmt.Errorf("loading default ramp: %w", err)
 	}
 	out.ramp = rmp
-
-	// textures
-	out.textures = map[uint16]*colorSampler{}
-	for idx, img := range textures {
-		if idx != math.MaxUint16 {
-			sampler := newColorSampler(img)
-			if sampler != nil {
-				out.textures[idx] = sampler
-			}
-		}
-	}
-
 	return out, nil
 }
 
@@ -200,7 +203,7 @@ type ColorMapGenerator struct {
 
 func NewColorMapGenerator(ctx context.Context, rampPath string, parsedLands *LandParser) (*ColorMapGenerator, error) {
 	// Build up flat color image
-	colorRenderer, err := NewVecTexLayerRenderer(rampPath, parsedLands.LandTextures)
+	colorRenderer, err := NewVecTexLayerRenderer(rampPath)
 	if err != nil {
 		return nil, fmt.Errorf("new color renderer: %w", err)
 	}
@@ -209,7 +212,7 @@ func NewColorMapGenerator(ctx context.Context, rampPath string, parsedLands *Lan
 		return nil, fmt.Errorf("generate cell maps: %w", err)
 	}
 	// Buld up detail layer
-	detailRenderer, err := NewVecDetailLayerRenderer(rampPath, parsedLands.LandTextures)
+	detailRenderer, err := NewVecDetailLayerRenderer(rampPath)
 	if err != nil {
 		return nil, fmt.Errorf("new color renderer: %w", err)
 	}

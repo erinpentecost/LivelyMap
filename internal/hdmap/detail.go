@@ -49,7 +49,7 @@ type DetailRenderer struct {
 	ramp *ramp.ColorRamp
 }
 
-func NewDetailRenderer(rampFilePath string, textures map[uint16]image.Image) (*DetailRenderer, error) {
+func NewDetailRenderer(rampFilePath string) (*DetailRenderer, error) {
 	out := &DetailRenderer{}
 
 	// load rampfile
