@@ -57,12 +57,12 @@ type Stats interface {
 }
 
 type LandParser struct {
-	Env          *cfg.Environment
-	Heights      *tdigest.TDigest
-	MapExtents   MapCoords
-	Lands        []*ParsedLandRecord
-	LandTextures map[uint16]image.Image
-	MaxHeight    float64
+	Env        *cfg.Environment
+	Heights    *tdigest.TDigest
+	MapExtents MapCoords
+	Lands      []*ParsedLandRecord
+
+	MaxHeight float64
 }
 
 type ParsedLandRecord struct {
@@ -73,6 +73,9 @@ type ParsedLandRecord struct {
 	vtex    [][]uint16
 	colors  [][]land.ColorField
 	faked   bool
+
+	PluginName string
+	LTEXmap    map[uint16]image.Image
 }
 
 func NewFallbackLandRecord() *ParsedLandRecord {
@@ -94,9 +97,8 @@ func NewFallbackLandRecord() *ParsedLandRecord {
 
 func NewLandParser(env *cfg.Environment) *LandParser {
 	return &LandParser{
-		Heights:      tdigest.New(),
-		LandTextures: map[uint16]image.Image{},
-		Env:          env,
+		Heights: tdigest.New(),
+		Env:     env,
 	}
 }
 
@@ -133,42 +135,23 @@ func (l *LandParser) ParsePlugins() error {
 	present := map[uint64]bool{}
 
 	for rec := range l.loadPlugins(ctx) {
-		switch rec.Tag {
-		case ltex.LTEX:
-			// https://github.com/OpenMW/openmw/blob/c06f94fee875ccc67801016b8bcc56936949e7ae/components/esmterrain/storage.cpp#L378
-			idx, path, err := parseLtex(rec)
-			if err != nil {
-				return fmt.Errorf("failed to parse LTEX record")
-			}
-			normalizedPath := strings.ToLower("textures/" + strings.ReplaceAll(path, "\\", "/"))
-			if img, err := l.readTexture(normalizedPath); err != nil {
-				// Lots of textures are missing; don't fail
-				// the whole run because of it.
-				err = fmt.Errorf("failed to load texture %q from disk: %w", normalizedPath, err)
-				fmt.Printf("%v\n", err)
-			} else {
-				// Have to add 1 to these according to components/esmterrain/storage.cpp#L378
-				l.LandTextures[idx+1] = img
-			}
-		case land.LAND:
-			parsed, err := l.parseLandRecord(rec)
-			if err != nil {
-				return fmt.Errorf("parse land record: %w", err)
-			}
-			l.Lands = append(l.Lands, parsed)
-			present[coordKey(parsed.x, parsed.y)] = true
-			// calc XY extents
-			l.MapExtents.Left = min(l.MapExtents.Left, parsed.x)
-			l.MapExtents.Right = max(l.MapExtents.Right, parsed.x)
-			l.MapExtents.Top = max(l.MapExtents.Top, parsed.y)
-			l.MapExtents.Bottom = min(l.MapExtents.Bottom, parsed.y)
-			// calc Z extents
-			for x := range parsed.heights {
-				for y := range parsed.heights[x] {
-					pointHeight := float64(parsed.heights[x][y])
-					l.Heights.Add(pointHeight, 1)
-					l.MaxHeight = max(l.MaxHeight, pointHeight)
-				}
+		parsed, err := l.parseLandRecord(rec)
+		if err != nil {
+			return fmt.Errorf("parse land record: %w", err)
+		}
+		l.Lands = append(l.Lands, parsed)
+		present[coordKey(parsed.x, parsed.y)] = true
+		// calc XY extents
+		l.MapExtents.Left = min(l.MapExtents.Left, parsed.x)
+		l.MapExtents.Right = max(l.MapExtents.Right, parsed.x)
+		l.MapExtents.Top = max(l.MapExtents.Top, parsed.y)
+		l.MapExtents.Bottom = min(l.MapExtents.Bottom, parsed.y)
+		// calc Z extents
+		for x := range parsed.heights {
+			for y := range parsed.heights[x] {
+				pointHeight := float64(parsed.heights[x][y])
+				l.Heights.Add(pointHeight, 1)
+				l.MaxHeight = max(l.MaxHeight, pointHeight)
 			}
 		}
 	}
@@ -263,12 +246,19 @@ func ensureAspectRatio(m MapCoords) MapCoords {
 	return m
 }
 
+type AugmentedLandRecord struct {
+	PluginName string
+	LandRecord *esm.Record
+	LTEXmap    map[uint16]image.Image
+}
+
 // loadPlugins reads in plugins and returns a filtered set of active records.
 // These have been deduped, with overridden records dropped.
-func (l *LandParser) loadPlugins(ctx context.Context) <-chan *esm.Record {
-	LTEXs := make(map[uint16]*esm.Record)
+func (l *LandParser) loadPlugins(ctx context.Context) <-chan *AugmentedLandRecord {
+	// LTEX records are not merged!
 	LANDs := make(map[string]*esm.Record)
 	type pluginsResp struct {
+		name string
 		recs []*esm.Record
 		err  error
 	}
@@ -284,13 +274,14 @@ func (l *LandParser) loadPlugins(ctx context.Context) <-chan *esm.Record {
 			}
 			fmt.Printf("Done parsing %q\n", p)
 			pluginsChan <- &pluginsResp{
+				name: p,
 				recs: records,
 				err:  err,
 			}
 		}
 	}()
 
-	out := make(chan *esm.Record, 10)
+	out := make(chan *AugmentedLandRecord, 10)
 
 	go func() {
 		defer close(out)
@@ -300,22 +291,32 @@ func (l *LandParser) loadPlugins(ctx context.Context) <-chan *esm.Record {
 				fmt.Printf("error parsing plugin: %v", resp.err)
 				continue
 			}
+			// get all LTEX records for the plugin.
+			LTEXs := make(map[uint16]image.Image)
 			for _, rec := range resp.recs {
 				switch rec.Tag {
 				case ltex.LTEX:
-					idx, _, err := parseLtex(rec)
+					// https://github.com/OpenMW/openmw/blob/c06f94fee875ccc67801016b8bcc56936949e7ae/components/esmterrain/storage.cpp#L378
+					idx, path, err := parseLtex(rec)
 					if err != nil {
 						fmt.Printf("failed to parse LTEX record")
 					} else {
-						if _, present := LTEXs[idx]; !present {
-							LTEXs[idx] = rec
-							select {
-							case out <- rec:
-							case <-ctx.Done():
-								return
-							}
+						normalizedPath := strings.ToLower("textures/" + strings.ReplaceAll(path, "\\", "/"))
+						if img, err := l.readTexture(normalizedPath); err != nil {
+							// Lots of textures are missing; don't fail
+							// the whole run because of it.
+							err = fmt.Errorf("failed to load texture %q from disk: %w", normalizedPath, err)
+							fmt.Printf("%v\n", err)
+						} else {
+							// Have to add 1 to these according to components/esmterrain/storage.cpp#L378
+							LTEXs[idx+1] = img
 						}
 					}
+				}
+			}
+
+			for _, rec := range resp.recs {
+				switch rec.Tag {
 				case land.LAND:
 					var intv *esm.Subrecord
 					var vhgt *esm.Subrecord
@@ -348,7 +349,11 @@ func (l *LandParser) loadPlugins(ctx context.Context) <-chan *esm.Record {
 					}
 					LANDs[key] = rec
 					select {
-					case out <- rec:
+					case out <- &AugmentedLandRecord{
+						PluginName: resp.name,
+						LandRecord: rec,
+						LTEXmap:    LTEXs,
+					}:
 					case <-ctx.Done():
 						return
 					}
@@ -365,9 +370,12 @@ func coordKey(x int32, y int32) uint64 {
 	return (uint64(y) << 32) ^ uint64(x)
 }
 
-func (l *LandParser) parseLandRecord(rec *esm.Record) (*ParsedLandRecord, error) {
-	out := &ParsedLandRecord{}
-	for _, subrec := range rec.Subrecords {
+func (l *LandParser) parseLandRecord(rec *AugmentedLandRecord) (*ParsedLandRecord, error) {
+	out := &ParsedLandRecord{
+		PluginName: rec.PluginName,
+		LTEXmap:    rec.LTEXmap,
+	}
+	for _, subrec := range rec.LandRecord.Subrecords {
 		switch subrec.Tag {
 		case land.INTV:
 			parsed := land.INTVField{}

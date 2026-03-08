@@ -79,7 +79,6 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 	if err := parsedLands.ParsePlugins(); err != nil {
 		return fmt.Errorf("parse plugins: %w", err)
 	}
-	fmt.Printf("Found %d land textures.\n", len(parsedLands.LandTextures))
 
 	fmt.Printf("Done parsing %d cells.\n", len(parsedLands.Lands))
 
@@ -121,7 +120,7 @@ func DrawMaps(ctx context.Context, rootPath string, env *cfg.Environment, maxThr
 
 	// Render individual vertex color "detail" cells
 	fmt.Printf("Rendering %d detailed cells...\n", len(parsedLands.Lands))
-	texturedRenderer, err := NewDetailRenderer(rampPath, parsedLands.LandTextures)
+	texturedRenderer, err := NewDetailRenderer(rampPath)
 	if err != nil {
 		return fmt.Errorf("new detailed renderer: %w", err)
 	}
