@@ -23,16 +23,15 @@ type VecTexLayerRenderer struct {
 	maxHeight   float32
 	waterHeight float32
 	// ramp is still used for water and as a fallback
-	ramp   *ramp.ColorRamp
-	texMux *sync.RWMutex
+	ramp *ramp.ColorRamp
 	// map of plugin -> ltex index -> sampler
-	textures map[string](map[uint16]*colorSampler)
+	//textures map[string](map[uint16]*colorSampler)
+	textures sync.Map
 }
 
 func NewVecTexLayerRenderer(rampFilePath string) (*VecTexLayerRenderer, error) {
 	out := &VecTexLayerRenderer{
-		texMux:   &sync.RWMutex{},
-		textures: map[string]map[uint16]*colorSampler{},
+		textures: sync.Map{},
 	}
 
 	// load rampfile
@@ -73,11 +72,10 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 
 	//var sampler map[uint16]*colorSampler
 
-	d.texMux.RLock()
-	samplerMap := d.textures[p.PluginName]
-	d.texMux.RUnlock()
-	if samplerMap == nil {
-		d.texMux.Lock()
+	var samplerMap map[uint16]*colorSampler
+	loadedMap, ok := d.textures.Load(p.PluginName)
+	//samplerMap := d.textures[p.PluginName]
+	if !ok {
 		// load up textures
 		samplerMap = map[uint16]*colorSampler{}
 		for idx, img := range p.LTEXmap {
@@ -88,8 +86,9 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 				}
 			}
 		}
-		d.textures[p.PluginName] = samplerMap
-		d.texMux.Unlock()
+		d.textures.Store(p.PluginName, samplerMap)
+	} else {
+		samplerMap = loadedMap.(map[uint16]*colorSampler)
 	}
 
 	// Throw away the last column and row.
@@ -108,7 +107,7 @@ func (d *VecTexLayerRenderer) Render(p *ParsedLandRecord) *image.RGBA {
 
 				if len(p.vtex) == 16 && len(p.vtex[dy]) == 16 {
 					texIndex := p.vtex[dy][dx]
-					tex, ok := d.textures[p.PluginName][texIndex]
+					tex, ok := samplerMap[texIndex]
 					if ok {
 						// hue and saturation from texture.
 						baseHSL := hue.RGBToHSL(baseColor)
